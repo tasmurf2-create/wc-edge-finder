@@ -27,6 +27,7 @@ _load_env()
 
 import wc_odds
 import prediction_markets as pmkt
+import football_intel as fintel
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -282,6 +283,55 @@ def _build_raw():
     singles.sort(key=lambda s: -s["edge"])
 
     parlays = _build_parlays(singles)
+
+    # ---- Football intelligence (form, injuries, conditions, weather) --------
+    # Build intel requests for all unique matches that have a value single
+    intel_requests = []
+    seen_matches   = set()
+    for s in singles:
+        match_label = s["match"]
+        if match_label in seen_matches:
+            continue
+        seen_matches.add(match_label)
+        parts = match_label.split(" vs ", 1)
+        if len(parts) != 2:
+            continue
+        home_raw, away_raw = parts
+        # Build a plain-English summary of the price signal to give Claude context
+        match_singles = [x for x in singles if x["match"] == match_label]
+        price_notes   = "\n".join(
+            f"- {x['outcome'].upper()}: book fair {x['fair_prob']*100:.1f}% "
+            f"vs best price {x['best_price']} ({x['best_book']}) "
+            f"= +{x['edge']:.1f}% edge"
+            + (f", Kalshi {x['kalshi']}%" if x['kalshi'] else "")
+            + (f", PM gap {x['pm_gap']:+.1f}%" if x['pm_gap'] else "")
+            for x in match_singles
+        )
+        intel_requests.append({
+            "home":        home_raw,
+            "away":        away_raw,
+            "commence":    s["commence"],
+            "price_notes": price_notes,
+        })
+
+    intel_map = {}
+    if intel_requests and os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            raw_map = fintel.get_intel_batch(intel_requests, max_calls=15)
+            # Rekey by match label for easy lookup
+            for req in intel_requests:
+                ck = fintel._cache_key(req["home"], req["away"])
+                if ck in raw_map:
+                    intel_map[req["home"] + " vs " + req["away"]] = raw_map[ck]
+        except Exception as e:
+            print(f"[intel] batch failed: {e}")
+
+    # Attach intel to singles and parlays
+    for s in singles:
+        s["intel"] = intel_map.get(s["match"])
+    for p in parlays:
+        for leg in p["legs"]:
+            leg["intel"] = intel_map.get(leg["match"])
 
     # Sorted bookmaker list for the frontend dropdown
     # Put Paddy Power first if present, then alphabetical

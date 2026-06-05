@@ -642,23 +642,70 @@ function singleHTML(s, book, stake) {
       </div>
     </div>
     <div class="why-box">${buildWhy(s)}</div>
+    ${intelHTML(s.intel)}
   </div>`;
 }
 
 function buildWhy(s) {
   const parts = [];
-  parts.push(`De-vigged bookmaker consensus gives this outcome a fair probability of <strong>${(s.fair_prob*100).toFixed(1)}%</strong>. The best available price implies only <strong>${(1/s.best_price*100).toFixed(1)}%</strong> — a <strong>+${s.edge.toFixed(1)}%</strong> gap in your favour.`);
+  parts.push(`De-vigged consensus fair prob <strong>${(s.fair_prob*100).toFixed(1)}%</strong> vs best price implied <strong>${(1/s.best_price*100).toFixed(1)}%</strong> — <strong>+${s.edge.toFixed(1)}% price edge</strong>.`);
   if (s.pm_gap !== null) {
     if (s.pm_gap < -2)
-      parts.push(`Prediction markets (Kalshi/Polymarket) price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than the books, reinforcing the value signal.`);
+      parts.push(`Kalshi/Polymarket price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than the books — prediction markets confirm the value.`);
     else if (s.pm_gap > 2)
-      parts.push(`⚠ Prediction markets price this side <strong>${s.pm_gap.toFixed(1)}%</strong> <em>lower</em> than the books — treat with extra caution.`);
+      parts.push(`<strong>Warning:</strong> Prediction markets price this side <strong>${s.pm_gap.toFixed(1)}%</strong> <em>lower</em> than the books — the price edge may be misleading.`);
     else
       parts.push(`Prediction markets broadly agree with bookmaker consensus.`);
   } else {
-    parts.push(`No prediction market data yet — value signal is from bookmaker consensus only.`);
+    parts.push(`No prediction market data — price signal from bookmaker consensus only.`);
   }
   return parts.join(' ');
+}
+
+function intelHTML(intel) {
+  if (!intel) return '';
+
+  const rec    = intel.recommendation || {};
+  const cond   = intel.conditions || {};
+  const conf   = intel.intel_confidence || 'low';
+  const confColour = conf === 'high' ? '#3fb950' : conf === 'medium' ? '#d29922' : '#6e7681';
+
+  // Does the analyst recommendation agree with the bet?
+  const recOutcome = rec.outcome || '';
+
+  // Conditions block
+  const altWarn = cond.altitude_m > 800
+    ? `<span style="color:#f85149;font-weight:700"> ALTITUDE ${cond.altitude_m}m</span>` : '';
+  const condLine = cond.city
+    ? `<div style="margin-bottom:6px"><span style="color:#6e7681">Venue:</span> <strong>${cond.city}</strong>${altWarn} &nbsp;·&nbsp; <span style="color:#6e7681">Local KO:</span> <strong>${cond.local_kickoff}</strong> &nbsp;·&nbsp; ${cond.avg_high_c}°C feels ${cond.feels_like_c}°C, ${cond.humidity_pct}% humidity</div>`
+    : '';
+
+  const strengthColour = rec.strength === 'strong' ? '#3fb950' : rec.strength === 'moderate' ? '#d29922' : '#8b949e';
+
+  return `<div style="margin-top:10px;border:1px solid #30363d;border-radius:8px;overflow:hidden">
+    <div style="background:#1c2128;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:0.78rem;font-weight:700;color:#c9d1d9;letter-spacing:0.04em">ANALYST RESEARCH</span>
+      <span style="font-size:0.72rem;color:${confColour}">analyst confidence: ${conf}</span>
+    </div>
+    <div style="padding:12px 14px;font-size:0.82rem;display:flex;flex-direction:column;gap:8px">
+      ${condLine}
+      <div><span style="color:#6e7681">Conditions impact:</span> ${intel.conditions_impact || '—'}</div>
+      <div><span style="color:#6e7681">Home form:</span> ${intel.home_form || '—'}</div>
+      <div><span style="color:#6e7681">Away form:</span> ${intel.away_form || '—'}</div>
+      <div><span style="color:#6e7681">Tactical matchup:</span> ${intel.tactical_matchup || '—'}</div>
+      <div><span style="color:#6e7681">Goals:</span> ${intel.goals_assessment || '—'}</div>
+      <div><span style="color:#6e7681">Market read:</span> ${intel.market_read || '—'}</div>
+      ${intel.key_absences ? `<div><span style="color:#6e7681">Absences:</span> ${intel.key_absences}</div>` : ''}
+      <div style="background:#0d1117;border-radius:6px;padding:10px 12px;margin-top:2px">
+        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:4px">ANALYST RECOMMENDATION</div>
+        <div style="font-weight:700;color:${strengthColour};margin-bottom:4px">${recOutcome.replace(/_/g,' ').toUpperCase()} &nbsp;<span style="font-weight:400;font-size:0.78rem">(${rec.strength || '—'})</span></div>
+        <div style="color:#c9d1d9;line-height:1.5">${rec.reasoning || '—'}</div>
+        ${rec.watch_out ? `<div style="margin-top:6px;color:#d29922;font-size:0.78rem">Watch out: ${rec.watch_out}</div>` : ''}
+      </div>
+      <div style="color:#c9d1d9;line-height:1.6;font-style:italic">${intel.overall_summary || ''}</div>
+      ${intel.knowledge_caveat ? `<div style="font-size:0.73rem;color:#6e7681;border-top:1px solid #21262d;padding-top:6px">Data caveat: ${intel.knowledge_caveat}</div>` : ''}
+    </div>
+  </div>`;
 }
 
 function parlayHTML(p, book, stake) {
