@@ -5,223 +5,262 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WC 2026 Edge Finder</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: #0d1117;
-    color: #e6edf3;
-    min-height: 100vh;
-  }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  min-height: 100vh;
+}
 
-  header {
-    background: #161b22;
-    border-bottom: 1px solid #30363d;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
+/* ---- header ---- */
+header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+header h1 { font-size: 1.15rem; font-weight: 700; color: #f0f6fc; }
+header h1 span { color: #3fb950; }
+#meta { font-size: 0.78rem; color: #8b949e; display: flex; align-items: center; gap: 14px; }
+#refresh-btn {
+  background: #21262d; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 5px 12px; font-size: 0.8rem; cursor: pointer; transition: background 0.15s;
+}
+#refresh-btn:hover { background: #30363d; }
+#refresh-btn:disabled { opacity: 0.5; cursor: default; }
 
-  header h1 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #f0f6fc;
-    letter-spacing: 0.02em;
-  }
+/* ---- tabs ---- */
+.tab-bar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  padding: 0 24px;
+  gap: 4px;
+}
+.tab-btn {
+  background: none; border: none; cursor: pointer;
+  color: #8b949e; font-size: 0.88rem; padding: 10px 18px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn:hover { color: #c9d1d9; }
+.tab-btn.active { color: #f0f6fc; border-bottom-color: #58a6ff; font-weight: 600; }
 
-  header h1 span { color: #3fb950; }
+/* ---- filter bar ---- */
+.filter-bar {
+  padding: 10px 24px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+}
+.filter-bar label { font-size: 0.82rem; color: #8b949e; }
+select, input[type=range] {
+  background: #21262d; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 4px 8px; font-size: 0.82rem;
+}
+#threshold-val { font-size: 0.82rem; color: #58a6ff; min-width: 28px; }
 
-  #meta {
-    font-size: 0.78rem;
-    color: #8b949e;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
+/* ---- legend ---- */
+.legend {
+  padding: 7px 24px;
+  display: flex; gap: 18px; font-size: 0.75rem; color: #8b949e;
+  border-bottom: 1px solid #30363d; flex-wrap: wrap;
+}
+.legend span { display: flex; align-items: center; gap: 5px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot-long { background: #f85149; }
+.dot-short { background: #3fb950; }
 
-  #refresh-btn {
-    background: #21262d;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  #refresh-btn:hover { background: #30363d; }
-  #refresh-btn:disabled { opacity: 0.5; cursor: default; }
+/* ---- tab panels ---- */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
-  #filter-bar {
-    padding: 12px 24px;
-    background: #161b22;
-    border-bottom: 1px solid #30363d;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
+/* ---- divergence grid ---- */
+#matches {
+  padding: 18px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 14px;
+}
 
-  #filter-bar label { font-size: 0.82rem; color: #8b949e; }
+/* ---- bets layout ---- */
+#bets-panel { padding: 18px 24px; display: flex; flex-direction: column; gap: 28px; }
+.bets-section-title {
+  font-size: 1rem; font-weight: 700; color: #f0f6fc;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.bets-section-title small { font-size: 0.75rem; font-weight: 400; color: #8b949e; }
 
-  select, input[type=range] {
-    background: #21262d;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 0.82rem;
-  }
+/* ---- card ---- */
+.card {
+  background: #161b22; border: 1px solid #30363d;
+  border-radius: 10px; overflow: hidden; transition: border-color 0.15s;
+}
+.card:hover { border-color: #58a6ff44; }
+.card.flag-long  { border-left: 3px solid #f85149; }
+.card.flag-short { border-left: 3px solid #3fb950; }
 
-  #threshold-val { font-size: 0.82rem; color: #58a6ff; min-width: 28px; }
+.card-header {
+  padding: 11px 15px;
+  background: #1c2128;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.match-title { font-weight: 600; font-size: 0.93rem; color: #f0f6fc; }
+.match-time  { font-size: 0.73rem; color: #8b949e; margin-top: 3px; }
+.card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 
-  #legend {
-    padding: 8px 24px;
-    display: flex;
-    gap: 20px;
-    font-size: 0.75rem;
-    color: #8b949e;
-    border-bottom: 1px solid #30363d;
-  }
-  #legend span { display: flex; align-items: center; gap: 6px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-  .dot-long  { background: #f85149; }
-  .dot-short { background: #3fb950; }
-  .dot-neutral { background: #484f58; }
+.badge {
+  font-size: 0.7rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 12px; white-space: nowrap;
+}
+.badge-long    { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+.badge-short   { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
+.badge-neutral { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+.badge-margin  { background: #21262d; color: #8b949e; border: 1px solid #30363d; font-weight: 400; }
+.badge-high    { background: #1f6feb33; color: #58a6ff; border: 1px solid #1f6feb66; }
+.badge-medium  { background: #9e6a0322; color: #d29922; border: 1px solid #9e6a0344; }
+.badge-low     { background: #21262d; color: #6e7681; border: 1px solid #30363d; }
 
-  #matches {
-    padding: 20px 24px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
-    gap: 16px;
-  }
+table { width: 100%; border-collapse: collapse; font-size: 0.81rem; }
+th {
+  padding: 5px 11px; text-align: right;
+  color: #6e7681; font-weight: 500; font-size: 0.7rem;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid #21262d;
+}
+th:first-child { text-align: left; }
+td {
+  padding: 7px 11px; text-align: right;
+  border-bottom: 1px solid #21262d; color: #c9d1d9;
+}
+td:first-child { text-align: left; color: #e6edf3; font-weight: 500; }
+tr:last-child td { border-bottom: none; }
 
-  .card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 10px;
-    overflow: hidden;
-    transition: border-color 0.15s;
-  }
-  .card:hover { border-color: #58a6ff44; }
-  .card.flag-long  { border-left: 3px solid #f85149; }
-  .card.flag-short { border-left: 3px solid #3fb950; }
+.diff-cell { font-weight: 700; min-width: 52px; }
+.diff-long  { color: #f85149; }
+.diff-short { color: #3fb950; }
+.diff-neutral { color: #6e7681; }
 
-  .card-header {
-    padding: 12px 16px;
-    background: #1c2128;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
+.edge-pos { color: #3fb950; font-weight: 700; }
+.edge-neg { color: #6e7681; }
+.edge-na  { color: #484f58; }
 
-  .match-title {
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: #f0f6fc;
-  }
+.bar-cell { padding: 7px 11px 7px 0; width: 70px; }
+.bar-wrap  { background: #21262d; border-radius: 4px; height: 5px; overflow: hidden; }
+.bar-fill  { height: 5px; border-radius: 4px; }
+.bar-long    { background: #f85149; }
+.bar-short   { background: #3fb950; }
+.bar-neutral { background: #484f58; }
 
-  .match-time {
-    font-size: 0.75rem;
-    color: #8b949e;
-    margin-top: 3px;
-  }
+.pm-missing { color: #484f58; font-size: 0.74rem; }
+.paddy-price { color: #88c0d0; font-size: 0.78rem; }
 
-  .badge {
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 12px;
-    white-space: nowrap;
-  }
-  .badge-gap-long  { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
-  .badge-gap-short { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
-  .badge-gap-neutral { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
-  .badge-margin { background: #21262d; color: #8b949e; border: 1px solid #30363d; font-weight: 400; }
+/* ---- totals sub-table ---- */
+.totals-toggle {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 15px; background: #1c2128;
+  font-size: 0.75rem; color: #8b949e; cursor: pointer;
+  border-top: 1px solid #21262d; user-select: none;
+}
+.totals-toggle:hover { color: #c9d1d9; }
+.totals-body { display: none; }
+.totals-body.open { display: block; }
 
-  .card-badges {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-  }
+/* ---- singles list ---- */
+.singles-list { display: flex; flex-direction: column; gap: 10px; }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
-  }
+.single-card {
+  background: #161b22; border: 1px solid #30363d;
+  border-radius: 8px; padding: 14px 16px;
+  display: grid; gap: 6px;
+}
+.single-card.conf-high   { border-left: 3px solid #3fb950; }
+.single-card.conf-medium { border-left: 3px solid #d29922; }
+.single-card.conf-low    { border-left: 3px solid #484f58; }
 
-  th {
-    padding: 6px 12px;
-    text-align: right;
-    color: #6e7681;
-    font-weight: 500;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid #21262d;
-  }
-  th:first-child { text-align: left; }
+.single-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.single-title { font-weight: 600; font-size: 0.92rem; color: #f0f6fc; }
+.single-sub   { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
+.single-prices {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: 0.82rem; color: #c9d1d9; margin-top: 4px;
+}
+.single-prices .lbl { color: #6e7681; margin-right: 3px; }
+.single-prices .val { font-weight: 600; }
+.single-prices .val.green { color: #3fb950; }
+.single-prices .val.blue  { color: #58a6ff; }
+.single-prices .val.gold  { color: #d29922; }
+.single-prices .val.pp    { color: #88c0d0; }
 
-  td {
-    padding: 8px 12px;
-    text-align: right;
-    border-bottom: 1px solid #21262d;
-    color: #c9d1d9;
-  }
-  td:first-child { text-align: left; color: #e6edf3; font-weight: 500; }
-  tr:last-child td { border-bottom: none; }
+.why-box {
+  font-size: 0.76rem; color: #8b949e;
+  background: #1c2128; border-radius: 5px;
+  padding: 6px 10px; margin-top: 2px;
+  line-height: 1.5;
+}
 
-  .diff-cell {
-    font-weight: 700;
-    min-width: 58px;
-  }
-  .diff-long  { color: #f85149; }
-  .diff-short { color: #3fb950; }
-  .diff-neutral { color: #6e7681; }
+/* ---- parlays ---- */
+.parlay-list { display: flex; flex-direction: column; gap: 12px; }
 
-  .bar-cell { padding: 8px 12px 8px 0; width: 80px; }
-  .bar-wrap { background: #21262d; border-radius: 4px; height: 6px; overflow: hidden; }
-  .bar-fill { height: 6px; border-radius: 4px; }
-  .bar-long  { background: #f85149; }
-  .bar-short { background: #3fb950; }
-  .bar-neutral { background: #484f58; }
+.parlay-card {
+  background: #161b22; border: 1px solid #30363d;
+  border-radius: 8px; overflow: hidden;
+}
+.parlay-card.conf-high   { border-left: 3px solid #3fb950; }
+.parlay-card.conf-medium { border-left: 3px solid #d29922; }
+.parlay-card.conf-low    { border-left: 3px solid #484f58; }
 
-  .pm-missing { color: #484f58; font-size: 0.75rem; }
+.parlay-header {
+  background: #1c2128; padding: 10px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.parlay-ev { font-weight: 700; font-size: 1rem; }
+.parlay-ev.pos { color: #3fb950; }
+.parlay-meta { font-size: 0.78rem; color: #8b949e; margin-top: 2px; }
 
-  #loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 80px 24px;
-    color: #8b949e;
-    gap: 16px;
-    grid-column: 1/-1;
-  }
+.parlay-legs { padding: 0; }
+.parlay-leg {
+  padding: 8px 16px;
+  border-top: 1px solid #21262d;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.82rem;
+}
+.parlay-leg-left  { color: #c9d1d9; }
+.parlay-leg-match { font-size: 0.73rem; color: #8b949e; }
+.parlay-leg-right { display: flex; align-items: center; gap: 10px; }
+.parlay-leg-price {
+  font-weight: 700; color: #f0f6fc;
+  background: #21262d; padding: 2px 8px; border-radius: 5px;
+}
+.parlay-leg-book { font-size: 0.73rem; color: #8b949e; }
+.parlay-leg-pp   { font-size: 0.73rem; color: #88c0d0; }
 
-  .spinner {
-    width: 36px; height: 36px;
-    border: 3px solid #30363d;
-    border-top-color: #58a6ff;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ---- loading / empty ---- */
+#loading, .loading-inner {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px 24px; color: #8b949e; gap: 14px;
+  grid-column: 1/-1;
+}
+.spinner {
+  width: 34px; height: 34px;
+  border: 3px solid #30363d; border-top-color: #58a6ff;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-  #error-msg {
-    display: none;
-    padding: 20px 24px;
-    color: #f85149;
-    font-size: 0.9rem;
-  }
-
-  .no-data { color: #484f58; font-size: 0.82rem; }
+.empty { color: #484f58; font-size: 0.88rem; padding: 30px 0; text-align: center; }
 </style>
 </head>
 <body>
@@ -234,166 +273,391 @@
   </div>
 </header>
 
-<div id="filter-bar">
-  <label>Sort by:</label>
-  <select id="sort-select" onchange="render()">
-    <option value="gap">Largest gap</option>
-    <option value="time">Kick-off time</option>
-  </select>
-  <label>Min gap:</label>
-  <input type="range" id="threshold" min="0" max="10" step="0.5" value="0" oninput="onThreshold()">
-  <span id="threshold-val">0%</span>
-  <label>Show:</label>
-  <select id="pm-filter" onchange="render()">
-    <option value="all">All matches</option>
-    <option value="pm">Prediction market data only</option>
-  </select>
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('divergence')">Market Divergence</button>
+  <button class="tab-btn" onclick="switchTab('bets')">Recommended Bets</button>
 </div>
 
-<div id="legend">
-  <span><span class="dot dot-long"></span> Books LONG (this side overpriced — other outcomes offer value)</span>
-  <span><span class="dot dot-short"></span> Books SHORT (possible value here)</span>
+<!-- ===================== DIVERGENCE TAB ===================== -->
+<div id="tab-divergence" class="tab-panel active">
+  <div class="filter-bar">
+    <label>Sort:</label>
+    <select id="sort-select" onchange="renderDivergence()">
+      <option value="gap">Largest gap</option>
+      <option value="time">Kick-off time</option>
+    </select>
+    <label>Min gap:</label>
+    <input type="range" id="threshold" min="0" max="10" step="0.5" value="0" oninput="onThreshold()">
+    <span id="threshold-val">0%</span>
+    <label>Show:</label>
+    <select id="pm-filter" onchange="renderDivergence()">
+      <option value="all">All matches</option>
+      <option value="pm">PM data only</option>
+    </select>
+  </div>
+  <div class="legend">
+    <span><span class="dot dot-long"></span> Books LONG — this side overpriced</span>
+    <span><span class="dot dot-short"></span> Books SHORT — possible value here</span>
+    <span style="color:#88c0d0">PP = Paddy Power price</span>
+  </div>
+  <div id="matches"><div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div></div>
 </div>
 
-<div id="matches"><div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div></div>
-<div id="error-msg"></div>
+<!-- ===================== BETS TAB ===================== -->
+<div id="tab-bets" class="tab-panel">
+  <div class="filter-bar">
+    <label>Confidence:</label>
+    <select id="conf-filter" onchange="renderBets()">
+      <option value="all">All</option>
+      <option value="high">High only</option>
+      <option value="high,medium">High + Medium</option>
+    </select>
+    <label>Market:</label>
+    <select id="market-filter" onchange="renderBets()">
+      <option value="all">All markets</option>
+      <option value="h2h">Match result (1X2)</option>
+      <option value="totals">Over / Under</option>
+    </select>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:#3fb950"></span> High confidence — book edge + PM confirms</span>
+    <span><span class="dot" style="background:#d29922"></span> Medium — book edge or strong PM signal</span>
+    <span><span class="dot" style="background:#484f58"></span> Low — small edge, no confirmation</span>
+    <span style="color:#88c0d0">PP = Paddy Power price</span>
+  </div>
+  <div id="bets-panel">
+    <div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>
+  </div>
+</div>
 
 <script>
+// ---- state ----
 let allMatches = [];
-let threshold = 0;
+let allSingles = [];
+let allParlays = [];
+let threshold  = 0;
+let activeTab  = 'divergence';
+
+// ---- tab switching ----
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['divergence','bets'][i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ---- data loading ----
+async function loadData(force = false) {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.textContent = 'Refreshing...';
+  document.getElementById('matches').innerHTML = '<div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div>';
+  document.getElementById('bets-panel').innerHTML = '<div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>';
+
+  try {
+    const url = force ? '/api/refresh' : '/api/divergence';
+    const [divRes, betsRes] = await Promise.all([
+      fetch(force ? '/api/refresh' : '/api/divergence'),
+      fetch('/api/bets')
+    ]);
+    const divData  = await divRes.json();
+    const betsData = await betsRes.json();
+
+    if (divData.error) throw new Error(divData.error);
+
+    allMatches = divData.matches || [];
+    allSingles = betsData.bets?.singles || [];
+    allParlays = betsData.bets?.parlays || [];
+
+    const d = new Date((divData.fetched_at || betsData.fetched_at) * 1000);
+    document.getElementById('fetch-time').textContent = 'Updated ' + d.toLocaleTimeString();
+
+    renderDivergence();
+    renderBets();
+  } catch (e) {
+    document.getElementById('matches').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+    document.getElementById('bets-panel').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Refresh';
+  }
+}
+
+// ---- utils ----
+function fmt(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', {weekday:'short',day:'numeric',month:'short'})
+      + ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  } catch { return iso; }
+}
 
 function onThreshold() {
   threshold = parseFloat(document.getElementById('threshold').value);
   document.getElementById('threshold-val').textContent = threshold + '%';
-  render();
+  renderDivergence();
 }
 
-async function loadData(force = false) {
-  const btn = document.getElementById('refresh-btn');
-  btn.disabled = true;
-  btn.textContent = 'Refreshing...';
-  document.getElementById('matches').innerHTML = '<div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div>';
-
-  try {
-    const url = force ? '/api/refresh' : '/api/divergence';
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.error) throw new Error(data.error);
-
-    allMatches = data.matches || [];
-
-    const d = new Date(data.fetched_at * 1000);
-    document.getElementById('fetch-time').textContent =
-      'Updated ' + d.toLocaleTimeString();
-
-    render();
-  } catch (e) {
-    document.getElementById('matches').innerHTML = '';
-    const err = document.getElementById('error-msg');
-    err.style.display = 'block';
-    err.textContent = 'Error: ' + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Refresh';
-  }
-}
-
-function render() {
+// ====================================================================
+// DIVERGENCE RENDER
+// ====================================================================
+function renderDivergence() {
   const sortBy = document.getElementById('sort-select').value;
   const pmOnly = document.getElementById('pm-filter').value === 'pm';
 
-  let matches = allMatches.filter(m => {
+  let list = allMatches.filter(m => {
     if (pmOnly && !m.has_pm_data) return false;
     if (Math.abs(m.max_gap) < threshold) return false;
     return true;
   });
 
-  if (sortBy === 'gap') {
-    matches.sort((a, b) => Math.abs(b.max_gap) - Math.abs(a.max_gap));
-  } else {
-    matches.sort((a, b) => a.commence.localeCompare(b.commence));
-  }
+  if (sortBy === 'time') list.sort((a,b) => a.commence.localeCompare(b.commence));
+  else list.sort((a,b) => Math.abs(b.max_gap) - Math.abs(a.max_gap));
 
   const container = document.getElementById('matches');
-  if (matches.length === 0) {
-    container.innerHTML = '<div id="loading"><span>No matches meet the current filters.</span></div>';
+  if (!list.length) {
+    container.innerHTML = '<div class="empty">No matches meet current filters.</div>';
     return;
   }
-
-  container.innerHTML = matches.map(m => cardHTML(m)).join('');
+  container.innerHTML = list.map(m => matchCardHTML(m)).join('');
 }
 
-function formatTime(iso) {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })
-      + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-  } catch { return iso; }
-}
-
-function cardHTML(m) {
-  const gap = m.max_gap;
-  const absGap = Math.abs(gap);
+function matchCardHTML(m) {
+  const gap     = m.max_gap;
   const isLong  = gap >  2;
   const isShort = gap < -2;
 
-  let cardClass = 'card';
-  if (isLong)  cardClass += ' flag-long';
-  if (isShort) cardClass += ' flag-short';
-
-  let badgeClass = 'badge badge-gap-neutral';
-  let badgeText  = absGap > 0 ? (gap > 0 ? '+' : '') + gap.toFixed(1) + '% gap' : 'no PM data';
-  if (isLong)  { badgeClass = 'badge badge-gap-long';  badgeText = '+' + gap.toFixed(1) + '% gap'; }
-  if (isShort) { badgeClass = 'badge badge-gap-short'; badgeText = gap.toFixed(1) + '% gap'; }
+  let cardCls  = 'card' + (isLong ? ' flag-long' : isShort ? ' flag-short' : '');
+  let badgeCls = isLong  ? 'badge badge-long'
+               : isShort ? 'badge badge-short'
+               :            'badge badge-neutral';
+  let badgeTxt = Math.abs(gap) > 0
+    ? (gap > 0 ? '+' : '') + gap.toFixed(1) + '% gap'
+    : 'no PM data';
 
   const rows = m.outcomes.map(o => {
-    const diff = o.diff;
-    const hasDiff = diff !== null;
-    const diffClass = !hasDiff ? 'diff-neutral' : diff > 2 ? 'diff-long' : diff < -2 ? 'diff-short' : 'diff-neutral';
-    const barClass  = !hasDiff ? 'bar-neutral'  : diff > 2 ? 'bar-long'  : diff < -2 ? 'bar-short'  : 'bar-neutral';
-    const barWidth  = hasDiff ? Math.min(Math.abs(diff) / 10 * 100, 100) : 0;
-
-    const diffText = hasDiff ? (diff > 0 ? '+' : '') + diff.toFixed(1) + '%' : '—';
-    const polyText   = o.poly   !== null ? o.poly.toFixed(1)   + '%' : '<span class="pm-missing">—</span>';
-    const kalshiText = o.kalshi !== null ? o.kalshi.toFixed(1) + '%' : '<span class="pm-missing">—</span>';
-
-    const bestText = o.best_price
-      ? o.best_price.toFixed(2) + ' <span style="color:#6e7681;font-size:0.72rem">(' + (o.best_book || '') + ')</span>'
-      : '—';
+    const diff     = o.diff;
+    const hasDiff  = diff !== null;
+    const diffCls  = !hasDiff ? 'diff-neutral' : diff > 2 ? 'diff-long' : diff < -2 ? 'diff-short' : 'diff-neutral';
+    const barCls   = !hasDiff ? 'bar-neutral'  : diff > 2 ? 'bar-long'  : diff < -2 ? 'bar-short'  : 'bar-neutral';
+    const barW     = hasDiff ? Math.min(Math.abs(diff)/10*100,100) : 0;
+    const diffTxt  = hasDiff ? (diff>0?'+':'') + diff.toFixed(1)+'%' : '—';
+    const polyTxt  = o.poly   != null ? o.poly.toFixed(1)+'%'   : '<span class="pm-missing">—</span>';
+    const kalTxt   = o.kalshi != null ? o.kalshi.toFixed(1)+'%' : '<span class="pm-missing">—</span>';
+    const bestTxt  = o.best_price ? o.best_price.toFixed(2)+' <span style="color:#6e7681;font-size:0.7rem">('+o.best_book+')</span>' : '—';
+    const paddyTxt = o.paddy  != null ? '<span class="paddy-price">PP '+o.paddy.toFixed(2)+'</span>' : '';
+    const edgeTxt  = o.edge   != null ? `<span class="${o.edge>0?'edge-pos':'edge-neg'}">${o.edge>0?'+':''}${o.edge.toFixed(1)}%</span>` : '<span class="edge-na">—</span>';
 
     return `<tr>
       <td>${o.outcome}</td>
       <td>${o.book_fair.toFixed(1)}%</td>
-      <td>${polyText}</td>
-      <td>${kalshiText}</td>
-      <td class="diff-cell ${diffClass}">${diffText}</td>
-      <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill ${barClass}" style="width:${barWidth}%"></div></div></td>
-      <td>${bestText}</td>
+      <td>${polyTxt}</td>
+      <td>${kalTxt}</td>
+      <td class="diff-cell ${diffCls}">${diffTxt}</td>
+      <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill ${barCls}" style="width:${barW}%"></div></div></td>
+      <td>${bestTxt} ${paddyTxt}</td>
+      <td>${edgeTxt}</td>
     </tr>`;
   }).join('');
 
-  return `<div class="${cardClass}">
+  // Totals sub-section
+  let totalsHTML = '';
+  if (m.totals && m.totals.length) {
+    const id = 'tot-' + m.label.replace(/\s/g,'');
+    const totRows = m.totals.map(t => {
+      return Object.entries(t.outcomes).map(([name, od]) => {
+        const eCls = od.edge > 1.5 ? 'edge-pos' : od.edge > 0 ? 'edge-pos' : 'edge-neg';
+        return `<tr>
+          <td>${name} ${t.line}</td>
+          <td>${od.fair}%</td>
+          <td colspan="3" style="color:#6e7681">over/under — no PM data</td>
+          <td class="bar-cell"></td>
+          <td>${od.best_price ? od.best_price.toFixed(2)+' <span style="color:#6e7681;font-size:0.7rem">('+od.best_book+')</span>' : '—'}</td>
+          <td><span class="${eCls}">${od.edge != null ? (od.edge>0?'+':'')+od.edge.toFixed(1)+'%' : '—'}</span></td>
+        </tr>`;
+      }).join('');
+    }).join('');
+    totalsHTML = `
+      <div class="totals-toggle" onclick="toggleTotals('${id}')">
+        ▶ Over / Under  <span style="color:#484f58">(click to expand)</span>
+      </div>
+      <div class="totals-body" id="${id}">
+        <table><thead><tr>
+          <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th><th>Edge</th>
+        </tr></thead><tbody>${totRows}</tbody></table>
+      </div>`;
+  }
+
+  return `<div class="${cardCls}">
     <div class="card-header">
       <div>
         <div class="match-title">${m.label}</div>
-        <div class="match-time">${formatTime(m.commence)}</div>
+        <div class="match-time">${fmt(m.commence)}</div>
       </div>
       <div class="card-badges">
-        <span class="${badgeClass}">${badgeText}</span>
-        <span class="badge badge-margin">book margin ${m.margin}%</span>
+        <span class="${badgeCls}">${badgeTxt}</span>
+        <span class="badge badge-margin">margin ${m.margin}%</span>
       </div>
     </div>
     <table>
       <thead><tr>
-        <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th>
+        <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th><th>Edge</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    ${totalsHTML}
   </div>`;
 }
 
+function toggleTotals(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  const toggle = el.previousElementSibling;
+  toggle.textContent = el.classList.contains('open')
+    ? '▼ Over / Under'
+    : '▶ Over / Under  (click to expand)';
+}
+
+// ====================================================================
+// BETS RENDER
+// ====================================================================
+function renderBets() {
+  const confFilter   = document.getElementById('conf-filter').value;
+  const marketFilter = document.getElementById('market-filter').value;
+  const allowedConf  = confFilter === 'all' ? ['high','medium','low']
+                     : confFilter.split(',');
+
+  let singles = allSingles.filter(s =>
+    allowedConf.includes(s.confidence) &&
+    (marketFilter === 'all' || s.market === marketFilter)
+  );
+
+  let parlays = allParlays.filter(p => allowedConf.includes(p.confidence));
+
+  const panel = document.getElementById('bets-panel');
+  if (!singles.length && !parlays.length) {
+    panel.innerHTML = '<div class="empty">No value bets found under current filters.</div>';
+    return;
+  }
+
+  panel.innerHTML = `
+    <div>
+      <div class="bets-section-title">
+        Singles
+        <small>${singles.length} value bet${singles.length !== 1 ? 's' : ''} found</small>
+      </div>
+      <div class="singles-list">
+        ${singles.length ? singles.map(singleHTML).join('') : '<div class="empty">None at this confidence level.</div>'}
+      </div>
+    </div>
+    <div>
+      <div class="bets-section-title">
+        Parlays &amp; Multi-Bets
+        <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} with positive EV</small>
+      </div>
+      <div class="parlay-list">
+        ${parlays.length ? parlays.map(parlayHTML).join('') : '<div class="empty">No positive-EV parlays at this confidence level.</div>'}
+      </div>
+    </div>`;
+}
+
+function singleHTML(s) {
+  const mktLabel = s.market === 'totals' ? 'Over/Under' : '1X2';
+  const confBadge = `<span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>`;
+
+  const why = buildWhy(s);
+
+  const paddyLine = s.paddy
+    ? `<span><span class="lbl">Paddy Power:</span><span class="val pp">${s.paddy.toFixed(2)}</span></span>`
+    : '';
+  const kalLine = s.kalshi != null
+    ? `<span><span class="lbl">Kalshi:</span><span class="val blue">${s.kalshi}%</span></span>`
+    : '';
+  const polyLine = s.poly != null
+    ? `<span><span class="lbl">Poly:</span><span class="val blue">${s.poly}%</span></span>`
+    : '';
+
+  return `<div class="single-card conf-${s.confidence}">
+    <div class="single-top">
+      <div>
+        <div class="single-title">${s.outcome.toUpperCase()} — ${s.match}</div>
+        <div class="single-sub">${fmt(s.commence)} &nbsp;·&nbsp; ${mktLabel}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        ${confBadge}
+        <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${s.edge.toFixed(1)}%</span>
+      </div>
+    </div>
+    <div class="single-prices">
+      <span><span class="lbl">Best price:</span><span class="val green">${s.best_price.toFixed(2)}</span> <span style="color:#6e7681;font-size:0.75rem">(${s.best_book})</span></span>
+      ${paddyLine}
+      <span><span class="lbl">Book fair:</span><span class="val">${(s.fair_prob*100).toFixed(1)}%</span></span>
+      ${kalLine}${polyLine}
+    </div>
+    <div class="why-box">${why}</div>
+  </div>`;
+}
+
+function buildWhy(s) {
+  const parts = [];
+  const impliedBest = (1/s.best_price*100).toFixed(1);
+  parts.push(`Book consensus fair prob <strong>${(s.fair_prob*100).toFixed(1)}%</strong> vs best available price implied <strong>${impliedBest}%</strong> → <strong>+${s.edge.toFixed(1)}% edge</strong>.`);
+
+  if (s.pm_gap !== null) {
+    if (s.pm_gap < -2) {
+      parts.push(`Prediction markets price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than bookmakers — books are short, reinforcing value.`);
+    } else if (s.pm_gap > 2) {
+      parts.push(`⚠ Prediction markets are <strong>${s.pm_gap.toFixed(1)}%</strong> lower than books on this side — price edge may be overstated.`);
+    } else {
+      parts.push(`Prediction markets broadly agree with bookmaker consensus.`);
+    }
+  } else {
+    parts.push(`No prediction market data yet for this match — value is based on bookmaker consensus only.`);
+  }
+
+  if (s.market === 'totals') {
+    parts.push(`Over/under edge comes from de-vigging across ${s.best_book} and other books — no PM cross-check available.`);
+  }
+
+  return parts.join(' ');
+}
+
+function parlayHTML(p) {
+  const legs = p.legs.map(l => {
+    const pp = l.paddy ? `<span class="parlay-leg-pp">PP ${l.paddy.toFixed(2)}</span>` : '';
+    return `<div class="parlay-leg">
+      <div class="parlay-leg-left">
+        <div><strong>${l.outcome.toUpperCase()}</strong></div>
+        <div class="parlay-leg-match">${l.match} · ${fmt(l.commence)}</div>
+      </div>
+      <div class="parlay-leg-right">
+        ${pp}
+        <span class="parlay-leg-book">${l.best_book}</span>
+        <span class="parlay-leg-price">${l.best_price.toFixed(2)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="parlay-card conf-${p.confidence}">
+    <div class="parlay-header">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="parlay-ev pos">+${p.ev_pct}% EV</span>
+          <span class="badge badge-${p.confidence}">${p.confidence.charAt(0).toUpperCase()+p.confidence.slice(1)}</span>
+          <span class="badge badge-neutral">${p.legs.length}-leg parlay</span>
+        </div>
+        <div class="parlay-meta">
+          Combined price: <strong>${p.combined_price.toFixed(2)}</strong>
+          &nbsp;·&nbsp; Combined fair probability: <strong>${p.combined_fair}%</strong>
+        </div>
+      </div>
+    </div>
+    <div class="parlay-legs">${legs}</div>
+  </div>`;
+}
+
+// ---- boot ----
 loadData();
 </script>
 </body>
