@@ -586,7 +586,7 @@ function renderBets() {
     <div>
       <div class="bets-section-title">
         Parlays &amp; Multi-Bets
-        <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} · ${book === 'best' ? 'best available price' : book}</small>
+        <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} where the combined price beats fair odds · ${book === 'best' ? 'best available price' : book}</small>
       </div>
       <div class="parlay-list">
         ${parlays.length
@@ -673,8 +673,12 @@ function parlayHTML(p, book, stake) {
     return { ...l, usedPrice: price, usedBook: bookLabel, fallback };
   });
 
-  const grossReturn = stake * combinedPrice;
-  const profit      = grossReturn - stake;
+  const grossReturn   = stake * combinedPrice;
+  const profit        = grossReturn - stake;
+  // Edge: fair combined prob vs what the combined price implies
+  const fairProb      = p.combined_fair / 100;
+  const impliedProb   = 1 / combinedPrice;
+  const combinedEdge  = ((fairProb - impliedProb) * 100).toFixed(1);
 
   const legs = legData.map(l => {
     const fallNote = l.fallback
@@ -703,7 +707,12 @@ function parlayHTML(p, book, stake) {
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="badge badge-${p.confidence}">${p.confidence.charAt(0).toUpperCase()+p.confidence.slice(1)}</span>
           <span class="badge badge-neutral">${p.legs.length}-leg parlay</span>
-          <span style="font-size:0.75rem;color:#8b949e">Combined fair prob: ${p.combined_fair}%</span>
+          <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${combinedEdge}%</span>
+        </div>
+        <div style="font-size:0.75rem;color:#8b949e;margin-top:5px">
+          Fair chance all legs win: <strong style="color:#c9d1d9">${p.combined_fair}%</strong>
+          &nbsp;&middot;&nbsp; Price implies: <strong style="color:#c9d1d9">${(impliedProb*100).toFixed(1)}%</strong>
+          &nbsp;&middot;&nbsp; You're getting overpaid by <strong style="color:#3fb950">+${combinedEdge}%</strong>
         </div>
         <div style="display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap">
           <div>
@@ -720,7 +729,7 @@ function parlayHTML(p, book, stake) {
             <div style="font-weight:700;color:#f0f6fc">${eur(grossReturn)}</div>
           </div>
           <div>
-            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Profit</div>
+            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Profit if wins</div>
             <div style="font-weight:700;color:#3fb950">+${eur(profit)}</div>
           </div>
         </div>
