@@ -484,13 +484,28 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
         intel["conditions"] = cond
         intel["cached_at"]  = int(time.time())
 
-        cache[ck] = {"intel": intel, "cached_at": int(time.time())}
+        cache[ck] = {"intel": intel, "cached_at": int(time.time()),
+                      "label": f"{home} vs {away}"}
         _save_cache(cache)
         return intel
 
     except Exception as e:
         print(f"[intel] {home} vs {away} failed: {e}")
         return None
+
+
+def load_intel_from_disk():
+    """
+    Return {match_label: intel_dict} from disk cache — call at server startup
+    to pre-populate in-memory cache without re-running any API calls.
+    """
+    result = {}
+    cache  = _load_cache()
+    now    = time.time()
+    for ck, entry in cache.items():
+        if (now - entry.get("cached_at", 0)) < CACHE_TTL and "label" in entry:
+            result[entry["label"]] = entry["intel"]
+    return result
 
 
 def get_intel_batch(match_list, max_calls=15):

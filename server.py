@@ -59,6 +59,12 @@ _intel_lock  = threading.Lock()
 _intel_busy  = False       # True while background fetch is running
 _teams_busy  = False       # True while team snapshot fetches are running
 
+# Pre-load cached intel from disk so restarts don't lose analysis
+_disk_intel = fintel.load_intel_from_disk()
+if _disk_intel:
+    _intel_cache.update(_disk_intel)
+    print(f"[startup] loaded {len(_disk_intel)} intel entries from disk")
+
 
 # ---------------------------------------------------------------------------
 # Bookmaker data helpers
