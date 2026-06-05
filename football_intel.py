@@ -20,9 +20,10 @@ from pathlib import Path
 import anthropic
 
 CACHE_FILE      = Path("intel_cache.json")
-TEAM_DATA_FILE  = Path("team_data.json")
-CACHE_TTL       = 43200   # 12 hours — match analysis
-TEAM_DATA_TTL   = 86400   # 24 hours — team form/injury snapshot
+PROFILES_FILE   = Path("team_profiles.json")   # squad announcements — never expires
+INJURIES_FILE   = Path("team_injuries.json")   # injuries/suspensions — refreshed daily
+CACHE_TTL       = 43200    # 12 hours — match analysis
+INJURIES_TTL    = 43200    # 12 hours — injury data
 MODEL           = "claude-sonnet-4-6"
 
 _client = None
@@ -248,100 +249,134 @@ def _cache_key(home, away):
 
 
 # ---------------------------------------------------------------------------
-# Team data cache — web search once per team per day, store to disk
+# Team data — two-tier cache
+#   Profiles  : WC 2026 squad announcement — fetched once, never expires
+#   Injuries  : Current injuries/suspensions — refreshed daily
 # ---------------------------------------------------------------------------
 
-def _load_team_data():
-    if TEAM_DATA_FILE.exists():
+def _load_json(path):
+    if Path(path).exists():
         try:
-            return json.loads(TEAM_DATA_FILE.read_text())
+            return json.loads(Path(path).read_text(encoding="utf-8"))
         except Exception:
             pass
     return {}
 
 
-def _save_team_data(data):
-    TEAM_DATA_FILE.write_text(json.dumps(data, indent=2))
+def _save_json(path, data):
+    Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _team_key(team):
     return team.lower().strip()
 
 
-def fetch_team_snapshot(team, force=False):
+def _web_search_text(prompt, max_uses=2, max_tokens=500):
+    """Run a single Claude web-search call and return the concatenated text."""
+    client = _get_client()
+    resp = client.messages.create(
+        model      = MODEL,
+        max_tokens = max_tokens,
+        tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
+        messages   = [{"role": "user", "content": prompt}],
+    )
+    return "".join(
+        b.text for b in resp.content if getattr(b, "type", None) == "text"
+    ).strip()
+
+
+# --- Profiles (squad announcements, one-time) ---
+
+def fetch_team_profile(team, force=False):
     """
-    Fetch a team's current form, injuries and squad news via web search.
-    Cached for 24h. Returns a plain-text summary string.
+    Fetch the confirmed WC 2026 squad for a team. Cached permanently.
+    Returns a plain-text summary.
     """
     key   = _team_key(team)
-    store = _load_team_data()
-    entry = store.get(key)
-
-    if not force and entry and (time.time() - entry.get("fetched_at", 0)) < TEAM_DATA_TTL:
-        return entry["snapshot"]
+    store = _load_json(PROFILES_FILE)
+    if not force and key in store:
+        return store[key]["profile"]
 
     try:
-        client = _get_client()
-        resp = client.messages.create(
-            model      = MODEL,
-            max_tokens = 400,
-            tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}],
-            messages   = [{
-                "role": "user",
-                "content": (
-                    f"Search for the latest news on the {team} national football team "
-                    f"for the 2026 FIFA World Cup. In 4-6 bullet points cover: "
-                    f"(1) manager and current squad form/results in 2026, "
-                    f"(2) key players to watch, "
-                    f"(3) any confirmed injuries or suspensions, "
-                    f"(4) tactical setup/style. "
-                    f"Be factual and concise. No waffle."
-                )
-            }],
+        text = _web_search_text(
+            f"What is the confirmed {team} squad for the 2026 FIFA World Cup? "
+            f"Include: manager name, key players by position (GK, DEF, MID, FWD), "
+            f"formation/style, and any notable players who missed selection. "
+            f"Be specific and factual. 6-8 bullet points.",
+            max_uses=1, max_tokens=400,
         )
-        # Extract text from mixed content blocks
-        snapshot = ""
-        for block in resp.content:
-            if getattr(block, "type", None) == "text":
-                snapshot = block.text.strip()
-                break
-
-        if snapshot:
-            store[key] = {"snapshot": snapshot, "fetched_at": int(time.time()), "team": team}
-            _save_team_data(store)
-            print(f"[team] fetched snapshot for {team} ({len(snapshot)} chars)")
-            return snapshot
+        if text:
+            store[key] = {"profile": text, "fetched_at": int(time.time()), "team": team}
+            _save_json(PROFILES_FILE, store)
+            print(f"[profile] {team} ({len(text)} chars)")
+            return text
     except Exception as e:
-        print(f"[team] web search failed for {team}: {e}")
+        print(f"[profile] failed for {team}: {e}")
 
-    # Fallback: return cached even if stale
-    return entry["snapshot"] if entry else ""
-
-
-def get_team_snapshots(home, away, force=False):
-    """Return (home_snapshot, away_snapshot) strings, fetching if needed."""
-    h = fetch_team_snapshot(home, force=force)
-    a = fetch_team_snapshot(away, force=force)
-    return h, a
+    return store.get(key, {}).get("profile", "")
 
 
-def get_team_snapshots_cached_only(home, away):
-    """Return snapshots from cache only — never triggers a web search."""
-    store = _load_team_data()
-    h = store.get(_team_key(home), {}).get("snapshot", "")
-    a = store.get(_team_key(away), {}).get("snapshot", "")
-    return h, a
+# --- Injuries (daily refresh) ---
+
+def fetch_team_injuries(team, force=False):
+    """
+    Fetch current injury/suspension news for a team. Cached 12h.
+    Returns a plain-text summary.
+    """
+    key   = _team_key(team)
+    store = _load_json(INJURIES_FILE)
+    entry = store.get(key, {})
+
+    if not force and entry and (time.time() - entry.get("fetched_at", 0)) < INJURIES_TTL:
+        return entry["injuries"]
+
+    try:
+        text = _web_search_text(
+            f"What are the latest injury and suspension news for {team} "
+            f"at the 2026 FIFA World Cup? List confirmed absences, doubtful players, "
+            f"and any fitness concerns. Be specific — player names and injury type. "
+            f"If none reported, say 'No significant injuries reported'.",
+            max_uses=1, max_tokens=250,
+        )
+        if text:
+            store[key] = {"injuries": text, "fetched_at": int(time.time()), "team": team}
+            _save_json(INJURIES_FILE, store)
+            print(f"[injuries] {team} ({len(text)} chars)")
+            return text
+    except Exception as e:
+        print(f"[injuries] failed for {team}: {e}")
+
+    return entry.get("injuries", "No injury data available.")
 
 
-def refresh_teams_for_matches(match_list, force=False):
-    """Pre-fetch team snapshots for all teams in match_list. Call once per day."""
-    teams = set()
-    for m in match_list:
-        teams.add(m["home"])
-        teams.add(m["away"])
-    for team in sorted(teams):
-        fetch_team_snapshot(team, force=force)
-    print(f"[team] snapshots ready for {len(teams)} teams")
+def get_team_context(home, away):
+    """Return (home_profile, away_profile, home_injuries, away_injuries) from cache only."""
+    profiles  = _load_json(PROFILES_FILE)
+    injuries  = _load_json(INJURIES_FILE)
+    hp = profiles.get(_team_key(home), {}).get("profile", "")
+    ap = profiles.get(_team_key(away), {}).get("profile", "")
+    hi = injuries.get(_team_key(home), {}).get("injuries", "")
+    ai = injuries.get(_team_key(away), {}).get("injuries", "")
+    return hp, ap, hi, ai
+
+
+def prefetch_team_data(home, away):
+    """
+    Ensure profile + injuries are cached for both teams before analysis.
+    Profiles fetched once ever. Injuries fetched if stale (>12h).
+    """
+    for team in (home, away):
+        fetch_team_profile(team)
+        fetch_team_injuries(team)
+
+
+def refresh_injuries_for_teams(teams, force=True):
+    """Force-refresh injury data for a list of teams."""
+    for team in teams:
+        try:
+            fetch_team_injuries(team, force=force)
+        except Exception as e:
+            print(f"[injuries] refresh failed for {team}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -359,15 +394,31 @@ your knowledge cutoff), say so clearly. Flag where odds look sharp and where the
 Always output valid JSON matching the exact schema requested — no markdown fences, no extra keys."""
 
 
-def _build_prompt(home, away, commence, price_notes, weather_str):
+def _build_prompt(home, away, commence, price_notes, weather_str,
+                  home_profile="", away_profile="", home_injuries="", away_injuries=""):
+    profile_section = ""
+    if home_profile or away_profile:
+        profile_section = f"""
+CONFIRMED SQUADS (from official WC 2026 announcements):
+{home.upper()}: {home_profile or 'Not available.'}
+
+{away.upper()}: {away_profile or 'Not available.'}
+"""
+    injury_section = ""
+    if home_injuries or away_injuries:
+        injury_section = f"""
+LATEST INJURY & SUSPENSION NEWS:
+{home.upper()}: {home_injuries or 'None reported.'}
+{away.upper()}: {away_injuries or 'None reported.'}
+"""
     return f"""WC 2026 match: {home} vs {away} (kick-off UTC: {commence})
 
-VENUE: {weather_str}
-
+VENUE & CONDITIONS: {weather_str}
+{profile_section}{injury_section}
 BOOKMAKER PRICE SIGNAL:
 {price_notes}
 
-Use your web search tool to look up current form, injuries and squad news for BOTH teams before analysing. Search for "{home} World Cup 2026 squad injuries form" and "{away} World Cup 2026 squad injuries form". Then output ONLY this JSON:
+Using the squad and injury data above, output ONLY this JSON:
 {{
   "home_form": "Last known form, goal record, key players. 2 sentences.",
   "away_form": "Same for {away}. 2 sentences.",
@@ -408,27 +459,23 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
     cond, vk     = get_conditions_for_match(home, away, commence)
     cond_str     = _fmt_conditions(cond, vk)
 
+    # Pre-fetch squad profile (once ever) + injuries (daily) before analysis
+    prefetch_team_data(home, away)
+    home_profile, away_profile, home_injuries, away_injuries = get_team_context(home, away)
+
     try:
         client = _get_client()
         resp   = client.messages.create(
             model      = MODEL,
-            max_tokens = 2500,
+            max_tokens = 1500,
             system     = SYSTEM_PROMPT,
-            tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
             messages   = [{"role": "user",
-                           "content": _build_prompt(home, away, commence, price_notes, cond_str)}],
+                           "content": _build_prompt(
+                               home, away, commence, price_notes, cond_str,
+                               home_profile, away_profile, home_injuries, away_injuries,
+                           )}],
         )
-        # Concatenate all text blocks (web search returns many small fragments)
-        full_text = "".join(
-            block.text for block in resp.content
-            if getattr(block, "type", None) == "text"
-        )
-        # Extract the JSON object from the response (ignore any prose before/after)
-        start = full_text.find("{")
-        end   = full_text.rfind("}") + 1
-        if start == -1 or end == 0:
-            raise ValueError("No JSON object found in response")
-        raw = full_text[start:end]
+        raw = resp.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -470,10 +517,8 @@ def get_intel_batch(match_list, max_calls=15):
         print(f"[intel] {len(results)} matches from cache, 0 fresh calls")
         return results
 
-    # Run sequentially with a gap between calls to stay under 30k tokens/minute rate limit
-    for i, m in enumerate(to_fetch):
-        if i > 0:
-            time.sleep(20)   # wait 20s between calls — each web-search call uses ~15k tokens
+    # Run sequentially — analysis calls are small (~3k tokens each), no gap needed
+    for m in to_fetch:
         intel = get_match_intel(m["home"], m["away"], m.get("commence",""), m.get("price_notes",""))
         if intel:
             results[_cache_key(m["home"], m["away"])] = intel

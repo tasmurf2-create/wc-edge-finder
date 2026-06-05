@@ -270,7 +270,7 @@ tr:last-child td { border-bottom: none; }
   <div id="meta">
     <span id="fetch-time">Loading...</span>
     <button id="refresh-btn" onclick="loadData(true)">Refresh</button>
-    <button id="team-btn" onclick="refreshTeams()" style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">Update Team News</button>
+    <button id="team-btn" onclick="refreshInjuries()" style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">Refresh Injuries</button>
   </div>
 </header>
 
@@ -420,20 +420,19 @@ async function loadData(force = false) {
   }
 }
 
-async function refreshTeams() {
+async function refreshInjuries() {
   const btn = document.getElementById('team-btn');
-  btn.disabled = true; btn.textContent = 'Fetching team news...';
+  btn.disabled = true; btn.textContent = 'Fetching injuries...';
   try {
-    const res = await fetch('/api/refresh-teams');
+    const res = await fetch('/api/refresh-injuries');
     const d = await res.json();
     btn.textContent = `Updating ${d.teams} teams...`;
-    // Wait a bit then reload intel
     setTimeout(async () => {
       await loadData(false);
-      btn.disabled = false; btn.textContent = 'Update Team News';
-    }, d.teams * 8000); // ~8s per team
+      btn.disabled = false; btn.textContent = 'Refresh Injuries';
+    }, d.teams * 5000); // ~5s per team for injury-only search
   } catch(e) {
-    btn.disabled = false; btn.textContent = 'Update Team News';
+    btn.disabled = false; btn.textContent = 'Refresh Injuries';
   }
 }
 

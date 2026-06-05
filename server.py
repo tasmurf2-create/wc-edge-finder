@@ -535,32 +535,26 @@ def intel():
     })
 
 
-@app.get("/api/refresh-teams")
-def refresh_teams():
-    """Force re-fetch of all team snapshots via web search (once per day is enough)."""
+@app.get("/api/refresh-injuries")
+def refresh_injuries():
+    """Force re-fetch of injury/suspension data for all teams with value bets."""
     d = get_raw()
-    singles = d["bets"]["singles"]
-    requests = fintel._build_intel_requests.__wrapped__(singles) if hasattr(fintel._build_intel_requests, '__wrapped__') else None
-    # Build team list from singles
     teams = set()
-    for s in singles:
+    for s in d["bets"]["singles"]:
         parts = s["match"].split(" vs ", 1)
         if len(parts) == 2:
-            teams.add(parts[0])
-            teams.add(parts[1])
+            teams.add(parts[0]); teams.add(parts[1])
 
     def _do_refresh():
-        for team in sorted(teams):
-            fintel.fetch_team_snapshot(team, force=True)
-        # Clear intel cache so next load re-analyses with fresh team data
+        fintel.refresh_injuries_for_teams(sorted(teams), force=True)
+        # Clear intel cache so next load re-analyses with fresh injury data
         with _intel_lock:
             _intel_cache.clear()
         import pathlib
         pathlib.Path("intel_cache.json").unlink(missing_ok=True)
-        print(f"[team] forced refresh done for {len(teams)} teams")
+        print(f"[injuries] refresh done for {len(teams)} teams")
 
-    t = threading.Thread(target=_do_refresh, daemon=True)
-    t.start()
+    threading.Thread(target=_do_refresh, daemon=True).start()
     return JSONResponse({"status": "refreshing", "teams": len(teams)})
 
 
