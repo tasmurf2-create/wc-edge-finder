@@ -435,8 +435,10 @@ def _build_parlays(singles, max_legs=3, top_n=10):
     """
     parlays = []
 
-    # Only use positively-edged singles, capped at top 20 to avoid explosion
-    candidates = [s for s in singles if s["edge"] > 0][:20]
+    # Only use positively-edged singles where fair_prob >= 12%
+    # This prevents combining low-probability draws/upsets that produce
+    # misleadingly huge combined prices but near-zero real chance of winning
+    candidates = [s for s in singles if s["edge"] > 0 and s["fair_prob"] >= 0.12][:20]
 
     for n_legs in (2, 3):
         for combo in itertools.combinations(candidates, n_legs):
@@ -461,7 +463,7 @@ def _build_parlays(singles, max_legs=3, top_n=10):
             parlays.append({
                 "legs":           [_leg_summary(c) for c in combo],
                 "combined_price": round(combined_price, 2),
-                "combined_fair":  round(combined_fair * 100, 1),
+                "combined_fair":  round(combined_fair * 100, 3),
                 "ev_pct":         round(ev * 100, 1),
                 "confidence":     min_conf,
             })

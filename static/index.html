@@ -210,6 +210,23 @@ tr:last-child td { border-bottom: none; }
   line-height: 1.5;
 }
 
+/* ---- bet type sub-tabs ---- */
+.bet-type-btn {
+  background: none; border: none; cursor: pointer;
+  color: #8b949e; font-size: 0.82rem; padding: 8px 16px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  font-family: inherit;
+}
+.bet-type-btn:hover { color: #c9d1d9; }
+.bet-type-btn.active { color: #f0f6fc; border-bottom-color: #58a6ff; font-weight: 600; }
+
+/* ---- top picks ---- */
+.picks-round-title {
+  font-size: 0.82rem; font-weight: 700; color: #58a6ff;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 6px 0 10px 0; border-bottom: 1px solid #21262d; margin-bottom: 12px;
+}
+
 /* ---- parlays ---- */
 .parlay-list { display: flex; flex-direction: column; gap: 12px; }
 
@@ -275,8 +292,9 @@ tr:last-child td { border-bottom: none; }
 </header>
 
 <div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('divergence')">Market Divergence</button>
-  <button class="tab-btn" onclick="switchTab('bets')">Recommended Bets</button>
+  <button class="tab-btn active" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
+  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">Recommended Bets</button>
+  <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">⭐ Top Picks</button>
 </div>
 
 <!-- ===================== DIVERGENCE TAB ===================== -->
@@ -337,8 +355,37 @@ tr:last-child td { border-bottom: none; }
     <span><span class="dot" style="background:#484f58"></span> Low — small edge, no confirmation</span>
     <span style="color:#88c0d0">PP = Paddy Power price</span>
   </div>
+  <!-- Singles / Multi sub-tabs -->
+  <div style="background:#161b22;border-bottom:1px solid #21262d;padding:0 24px;display:flex;gap:2px">
+    <button id="btn-singles" class="bet-type-btn active" onclick="switchBetsTab('singles')">Singles</button>
+    <button id="btn-parlays" class="bet-type-btn" onclick="switchBetsTab('parlays')">Multi-Bets</button>
+  </div>
   <div id="bets-panel">
     <div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>
+  </div>
+</div>
+
+<!-- ===================== TOP PICKS TAB ===================== -->
+<div id="tab-picks" class="tab-panel">
+  <div class="filter-bar">
+    <label>Bookmaker:</label>
+    <select id="picks-book-select" onchange="renderTopPicks()">
+      <option value="best">Best available (any book)</option>
+    </select>
+    <label>Stake:</label>
+    <span style="display:flex;align-items:center;gap:4px">
+      <span style="color:#8b949e">€</span>
+      <input type="number" id="picks-stake-input" value="10" min="1" step="1"
+        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
+        oninput="renderTopPicks()">
+    </span>
+  </div>
+  <div class="legend">
+    <span>Top 5 value bets ranked by edge, grouped by tournament round</span>
+    <span style="color:#88c0d0">Focus: upcoming group stage games</span>
+  </div>
+  <div id="picks-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
+    <div class="loading-inner"><div class="spinner"></div><span>Loading picks...</span></div>
   </div>
 </div>
 
@@ -349,14 +396,16 @@ let allSingles  = [];
 let allParlays  = [];
 let allBookmakers = [];
 let threshold   = 0;
+let betsSubTab  = 'singles';
 
 // ---- tab switching ----
 function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', ['divergence','bets'][i] === tab);
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'picks') renderTopPicks();
 }
 
 // ---- data loading ----
@@ -386,22 +435,25 @@ async function loadData(force = false) {
     allParlays    = betsData.bets?.parlays || [];
     allBookmakers = betsData.bookmakers   || [];
 
-    // Populate bookmaker dropdown once
-    const sel = document.getElementById('book-select');
-    if (sel.options.length <= 1 && allBookmakers.length) {
-      allBookmakers.forEach(bk => {
-        const opt = document.createElement('option');
-        opt.value = bk; opt.textContent = bk;
-        if (bk === 'Paddy Power') opt.selected = true;
-        sel.appendChild(opt);
-      });
-    }
+    // Populate bookmaker dropdowns once (bets tab + picks tab)
+    ['book-select', 'picks-book-select'].forEach(selId => {
+      const sel = document.getElementById(selId);
+      if (sel.options.length <= 1 && allBookmakers.length) {
+        allBookmakers.forEach(bk => {
+          const opt = document.createElement('option');
+          opt.value = bk; opt.textContent = bk;
+          if (bk === 'Paddy Power') opt.selected = true;
+          sel.appendChild(opt);
+        });
+      }
+    });
 
     const d = new Date((divData.fetched_at || betsData.fetched_at) * 1000);
     document.getElementById('fetch-time').textContent = 'Updated ' + d.toLocaleTimeString();
 
     renderDivergence();
     renderBets();
+    renderTopPicks();
 
     // If intel is still loading in background, poll for it every 8s
     if (betsData.intel_loading) {
@@ -451,7 +503,7 @@ async function pollIntel() {
       if (!l.intel && data.intel[l.match]) { l.intel = data.intel[l.match]; changed = true; }
     }));
 
-    if (changed) renderBets();
+    if (changed) { renderBets(); renderTopPicks(); }
 
     // Stop polling once intel is done loading
     if (!data.intel_loading) {
@@ -616,6 +668,13 @@ function toggleTotals(id) {
 // ====================================================================
 // BETS RENDER
 // ====================================================================
+function switchBetsTab(tab) {
+  betsSubTab = tab;
+  document.getElementById('btn-singles').classList.toggle('active', tab === 'singles');
+  document.getElementById('btn-parlays').classList.toggle('active', tab === 'parlays');
+  renderBets();
+}
+
 function renderBets() {
   const book         = chosenBook();
   const stake        = chosenStake();
@@ -630,32 +689,38 @@ function renderBets() {
   const parlays = allParlays.filter(p => allowedConf.includes(p.confidence));
 
   const panel = document.getElementById('bets-panel');
-  if (!singles.length && !parlays.length) {
-    panel.innerHTML = '<div class="empty">No value bets found under current filters.</div>';
-    return;
-  }
 
-  panel.innerHTML = `
-    <div>
-      <div class="bets-section-title">
-        Singles
-        <small>${singles.length} value bet${singles.length !== 1 ? 's' : ''} · ${book === 'best' ? 'best available price' : book}</small>
+  if (betsSubTab === 'parlays') {
+    if (!parlays.length) {
+      panel.innerHTML = '<div class="empty" style="padding:24px">No positive-EV multi-bets at this confidence level.<br><small style="color:#6e7681">Try lowering the confidence filter or refreshing to get more data.</small></div>';
+      return;
+    }
+    panel.innerHTML = `
+      <div style="padding:18px 24px 0">
+        <div class="bets-section-title">
+          Multi-Bets
+          <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} where combined price beats fair odds · ${book === 'best' ? 'best available price' : book}</small>
+        </div>
       </div>
-      <div class="singles-list">
+      <div class="parlay-list" style="padding:0 24px 24px">
+        ${parlays.map(p => parlayHTML(p, book, stake)).join('')}
+      </div>`;
+  } else {
+    if (!singles.length) {
+      panel.innerHTML = '<div class="empty" style="padding:24px">No value singles found under current filters.</div>';
+      return;
+    }
+    panel.innerHTML = `
+      <div style="padding:18px 24px 0">
+        <div class="bets-section-title">
+          Singles
+          <small>${singles.length} value bet${singles.length !== 1 ? 's' : ''} · ${book === 'best' ? 'best available price' : book}</small>
+        </div>
+      </div>
+      <div class="singles-list" style="padding:0 24px 24px">
         ${singles.map(s => singleHTML(s, book, stake)).join('')}
-      </div>
-    </div>
-    <div>
-      <div class="bets-section-title">
-        Parlays &amp; Multi-Bets
-        <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} where the combined price beats fair odds · ${book === 'best' ? 'best available price' : book}</small>
-      </div>
-      <div class="parlay-list">
-        ${parlays.length
-          ? parlays.map(p => parlayHTML(p, book, stake)).join('')
-          : '<div class="empty">No positive-EV parlays at this confidence level.</div>'}
-      </div>
-    </div>`;
+      </div>`;
+  }
 }
 
 function singleHTML(s, book, stake) {
@@ -787,7 +852,8 @@ function parlayHTML(p, book, stake) {
   // Edge: fair combined prob vs what the combined price implies
   const fairProb      = p.combined_fair / 100;
   const impliedProb   = 1 / combinedPrice;
-  const combinedEdge  = ((fairProb - impliedProb) * 100).toFixed(1);
+  const edgeRaw       = (fairProb - impliedProb) * 100;
+  const combinedEdge  = Math.abs(edgeRaw) < 0.1 ? edgeRaw.toFixed(3) : edgeRaw.toFixed(1);
 
   const legs = legData.map(l => {
     const fallNote = l.fallback
@@ -819,8 +885,8 @@ function parlayHTML(p, book, stake) {
           <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${combinedEdge}%</span>
         </div>
         <div style="font-size:0.75rem;color:#8b949e;margin-top:5px">
-          Fair chance all legs win: <strong style="color:#c9d1d9">${p.combined_fair}%</strong>
-          &nbsp;&middot;&nbsp; Price implies: <strong style="color:#c9d1d9">${(impliedProb*100).toFixed(1)}%</strong>
+          Fair chance all legs win: <strong style="color:#c9d1d9">${p.combined_fair < 1 ? p.combined_fair.toFixed(2) : p.combined_fair.toFixed(1)}%</strong>
+          &nbsp;&middot;&nbsp; Price implies: <strong style="color:#c9d1d9">${(impliedProb*100).toFixed(2)}%</strong>
           &nbsp;&middot;&nbsp; You're getting overpaid by <strong style="color:#3fb950">+${combinedEdge}%</strong>
         </div>
         <div style="display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap">
@@ -847,6 +913,70 @@ function parlayHTML(p, book, stake) {
     <div class="parlay-legs">${legs}</div>
     ${fallbackWarning}
   </div>`;
+}
+
+// ---- tournament round helpers ----
+const ROUND_ORDER = [
+  'Group Stage — Round 1', 'Group Stage — Round 2', 'Group Stage — Round 3',
+  'Round of 32', 'Round of 16', 'Quarter-finals', 'Semi-finals', 'Final', 'Upcoming'
+];
+
+function getTournamentRound(iso) {
+  if (!iso) return 'Upcoming';
+  const d = new Date(iso);
+  const m = d.getMonth() + 1, day = d.getDate();
+  // WC 2026: Jun 11 start
+  if (m === 6 && day <= 15) return 'Group Stage — Round 1';
+  if (m === 6 && day <= 20) return 'Group Stage — Round 2';
+  if (m === 6 && day <= 26) return 'Group Stage — Round 3';
+  if (m === 6 || (m === 7 && day <= 4)) return 'Round of 32';
+  if (m === 7 && day <= 9) return 'Round of 16';
+  if (m === 7 && day <= 12) return 'Quarter-finals';
+  if (m === 7 && day <= 16) return 'Semi-finals';
+  return 'Final';
+}
+
+function picksChosenBook() {
+  return document.getElementById('picks-book-select')?.value || 'best';
+}
+function picksChosenStake() {
+  return parseFloat(document.getElementById('picks-stake-input')?.value) || 10;
+}
+
+function renderTopPicks() {
+  const panel = document.getElementById('picks-panel');
+  if (!panel) return;
+
+  const top5 = allSingles.slice(0, 5); // already sorted by edge desc from server
+
+  if (!top5.length) {
+    panel.innerHTML = '<div class="empty">No picks yet — data loading...</div>';
+    return;
+  }
+
+  const book  = picksChosenBook();
+  const stake = picksChosenStake();
+
+  // Group by tournament round
+  const groups = {};
+  top5.forEach(s => {
+    const rnd = getTournamentRound(s.commence);
+    if (!groups[rnd]) groups[rnd] = [];
+    groups[rnd].push(s);
+  });
+
+  const html = ROUND_ORDER
+    .filter(r => groups[r])
+    .map(r => `
+      <div>
+        <div class="picks-round-title">${r}</div>
+        <div class="singles-list">
+          ${groups[r].map(s => singleHTML(s, book, stake)).join('')}
+        </div>
+      </div>`)
+    .join('');
+
+  panel.innerHTML = html || '<div class="empty">No picks available.</div>';
 }
 
 // ---- boot ----
