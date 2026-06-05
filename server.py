@@ -35,7 +35,13 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
-REGIONS = "uk,eu,us"       # wider region set to catch Paddy Power + US books
+REGIONS = "uk"             # UK region covers all Irish-accessible bookmakers
+
+# Only show prices from bookmakers the user has accounts with
+BOOKMAKER_WHITELIST = {
+    "Paddy Power", "Betfair", "Betfair Exchange",
+    "Bet365", "BoyleSports", "Ladbrokes", "William Hill",
+}
 EDGE_MIN   = 0.005         # flag singles with >0.5% edge
 PARLAY_MIN = 0.005         # minimum combined EV to include a parlay
 VALUE_THRESHOLD = 0.015    # 1.5% edge = "clear value"
@@ -177,23 +183,6 @@ def _run_intel_bg(intel_requests):
     global _intel_busy
     print(f"[intel] background fetch starting for {len(intel_requests)} match(es)...")
     try:
-        # Step 1: pre-fetch team snapshots for just these matches (concurrently, fast)
-        teams = set()
-        for r in intel_requests:
-            teams.add(r["home"])
-            teams.add(r["away"])
-        store = fintel._load_team_data()
-        now   = time.time()
-        missing_teams = [t for t in teams
-                         if _team_key(t) not in store or
-                         (now - store[_team_key(t)].get("fetched_at", 0)) > fintel.TEAM_DATA_TTL]
-        if missing_teams and os.environ.get("ANTHROPIC_API_KEY"):
-            import concurrent.futures as cf
-            print(f"[team] fetching snapshots for: {', '.join(sorted(missing_teams))}")
-            with cf.ThreadPoolExecutor(max_workers=2) as ex:
-                list(ex.map(fintel.fetch_team_snapshot, missing_teams))
-
-        # Step 2: run match analysis (uses cached team data, no web search)
         raw_map = fintel.get_intel_batch(intel_requests, max_calls=MAX_INTEL_MATCHES)
         with _intel_lock:
             for req in intel_requests:
@@ -274,6 +263,7 @@ def _build_raw():
         kl_probs   = kal.get(mk, {}).get("probs", {})
         pm_probs   = poly.get(mk, {}).get("probs", {})
         book_table = _all_h2h_prices(ev)   # {bookname: {outcome: price}}
+        book_table = {k: v for k, v in book_table.items() if k in BOOKMAKER_WHITELIST}
         all_books.update(book_table.keys())
 
         # ---- h2h outcomes ---------------------------------------------------
@@ -282,10 +272,15 @@ def _build_raw():
 
         for raw_name, fair_p in h2h_r["fair"].items():
             norm = "draw" if pmkt._is_draw(raw_name) else pmkt.normalize_team(raw_name)
-            bp_price, bp_book = h2h_r["best_price"].get(raw_name, (None, None))
-            # Per-bookmaker prices for this outcome
+            # Per-bookmaker prices for this outcome (whitelisted books only)
             per_book = {bk: prices[raw_name] for bk, prices in book_table.items() if raw_name in prices}
             paddy = per_book.get("Paddy Power")
+            # Best price from whitelisted books only
+            if per_book:
+                bp_book  = max(per_book, key=per_book.get)
+                bp_price = per_book[bp_book]
+            else:
+                bp_price, bp_book = h2h_r["best_price"].get(raw_name, (None, None))
 
             kp = kl_probs.get(norm)
             pp = pm_probs.get(norm)

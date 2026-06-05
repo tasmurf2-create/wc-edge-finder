@@ -359,23 +359,15 @@ your knowledge cutoff), say so clearly. Flag where odds look sharp and where the
 Always output valid JSON matching the exact schema requested — no markdown fences, no extra keys."""
 
 
-def _build_prompt(home, away, commence, price_notes, weather_str, home_snap="", away_snap=""):
-    team_section = ""
-    if home_snap or away_snap:
-        team_section = f"""
-LIVE TEAM DATA (fetched today via web search — use this, not your training memory):
-{home.upper()}: {home_snap or 'No data available.'}
-
-{away.upper()}: {away_snap or 'No data available.'}
-"""
+def _build_prompt(home, away, commence, price_notes, weather_str):
     return f"""WC 2026 match: {home} vs {away} (kick-off UTC: {commence})
 
 VENUE: {weather_str}
-{team_section}
+
 BOOKMAKER PRICE SIGNAL:
 {price_notes}
 
-Output ONLY this JSON (use the live team data above as your primary source):
+Use your web search tool to look up current form, injuries and squad news for BOTH teams before analysing. Search for "{home} World Cup 2026 squad injuries form" and "{away} World Cup 2026 squad injuries form". Then output ONLY this JSON:
 {{
   "home_form": "Last known form, goal record, key players. 2 sentences.",
   "away_form": "Same for {away}. 2 sentences.",
@@ -416,19 +408,27 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
     cond, vk     = get_conditions_for_match(home, away, commence)
     cond_str     = _fmt_conditions(cond, vk)
 
-    # Use team snapshots only if already cached — never block analysis waiting for web search
-    home_snap, away_snap = get_team_snapshots_cached_only(home, away)
-
     try:
         client = _get_client()
         resp   = client.messages.create(
             model      = MODEL,
-            max_tokens = 1200,
+            max_tokens = 2500,
             system     = SYSTEM_PROMPT,
+            tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
             messages   = [{"role": "user",
-                           "content": _build_prompt(home, away, commence, price_notes, cond_str, home_snap, away_snap)}],
+                           "content": _build_prompt(home, away, commence, price_notes, cond_str)}],
         )
-        raw = resp.content[0].text.strip()
+        # Concatenate all text blocks (web search returns many small fragments)
+        full_text = "".join(
+            block.text for block in resp.content
+            if getattr(block, "type", None) == "text"
+        )
+        # Extract the JSON object from the response (ignore any prose before/after)
+        start = full_text.find("{")
+        end   = full_text.rfind("}") + 1
+        if start == -1 or end == 0:
+            raise ValueError("No JSON object found in response")
+        raw = full_text[start:end]
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -470,20 +470,13 @@ def get_intel_batch(match_list, max_calls=15):
         print(f"[intel] {len(results)} matches from cache, 0 fresh calls")
         return results
 
-    def _fetch_one(m):
+    # Run sequentially with a gap between calls to stay under 30k tokens/minute rate limit
+    for i, m in enumerate(to_fetch):
+        if i > 0:
+            time.sleep(20)   # wait 20s between calls — each web-search call uses ~15k tokens
         intel = get_match_intel(m["home"], m["away"], m.get("commence",""), m.get("price_notes",""))
-        return m["home"], m["away"], intel
-
-    # Run sequentially to stay under token-per-minute rate limits
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-        futures = [ex.submit(_fetch_one, m) for m in to_fetch]
-        for fut in concurrent.futures.as_completed(futures):
-            try:
-                home, away, intel = fut.result()
-                if intel:
-                    results[_cache_key(home, away)] = intel
-            except Exception as e:
-                print(f"[intel] concurrent fetch error: {e}")
+        if intel:
+            results[_cache_key(m["home"], m["away"])] = intel
 
     print(f"[intel] {len(results)} matches served ({len(to_fetch)} fresh Claude calls)")
     return results
