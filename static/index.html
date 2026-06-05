@@ -306,6 +306,17 @@ tr:last-child td { border-bottom: none; }
 <!-- ===================== BETS TAB ===================== -->
 <div id="tab-bets" class="tab-panel">
   <div class="filter-bar">
+    <label>Bookmaker:</label>
+    <select id="book-select" onchange="renderBets()">
+      <option value="best">Best available (any book)</option>
+    </select>
+    <label>Stake:</label>
+    <span style="display:flex;align-items:center;gap:4px">
+      <span style="color:#8b949e">€</span>
+      <input type="number" id="stake-input" value="10" min="1" step="1"
+        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
+        oninput="renderBets()">
+    </span>
     <label>Confidence:</label>
     <select id="conf-filter" onchange="renderBets()">
       <option value="all">All</option>
@@ -332,15 +343,14 @@ tr:last-child td { border-bottom: none; }
 
 <script>
 // ---- state ----
-let allMatches = [];
-let allSingles = [];
-let allParlays = [];
-let threshold  = 0;
-let activeTab  = 'divergence';
+let allMatches  = [];
+let allSingles  = [];
+let allParlays  = [];
+let allBookmakers = [];
+let threshold   = 0;
 
 // ---- tab switching ----
 function switchTab(tab) {
-  activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
     b.classList.toggle('active', ['divergence','bets'][i] === tab);
   });
@@ -356,7 +366,6 @@ async function loadData(force = false) {
   document.getElementById('bets-panel').innerHTML = '<div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>';
 
   try {
-    const url = force ? '/api/refresh' : '/api/divergence';
     const [divRes, betsRes] = await Promise.all([
       fetch(force ? '/api/refresh' : '/api/divergence'),
       fetch('/api/bets')
@@ -366,9 +375,21 @@ async function loadData(force = false) {
 
     if (divData.error) throw new Error(divData.error);
 
-    allMatches = divData.matches || [];
-    allSingles = betsData.bets?.singles || [];
-    allParlays = betsData.bets?.parlays || [];
+    allMatches    = divData.matches    || [];
+    allSingles    = betsData.bets?.singles || [];
+    allParlays    = betsData.bets?.parlays || [];
+    allBookmakers = betsData.bookmakers   || [];
+
+    // Populate bookmaker dropdown once
+    const sel = document.getElementById('book-select');
+    if (sel.options.length <= 1 && allBookmakers.length) {
+      allBookmakers.forEach(bk => {
+        const opt = document.createElement('option');
+        opt.value = bk; opt.textContent = bk;
+        if (bk === 'Paddy Power') opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
 
     const d = new Date((divData.fetched_at || betsData.fetched_at) * 1000);
     document.getElementById('fetch-time').textContent = 'Updated ' + d.toLocaleTimeString();
@@ -393,10 +414,23 @@ function fmt(iso) {
   } catch { return iso; }
 }
 
+function eur(val) { return '€' + val.toFixed(2); }
+
 function onThreshold() {
   threshold = parseFloat(document.getElementById('threshold').value);
   document.getElementById('threshold-val').textContent = threshold + '%';
   renderDivergence();
+}
+
+function chosenBook()  { return document.getElementById('book-select').value; }
+function chosenStake() { return parseFloat(document.getElementById('stake-input').value) || 10; }
+
+// Get price for a single at the chosen bookmaker (falls back to best price)
+function priceForBook(s, book) {
+  if (book === 'best') return { price: s.best_price, bookLabel: s.best_book, fallback: false };
+  const p = s.per_book?.[book];
+  if (p) return { price: p, bookLabel: book, fallback: false };
+  return { price: s.best_price, bookLabel: s.best_book, fallback: true };
 }
 
 // ====================================================================
@@ -461,26 +495,25 @@ function matchCardHTML(m) {
     </tr>`;
   }).join('');
 
-  // Totals sub-section
   let totalsHTML = '';
   if (m.totals && m.totals.length) {
-    const id = 'tot-' + m.label.replace(/\s/g,'');
-    const totRows = m.totals.map(t => {
-      return Object.entries(t.outcomes).map(([name, od]) => {
-        const eCls = od.edge > 1.5 ? 'edge-pos' : od.edge > 0 ? 'edge-pos' : 'edge-neg';
+    const id = 'tot-' + m.label.replace(/\W/g,'');
+    const totRows = m.totals.map(t =>
+      Object.entries(t.outcomes).map(([name, od]) => {
+        const eCls = od.edge > 0 ? 'edge-pos' : 'edge-neg';
         return `<tr>
           <td>${name} ${t.line}</td>
           <td>${od.fair}%</td>
-          <td colspan="3" style="color:#6e7681">over/under — no PM data</td>
+          <td colspan="3" style="color:#6e7681">no PM data</td>
           <td class="bar-cell"></td>
           <td>${od.best_price ? od.best_price.toFixed(2)+' <span style="color:#6e7681;font-size:0.7rem">('+od.best_book+')</span>' : '—'}</td>
           <td><span class="${eCls}">${od.edge != null ? (od.edge>0?'+':'')+od.edge.toFixed(1)+'%' : '—'}</span></td>
         </tr>`;
-      }).join('');
-    }).join('');
+      }).join('')
+    ).join('');
     totalsHTML = `
       <div class="totals-toggle" onclick="toggleTotals('${id}')">
-        ▶ Over / Under  <span style="color:#484f58">(click to expand)</span>
+        ▶ Over / Under <span style="color:#484f58">(click to expand)</span>
       </div>
       <div class="totals-body" id="${id}">
         <table><thead><tr>
@@ -513,27 +546,26 @@ function matchCardHTML(m) {
 function toggleTotals(id) {
   const el = document.getElementById(id);
   el.classList.toggle('open');
-  const toggle = el.previousElementSibling;
-  toggle.textContent = el.classList.contains('open')
+  el.previousElementSibling.textContent = el.classList.contains('open')
     ? '▼ Over / Under'
-    : '▶ Over / Under  (click to expand)';
+    : '▶ Over / Under (click to expand)';
 }
 
 // ====================================================================
 // BETS RENDER
 // ====================================================================
 function renderBets() {
+  const book         = chosenBook();
+  const stake        = chosenStake();
   const confFilter   = document.getElementById('conf-filter').value;
   const marketFilter = document.getElementById('market-filter').value;
-  const allowedConf  = confFilter === 'all' ? ['high','medium','low']
-                     : confFilter.split(',');
+  const allowedConf  = confFilter === 'all' ? ['high','medium','low'] : confFilter.split(',');
 
-  let singles = allSingles.filter(s =>
+  const singles = allSingles.filter(s =>
     allowedConf.includes(s.confidence) &&
     (marketFilter === 'all' || s.market === marketFilter)
   );
-
-  let parlays = allParlays.filter(p => allowedConf.includes(p.confidence));
+  const parlays = allParlays.filter(p => allowedConf.includes(p.confidence));
 
   const panel = document.getElementById('bets-panel');
   if (!singles.length && !parlays.length) {
@@ -545,115 +577,157 @@ function renderBets() {
     <div>
       <div class="bets-section-title">
         Singles
-        <small>${singles.length} value bet${singles.length !== 1 ? 's' : ''} found</small>
+        <small>${singles.length} value bet${singles.length !== 1 ? 's' : ''} · ${book === 'best' ? 'best available price' : book}</small>
       </div>
       <div class="singles-list">
-        ${singles.length ? singles.map(singleHTML).join('') : '<div class="empty">None at this confidence level.</div>'}
+        ${singles.map(s => singleHTML(s, book, stake)).join('')}
       </div>
     </div>
     <div>
       <div class="bets-section-title">
         Parlays &amp; Multi-Bets
-        <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} with positive EV</small>
+        <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} · ${book === 'best' ? 'best available price' : book}</small>
       </div>
       <div class="parlay-list">
-        ${parlays.length ? parlays.map(parlayHTML).join('') : '<div class="empty">No positive-EV parlays at this confidence level.</div>'}
+        ${parlays.length
+          ? parlays.map(p => parlayHTML(p, book, stake)).join('')
+          : '<div class="empty">No positive-EV parlays at this confidence level.</div>'}
       </div>
     </div>`;
 }
 
-function singleHTML(s) {
-  const mktLabel = s.market === 'totals' ? 'Over/Under' : '1X2';
-  const confBadge = `<span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>`;
+function singleHTML(s, book, stake) {
+  const { price, bookLabel, fallback } = priceForBook(s, book);
+  const grossReturn = stake * price;
+  const profit      = grossReturn - stake;
+  const mktLabel    = s.market === 'totals' ? 'Over/Under' : '1X2';
 
-  const why = buildWhy(s);
+  const fallbackNote = fallback
+    ? `<span style="color:#d29922;font-size:0.73rem"> ⚠ not at ${book}, using ${bookLabel}</span>`
+    : '';
 
-  const paddyLine = s.paddy
-    ? `<span><span class="lbl">Paddy Power:</span><span class="val pp">${s.paddy.toFixed(2)}</span></span>`
-    : '';
-  const kalLine = s.kalshi != null
-    ? `<span><span class="lbl">Kalshi:</span><span class="val blue">${s.kalshi}%</span></span>`
-    : '';
-  const polyLine = s.poly != null
-    ? `<span><span class="lbl">Poly:</span><span class="val blue">${s.poly}%</span></span>`
-    : '';
+  const kalLine  = s.kalshi != null ? `<span><span class="lbl">Kalshi:</span><span class="val blue">${s.kalshi}%</span></span>` : '';
+  const polyLine = s.poly   != null ? `<span><span class="lbl">Poly:</span><span class="val blue">${s.poly}%</span></span>`   : '';
 
   return `<div class="single-card conf-${s.confidence}">
     <div class="single-top">
       <div>
-        <div class="single-title">${s.outcome.toUpperCase()} — ${s.match}</div>
-        <div class="single-sub">${fmt(s.commence)} &nbsp;·&nbsp; ${mktLabel}</div>
+        <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
+        <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mktLabel}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        ${confBadge}
+        <span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>
         <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${s.edge.toFixed(1)}%</span>
       </div>
     </div>
     <div class="single-prices">
-      <span><span class="lbl">Best price:</span><span class="val green">${s.best_price.toFixed(2)}</span> <span style="color:#6e7681;font-size:0.75rem">(${s.best_book})</span></span>
-      ${paddyLine}
+      <span><span class="lbl">Price:</span><span class="val green">${price.toFixed(2)}</span>
+        <span style="color:#6e7681;font-size:0.75rem">(${bookLabel})</span>${fallbackNote}</span>
       <span><span class="lbl">Book fair:</span><span class="val">${(s.fair_prob*100).toFixed(1)}%</span></span>
       ${kalLine}${polyLine}
     </div>
-    <div class="why-box">${why}</div>
+    <div style="background:#1c2128;border-radius:6px;padding:10px 14px;margin-top:6px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+      <div>
+        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Stake</div>
+        <div style="font-size:1rem;font-weight:700;color:#f0f6fc">${eur(stake)}</div>
+      </div>
+      <div style="color:#484f58;font-size:1.2rem">→</div>
+      <div>
+        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Gross return</div>
+        <div style="font-size:1rem;font-weight:700;color:#f0f6fc">${eur(grossReturn)}</div>
+      </div>
+      <div>
+        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Profit</div>
+        <div style="font-size:1rem;font-weight:700;color:#3fb950">+${eur(profit)}</div>
+      </div>
+    </div>
+    <div class="why-box">${buildWhy(s)}</div>
   </div>`;
 }
 
 function buildWhy(s) {
   const parts = [];
-  const impliedBest = (1/s.best_price*100).toFixed(1);
-  parts.push(`Book consensus fair prob <strong>${(s.fair_prob*100).toFixed(1)}%</strong> vs best available price implied <strong>${impliedBest}%</strong> → <strong>+${s.edge.toFixed(1)}% edge</strong>.`);
-
+  parts.push(`De-vigged bookmaker consensus gives this outcome a fair probability of <strong>${(s.fair_prob*100).toFixed(1)}%</strong>. The best available price implies only <strong>${(1/s.best_price*100).toFixed(1)}%</strong> — a <strong>+${s.edge.toFixed(1)}%</strong> gap in your favour.`);
   if (s.pm_gap !== null) {
-    if (s.pm_gap < -2) {
-      parts.push(`Prediction markets price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than bookmakers — books are short, reinforcing value.`);
-    } else if (s.pm_gap > 2) {
-      parts.push(`⚠ Prediction markets are <strong>${s.pm_gap.toFixed(1)}%</strong> lower than books on this side — price edge may be overstated.`);
-    } else {
+    if (s.pm_gap < -2)
+      parts.push(`Prediction markets (Kalshi/Polymarket) price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than the books, reinforcing the value signal.`);
+    else if (s.pm_gap > 2)
+      parts.push(`⚠ Prediction markets price this side <strong>${s.pm_gap.toFixed(1)}%</strong> <em>lower</em> than the books — treat with extra caution.`);
+    else
       parts.push(`Prediction markets broadly agree with bookmaker consensus.`);
-    }
   } else {
-    parts.push(`No prediction market data yet for this match — value is based on bookmaker consensus only.`);
+    parts.push(`No prediction market data yet — value signal is from bookmaker consensus only.`);
   }
-
-  if (s.market === 'totals') {
-    parts.push(`Over/under edge comes from de-vigging across ${s.best_book} and other books — no PM cross-check available.`);
-  }
-
   return parts.join(' ');
 }
 
-function parlayHTML(p) {
-  const legs = p.legs.map(l => {
-    const pp = l.paddy ? `<span class="parlay-leg-pp">PP ${l.paddy.toFixed(2)}</span>` : '';
+function parlayHTML(p, book, stake) {
+  // Recalculate combined price using the chosen book's prices per leg
+  let combinedPrice = 1;
+  let anyFallback   = false;
+
+  const legData = p.legs.map(l => {
+    const { price, bookLabel, fallback } = priceForBook(l, book);
+    combinedPrice *= price;
+    if (fallback) anyFallback = true;
+    return { ...l, usedPrice: price, usedBook: bookLabel, fallback };
+  });
+
+  const grossReturn = stake * combinedPrice;
+  const profit      = grossReturn - stake;
+
+  const legs = legData.map(l => {
+    const fallNote = l.fallback
+      ? `<span style="color:#d29922;font-size:0.7rem"> ⚠ ${l.usedBook}</span>`
+      : '';
     return `<div class="parlay-leg">
       <div class="parlay-leg-left">
         <div><strong>${l.outcome.toUpperCase()}</strong></div>
-        <div class="parlay-leg-match">${l.match} · ${fmt(l.commence)}</div>
+        <div class="parlay-leg-match">${l.match} &middot; ${fmt(l.commence)}</div>
       </div>
       <div class="parlay-leg-right">
-        ${pp}
-        <span class="parlay-leg-book">${l.best_book}</span>
-        <span class="parlay-leg-price">${l.best_price.toFixed(2)}</span>
+        ${fallNote}
+        <span class="parlay-leg-book">${l.usedBook}</span>
+        <span class="parlay-leg-price">${l.usedPrice.toFixed(2)}</span>
       </div>
     </div>`;
   }).join('');
 
+  const fallbackWarning = anyFallback
+    ? `<div style="font-size:0.73rem;color:#d29922;padding:6px 16px;border-top:1px solid #21262d">⚠ One or more legs not available at ${book === 'best' ? 'chosen book' : book} — best price used instead.</div>`
+    : '';
+
   return `<div class="parlay-card conf-${p.confidence}">
     <div class="parlay-header">
-      <div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="parlay-ev pos">+${p.ev_pct}% EV</span>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="badge badge-${p.confidence}">${p.confidence.charAt(0).toUpperCase()+p.confidence.slice(1)}</span>
           <span class="badge badge-neutral">${p.legs.length}-leg parlay</span>
+          <span style="font-size:0.75rem;color:#8b949e">Combined fair prob: ${p.combined_fair}%</span>
         </div>
-        <div class="parlay-meta">
-          Combined price: <strong>${p.combined_price.toFixed(2)}</strong>
-          &nbsp;·&nbsp; Combined fair probability: <strong>${p.combined_fair}%</strong>
+        <div style="display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Stake</div>
+            <div style="font-weight:700;color:#f0f6fc">${eur(stake)}</div>
+          </div>
+          <div style="color:#484f58">→</div>
+          <div>
+            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Combined price</div>
+            <div style="font-weight:700;color:#f0f6fc">${combinedPrice.toFixed(2)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Gross return</div>
+            <div style="font-weight:700;color:#f0f6fc">${eur(grossReturn)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Profit</div>
+            <div style="font-weight:700;color:#3fb950">+${eur(profit)}</div>
+          </div>
         </div>
       </div>
     </div>
     <div class="parlay-legs">${legs}</div>
+    ${fallbackWarning}
   </div>`;
 }
 

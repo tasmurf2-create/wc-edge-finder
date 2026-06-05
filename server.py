@@ -120,17 +120,15 @@ def _analyse_totals(event):
     return result
 
 
-def _paddy_price(event, outcome_name):
-    """Return Paddy Power price for a named h2h outcome, or None."""
+def _all_h2h_prices(event):
+    """Return {bookmaker_title: {outcome_name: price}} for h2h market."""
+    result = {}
     for bm in event.get("bookmakers", []):
-        if "paddy" in bm["title"].lower():
-            for market in bm.get("markets", []):
-                if market["key"] != "h2h":
-                    continue
-                for o in market["outcomes"]:
-                    if o["name"].lower() == outcome_name.lower():
-                        return o["price"]
-    return None
+        for market in bm.get("markets", []):
+            if market["key"] != "h2h":
+                continue
+            result[bm["title"]] = {o["name"]: o["price"] for o in market["outcomes"]}
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -152,8 +150,9 @@ def _build_raw():
     except Exception:
         poly = {}
 
-    matches  = []
-    singles  = []   # value bet candidates for parlay builder
+    matches     = []
+    singles     = []
+    all_books   = set()
 
     for ev in events:
         h2h_r = _analyse_h2h(ev)
@@ -165,8 +164,10 @@ def _build_raw():
         label = f"{home} vs {away}"
         comm  = h2h_r["commence"]
 
-        kl_probs = kal.get(mk, {}).get("probs", {})
-        pm_probs = poly.get(mk, {}).get("probs", {})
+        kl_probs   = kal.get(mk, {}).get("probs", {})
+        pm_probs   = poly.get(mk, {}).get("probs", {})
+        book_table = _all_h2h_prices(ev)   # {bookname: {outcome: price}}
+        all_books.update(book_table.keys())
 
         # ---- h2h outcomes ---------------------------------------------------
         h2h_outcomes = []
@@ -175,7 +176,9 @@ def _build_raw():
         for raw_name, fair_p in h2h_r["fair"].items():
             norm = "draw" if pmkt._is_draw(raw_name) else pmkt.normalize_team(raw_name)
             bp_price, bp_book = h2h_r["best_price"].get(raw_name, (None, None))
-            paddy = _paddy_price(ev, raw_name)
+            # Per-bookmaker prices for this outcome
+            per_book = {bk: prices[raw_name] for bk, prices in book_table.items() if raw_name in prices}
+            paddy = per_book.get("Paddy Power")
 
             kp = kl_probs.get(norm)
             pp = pm_probs.get(norm)
@@ -226,9 +229,11 @@ def _build_raw():
                     "commence":    comm,
                     "market":      "h2h",
                     "outcome":     norm,
+                    "raw_outcome": raw_name,
                     "fair_prob":   fair_p,
                     "best_price":  bp_price,
                     "best_book":   bp_book,
+                    "per_book":    per_book,   # {bookname: price}
                     "paddy":       paddy,
                     "edge":        edge,
                     "pm_gap":      pm_gap,
@@ -278,9 +283,17 @@ def _build_raw():
 
     parlays = _build_parlays(singles)
 
+    # Sorted bookmaker list for the frontend dropdown
+    # Put Paddy Power first if present, then alphabetical
+    book_list = sorted(all_books)
+    if "Paddy Power" in book_list:
+        book_list.remove("Paddy Power")
+        book_list.insert(0, "Paddy Power")
+
     return {
         "fetched_at": int(time.time()),
         "matches":    matches,
+        "bookmakers": book_list,
         "bets": {
             "singles": singles,
             "parlays": parlays,
@@ -345,7 +358,8 @@ def _leg_summary(s):
         "outcome":    s["outcome"],
         "best_price": s["best_price"],
         "best_book":  s["best_book"],
-        "paddy":      s["paddy"],
+        "per_book":   s.get("per_book", {}),
+        "paddy":      s.get("paddy"),
         "edge":       s["edge"],
         "confidence": s["confidence"],
     }
@@ -377,7 +391,7 @@ def divergence():
 @app.get("/api/bets")
 def bets():
     d = get_raw()
-    return JSONResponse({"fetched_at": d["fetched_at"], "bets": d["bets"]})
+    return JSONResponse({"fetched_at": d["fetched_at"], "bets": d["bets"], "bookmakers": d.get("bookmakers", [])})
 
 
 @app.get("/api/refresh")
