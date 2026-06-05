@@ -71,12 +71,12 @@ if _disk_intel:
 # ---------------------------------------------------------------------------
 
 def _fetch_events():
-    """Pull h2h + totals in a single API call."""
+    """Pull h2h + totals + spreads (Asian handicap) in a single API call."""
     key = wc_odds.find_world_cup_key()
     return wc_odds.get(
         f"/sports/{key}/odds",
         regions=REGIONS,
-        markets="h2h,totals",
+        markets="h2h,totals,spreads",
         oddsFormat=wc_odds.ODDS_FORMAT,
     )
 
@@ -147,6 +147,73 @@ def _all_h2h_prices(event):
             if market["key"] != "h2h":
                 continue
             result[bm["title"]] = {o["name"]: o["price"] for o in market["outcomes"]}
+    return result
+
+
+def _analyse_spreads(event):
+    """
+    De-vig Asian handicap (spreads) market.
+    Returns { (team_name, point): {fair_prob, best_price, best_book, edge} }
+    Only includes lines where at least 3 books agree (avoids one-off lines).
+    """
+    line_prices = defaultdict(list)   # (team_name, point) -> [(price, bookmaker)]
+    line_best   = {}                   # (team_name, point) -> (best_price, best_book)
+    line_book_count = defaultdict(set) # point -> set of bookmakers
+
+    for bm in event.get("bookmakers", []):
+        for market in bm.get("markets", []):
+            if market["key"] != "spreads":
+                continue
+            for o in market["outcomes"]:
+                point = o.get("point")
+                if point is None:
+                    continue
+                key = (o["name"], point)
+                price = o["price"]
+                line_prices[key].append((price, bm["title"]))
+                line_book_count[point].add(bm["title"])
+                if key not in line_best or price > line_best[key][0]:
+                    line_best[key] = (price, bm["title"])
+
+    # Group by point, only process lines with at least 3 books
+    by_point = defaultdict(dict)
+    for (team_name, point), prices in line_prices.items():
+        if len(line_book_count[point]) >= 3:
+            by_point[point][team_name] = prices
+
+    result = {}
+    for point, sides in by_point.items():
+        if len(sides) != 2:
+            continue
+        avg_implied = {
+            team: sum(1.0/p for p, _ in prices) / len(prices)
+            for team, prices in sides.items()
+        }
+        fair, _ = _devig(avg_implied)
+        for team, fp in fair.items():
+            bp_price, bp_book = line_best.get((team, point), (None, None))
+            if not bp_price:
+                continue
+            edge = round((fp - 1.0/bp_price) * 100, 2)
+            result[(team, point)] = {
+                "fair_prob": fp,
+                "best_price": bp_price,
+                "best_book": bp_book,
+                "edge": edge,
+            }
+    return result
+
+
+def _all_spread_prices(event, team_name, point):
+    """Return {bookmaker: price} for a specific team + handicap line."""
+    result = {}
+    for bm in event.get("bookmakers", []):
+        for market in bm.get("markets", []):
+            if market["key"] != "spreads":
+                continue
+            for o in market["outcomes"]:
+                if o.get("name") == team_name and o.get("point") == point:
+                    result[bm["title"]] = o["price"]
     return result
 
 
@@ -367,6 +434,7 @@ def _build_raw():
                         "fair_prob":  od["fair"] / 100,
                         "best_price": od["best_price"],
                         "best_book":  od["best_book"],
+                        "per_book":   {},
                         "paddy":      None,
                         "edge":       edge,
                         "pm_gap":     None,
@@ -375,6 +443,46 @@ def _build_raw():
                         "poly":       None,
                     })
             totals_list.append({"line": line, **td})
+
+        # ---- spreads (Asian handicap) ---------------------------------------
+        spreads_data = _analyse_spreads(ev)
+        for (team_name, point), sd in spreads_data.items():
+            if sd["edge"] is None or sd["edge"] <= EDGE_MIN * 100:
+                continue
+            per_book = _all_spread_prices(ev, team_name, point)
+            per_book = {k: v for k, v in per_book.items() if k in BOOKMAKER_WHITELIST}
+            paddy = per_book.get("Paddy Power")
+            if per_book:
+                bp_book  = max(per_book, key=per_book.get)
+                bp_price = per_book[bp_book]
+            else:
+                bp_price = sd["best_price"]
+                bp_book  = sd["best_book"]
+            edge = round((sd["fair_prob"] - 1.0/bp_price) * 100, 2) if bp_price else None
+            if edge is None or edge <= EDGE_MIN * 100:
+                continue
+            # Human-readable: "Germany (-1.5)" = Germany wins by 2+
+            sign = "+" if point > 0 else ""
+            outcome_label = f"{team_name} ({sign}{point:g})"
+            singles.append({
+                "match":      label,
+                "commence":   comm,
+                "market":     "spreads",
+                "outcome":    outcome_label,
+                "fair_prob":  sd["fair_prob"],
+                "best_price": bp_price,
+                "best_book":  bp_book,
+                "per_book":   per_book,
+                "paddy":      paddy,
+                "edge":       edge,
+                "pm_gap":     None,
+                "confidence": "medium" if edge > VALUE_THRESHOLD * 100 else "low",
+                "kalshi":     None,
+                "poly":       None,
+                # Keep raw handicap info for analyst matching
+                "spread_team":  team_name,
+                "spread_point": point,
+            })
 
         matches.append({
             "label":      label,
@@ -396,6 +504,7 @@ def _build_raw():
         cached_intel = dict(_intel_cache)
     for s in singles:
         s["intel"] = cached_intel.get(s["match"])
+        s["analyst_confirms"] = _analyst_confirms(s) if s["intel"] else None
     for p in parlays:
         for leg in p["legs"]:
             leg["intel"] = cached_intel.get(leg["match"])
@@ -419,6 +528,73 @@ def _build_raw():
             "parlays": parlays,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Analyst confirmation helper
+# ---------------------------------------------------------------------------
+
+def _analyst_confirms(single):
+    """
+    Check whether the intel's recommended_bets includes this single's outcome.
+    Returns True (confirmed), False (contradicted), or None (no intel / old schema).
+    """
+    intel = single.get("intel")
+    if not intel:
+        return None
+
+    rec_bets = intel.get("recommended_bets")
+    if not rec_bets:
+        # Old-schema intel — fall back to checking the legacy single recommendation field
+        rec = intel.get("recommendation", {})
+        old_outcome = rec.get("outcome", "")
+        return _outcome_matches(single, old_outcome)
+
+    for rb in rec_bets:
+        if _outcome_matches(single, rb.get("outcome", ""), rb.get("market", "")):
+            return True
+    return False
+
+
+def _outcome_matches(single, analyst_outcome, analyst_market=""):
+    """Map analyst outcome string to a single bet's outcome + market."""
+    s_market  = single.get("market", "")
+    s_outcome = single.get("outcome", "").lower()
+    # Extract home/away team names from match label "Home vs Away"
+    match_label = single.get("match", "")
+    parts       = match_label.split(" vs ", 1)
+    home_name   = parts[0].lower() if len(parts) == 2 else ""
+    away_name   = parts[1].lower() if len(parts) == 2 else ""
+
+    ao = analyst_outcome.lower().replace(" ", "_")
+
+    if s_market == "h2h":
+        if ao == "home_win":   return s_outcome == home_name
+        if ao == "away_win":   return s_outcome not in (home_name, "draw") and s_outcome != ""
+        if ao == "draw":       return s_outcome == "draw"
+
+    elif s_market == "totals":
+        if ao.startswith("over"):   return "over" in s_outcome
+        if ao.startswith("under"):  return "under" in s_outcome
+
+    elif s_market == "spreads":
+        # analyst_outcome format: "home_-1.5" or "away_+1" etc.
+        spread_team  = single.get("spread_team", "").lower()
+        spread_point = single.get("spread_point")
+        if ao.startswith("home_"):
+            try:
+                target_pt = float(ao.split("home_")[1])
+                return spread_team == home_name and spread_point == target_pt
+            except ValueError:
+                return spread_team == home_name
+        if ao.startswith("away_"):
+            try:
+                target_pt = float(ao.split("away_")[1])
+                return spread_team == away_name and spread_point == target_pt
+            except ValueError:
+                return spread_team == away_name
+    return False
 
 
 # ---------------------------------------------------------------------------

@@ -384,12 +384,14 @@ def refresh_injuries_for_teams(teams, force=True):
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """You are a senior football betting analyst with 20 years of experience
-specialising in international tournaments and FIFA World Cups. You combine deep tactical
-knowledge with sharp commercial instincts — you understand both the football AND the markets.
+specialising in international tournaments and FIFA World Cups. You think like a professional
+gambler: you identify which outcomes make genuine footballing sense, consider ALL available
+markets (match result, goals over/under, draw value), and only recommend bets where the
+logic is sound — not just where the price happens to look big.
 
-Your job: analyse World Cup 2026 matches and produce structured research that a punter
-can act on. Be direct, specific, and honest. If you're uncertain (e.g. injury news after
-your knowledge cutoff), say so clearly. Flag where odds look sharp and where they look soft.
+Your job: analyse World Cup 2026 matches and produce up to 3 specific recommended bets
+across any combination of markets. Each recommended bet must have a clear football reason —
+not just "the price is long". Factor in conditions, form, tactical matchup, and absences.
 
 Always output valid JSON matching the exact schema requested — no markdown fences, no extra keys."""
 
@@ -415,28 +417,58 @@ LATEST INJURY & SUSPENSION NEWS:
 
 VENUE & CONDITIONS: {weather_str}
 {profile_section}{injury_section}
-BOOKMAKER PRICE SIGNAL:
+BOOKMAKER PRICE SIGNAL (for context — your recommendation must be driven by football logic first):
 {price_notes}
+
+Analyse this match as a professional gambler. Consider ALL these markets:
+- Match result (1X2): {home} win | draw | {away} win
+- Goals: over 2.5 | under 2.5 | over 1.5 | under 1.5
+- Asian handicap: {home} (-0.5) | {home} (-1) | {home} (-1.5) | {home} (-2)
+                  {away} (+0.5) | {away} (+1)  | {away} (+1.5)  | {away} (+2)
+
+Handicap guide:
+  "{home} (-1.5)" = {home} must WIN BY 2 OR MORE goals to win the bet
+  "{away} (+1.5)" = {away} can lose by 1, draw, or win and still win the bet
+  "{home} (-0.5)" = {home} must win by any margin (same as home win)
+
+Identify the 1-3 outcomes that make genuine football sense. An outcome qualifies if:
+  (a) there is a clear footballing reason it is likely or undervalued, AND
+  (b) the risk/reward is reasonable given what you know
+
+Do NOT recommend a bet just because the price is big. A 10/1 shot is still a bad bet if the
+football logic doesn't support it. A 1.5/1 favourite at fair price is better than a 10/1 shot
+backed purely by price signal.
+
+Examples of good thinking:
+- "Germany should win comfortably against Curaçao — recommend Germany (-1.5) not just Germany win"
+- "Uzbekistan vs Colombia at altitude — recommend under 2.5 goals + Colombia win separately"
+- "Even match — draw is the value outcome, over 1.5 goals likely but speculative"
 
 Using the squad and injury data above, output ONLY this JSON:
 {{
-  "home_form": "Last known form, goal record, key players. 2 sentences.",
-  "away_form": "Same for {away}. 2 sentences.",
+  "home_form": "Last known form, goal record, key players in 2 sentences.",
+  "away_form": "Same for {away} in 2 sentences.",
   "key_absences": "Known injuries/suspensions or 'none known'.",
   "conditions_impact": "How heat/altitude/kickoff time affects each team specifically. Which team benefits?",
   "tactical_matchup": "Style clash in 2 sentences. Who does it favour?",
-  "goals_assessment": "Over/under 2.5 reasoning. BTTS likelihood.",
-  "market_read": "Is the price fair, favourite too short, or underdog value?",
-  "recommendation": {{
-    "outcome": "home_win|draw|away_win|over_2.5|under_2.5|no_clear_edge",
-    "reasoning": "2 sentences — football reasons, not just price.",
-    "strength": "strong|moderate|lean",
-    "watch_out": "Biggest risk to this call in 1 sentence."
-  }},
-  "overall_summary": "3 sentences a punter can act on. Lead with conditions.",
+  "goals_assessment": "Expected goal total with reasoning. Over/under 2.5 call. BTTS likely or not and why.",
+  "market_read": "Which side of each market (h2h, totals, handicap) is correctly priced, overpriced, or offers genuine value?",
+  "recommended_bets": [
+    {{
+      "market": "h2h|totals|spreads",
+      "outcome": "home_win|draw|away_win|over_2.5|under_2.5|over_1.5|under_1.5|home_-0.5|home_-1|home_-1.5|home_-2|away_+0.5|away_+1|away_+1.5|away_+2",
+      "confidence": "high|medium|low",
+      "reasoning": "The football reason — not the price — why this outcome makes sense. 2 sentences.",
+      "strength": "strong|moderate|lean"
+    }}
+  ],
+  "overall_summary": "3 sentences a punter can act on. Lead with the single best bet and why.",
   "intel_confidence": "high|medium|low",
   "knowledge_caveat": "What you don't know that matters most."
-}}"""
+}}
+
+Include 1 to 3 items in recommended_bets. Only include bets with genuine football logic.
+If no outcome has a clear edge, return an empty array and explain in overall_summary."""
 
 
 # ---------------------------------------------------------------------------

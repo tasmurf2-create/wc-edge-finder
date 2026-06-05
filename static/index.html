@@ -347,6 +347,7 @@ tr:last-child td { border-bottom: none; }
       <option value="all">All markets</option>
       <option value="h2h">Match result (1X2)</option>
       <option value="totals">Over / Under</option>
+      <option value="spreads">Asian Handicap</option>
     </select>
   </div>
   <div class="legend">
@@ -494,10 +495,14 @@ async function pollIntel() {
     const data = await res.json();
     if (!data.intel || !Object.keys(data.intel).length) return;
 
-    // Merge intel into allSingles and allParlays
+    // Merge intel into allSingles and allParlays; compute analyst confirmation
     let changed = false;
     allSingles.forEach(s => {
-      if (!s.intel && data.intel[s.match]) { s.intel = data.intel[s.match]; changed = true; }
+      if (!s.intel && data.intel[s.match]) {
+        s.intel = data.intel[s.match];
+        s.analyst_confirms = analystConfirms(s, s.intel);
+        changed = true;
+      }
     });
     allParlays.forEach(p => p.legs.forEach(l => {
       if (!l.intel && data.intel[l.match]) { l.intel = data.intel[l.match]; changed = true; }
@@ -723,11 +728,58 @@ function renderBets() {
   }
 }
 
+function analystConfirms(single, intel) {
+  if (!intel) return null;
+  const recs = intel.recommended_bets;
+  if (!recs || !recs.length) return null;
+  const sMarket  = single.market;
+  const sOutcome = single.outcome.toLowerCase();
+  const parts    = single.match.includes(' vs ') ? single.match.split(' vs ') : ['', ''];
+  const homeName = parts[0].toLowerCase();
+  const awayName = parts[1].toLowerCase();
+
+  for (const rb of recs) {
+    const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
+    if (sMarket === 'h2h') {
+      if (ao === 'home_win' && sOutcome === homeName) return true;
+      if (ao === 'away_win' && sOutcome !== homeName && sOutcome !== 'draw') return true;
+      if (ao === 'draw' && sOutcome === 'draw') return true;
+    } else if (sMarket === 'totals') {
+      if (ao.startsWith('over')  && sOutcome.includes('over'))  return true;
+      if (ao.startsWith('under') && sOutcome.includes('under')) return true;
+    } else if (sMarket === 'spreads') {
+      // e.g. ao = "home_-1.5", sOutcome = "germany (-1.5)"
+      if (ao.startsWith('home_')) {
+        const pt = ao.split('home_')[1]; // "-1.5"
+        if (sOutcome.includes(homeName) && sOutcome.includes(pt)) return true;
+      }
+      if (ao.startsWith('away_')) {
+        const pt = ao.split('away_')[1]; // "+1.5"
+        if (sOutcome.includes(awayName) && sOutcome.includes(pt)) return true;
+      }
+    }
+  }
+  return false;
+}
+
 function singleHTML(s, book, stake) {
   const { price, bookLabel, fallback } = priceForBook(s, book);
   const grossReturn = stake * price;
   const profit      = grossReturn - stake;
-  const mktLabel    = s.market === 'totals' ? 'Over/Under' : '1X2';
+  const mktLabel    = s.market === 'totals' ? 'Over/Under'
+                    : s.market === 'spreads' ? 'Handicap'
+                    : '1X2';
+
+  // Analyst confirmation (may be pre-set by server, or compute from intel)
+  let confirmed = s.analyst_confirms;
+  if (confirmed === undefined || confirmed === null) {
+    confirmed = analystConfirms(s, s.intel);
+  }
+  const analystBadge = confirmed === true
+    ? `<span class="badge" style="background:#1a3626;color:#3fb950;border:1px solid #3fb95066">✓ Analyst backed</span>`
+    : confirmed === false
+    ? `<span class="badge" style="background:#2a1a1a;color:#d29922;border:1px solid #d2992266">⚠ Analyst prefers other outcome</span>`
+    : ``;
 
   const fallbackNote = fallback
     ? `<span style="color:#d29922;font-size:0.73rem"> ⚠ not at ${book}, using ${bookLabel}</span>`
@@ -745,6 +797,7 @@ function singleHTML(s, book, stake) {
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>
         <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${s.edge.toFixed(1)}%</span>
+        ${analystBadge}
       </div>
     </div>
     <div class="single-prices">
@@ -947,15 +1000,21 @@ function renderTopPicks() {
   const panel = document.getElementById('picks-panel');
   if (!panel) return;
 
-  const top5 = allSingles.slice(0, 5); // already sorted by edge desc from server
-
-  if (!top5.length) {
+  if (!allSingles.length) {
     panel.innerHTML = '<div class="empty">No picks yet — data loading...</div>';
     return;
   }
 
   const book  = picksChosenBook();
   const stake = picksChosenStake();
+
+  // Separate analyst-confirmed bets from price-only bets
+  const confirmed = allSingles.filter(s => s.analyst_confirms === true);
+  const unconfirmed = allSingles.filter(s => s.analyst_confirms !== true);
+
+  // Top 5: analyst-confirmed first, then fill with best price-edge bets
+  const top5 = [...confirmed, ...unconfirmed].slice(0, 5);
+  const hasAnalyst = confirmed.length > 0;
 
   // Group by tournament round
   const groups = {};
@@ -964,6 +1023,12 @@ function renderTopPicks() {
     if (!groups[rnd]) groups[rnd] = [];
     groups[rnd].push(s);
   });
+
+  const note = !hasAnalyst
+    ? `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:0.82rem;color:#8b949e">
+        Analyst research is pending — showing top price-edge bets. Picks will update once analysis completes.
+       </div>`
+    : '';
 
   const html = ROUND_ORDER
     .filter(r => groups[r])
@@ -976,7 +1041,7 @@ function renderTopPicks() {
       </div>`)
     .join('');
 
-  panel.innerHTML = html || '<div class="empty">No picks available.</div>';
+  panel.innerHTML = note + (html || '<div class="empty">No picks available.</div>');
 }
 
 // ---- boot ----
