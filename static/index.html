@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WC 2026 Edge Finder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #f0f6fc;
+    letter-spacing: 0.02em;
+  }
+
+  header h1 span { color: #3fb950; }
+
+  #meta {
+    font-size: 0.78rem;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  #refresh-btn {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #refresh-btn:hover { background: #30363d; }
+  #refresh-btn:disabled { opacity: 0.5; cursor: default; }
+
+  #filter-bar {
+    padding: 12px 24px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  #filter-bar label { font-size: 0.82rem; color: #8b949e; }
+
+  select, input[type=range] {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.82rem;
+  }
+
+  #threshold-val { font-size: 0.82rem; color: #58a6ff; min-width: 28px; }
+
+  #legend {
+    padding: 8px 24px;
+    display: flex;
+    gap: 20px;
+    font-size: 0.75rem;
+    color: #8b949e;
+    border-bottom: 1px solid #30363d;
+  }
+  #legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot-long  { background: #f85149; }
+  .dot-short { background: #3fb950; }
+  .dot-neutral { background: #484f58; }
+
+  #matches {
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: #58a6ff44; }
+  .card.flag-long  { border-left: 3px solid #f85149; }
+  .card.flag-short { border-left: 3px solid #3fb950; }
+
+  .card-header {
+    padding: 12px 16px;
+    background: #1c2128;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .match-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #f0f6fc;
+  }
+
+  .match-time {
+    font-size: 0.75rem;
+    color: #8b949e;
+    margin-top: 3px;
+  }
+
+  .badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+  }
+  .badge-gap-long  { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+  .badge-gap-short { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
+  .badge-gap-neutral { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+  .badge-margin { background: #21262d; color: #8b949e; border: 1px solid #30363d; font-weight: 400; }
+
+  .card-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  th {
+    padding: 6px 12px;
+    text-align: right;
+    color: #6e7681;
+    font-weight: 500;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #21262d;
+  }
+  th:first-child { text-align: left; }
+
+  td {
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid #21262d;
+    color: #c9d1d9;
+  }
+  td:first-child { text-align: left; color: #e6edf3; font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+
+  .diff-cell {
+    font-weight: 700;
+    min-width: 58px;
+  }
+  .diff-long  { color: #f85149; }
+  .diff-short { color: #3fb950; }
+  .diff-neutral { color: #6e7681; }
+
+  .bar-cell { padding: 8px 12px 8px 0; width: 80px; }
+  .bar-wrap { background: #21262d; border-radius: 4px; height: 6px; overflow: hidden; }
+  .bar-fill { height: 6px; border-radius: 4px; }
+  .bar-long  { background: #f85149; }
+  .bar-short { background: #3fb950; }
+  .bar-neutral { background: #484f58; }
+
+  .pm-missing { color: #484f58; font-size: 0.75rem; }
+
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    color: #8b949e;
+    gap: 16px;
+    grid-column: 1/-1;
+  }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #30363d;
+    border-top-color: #58a6ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error-msg {
+    display: none;
+    padding: 20px 24px;
+    color: #f85149;
+    font-size: 0.9rem;
+  }
+
+  .no-data { color: #484f58; font-size: 0.82rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WC 2026 <span>Edge Finder</span></h1>
+  <div id="meta">
+    <span id="fetch-time">Loading...</span>
+    <button id="refresh-btn" onclick="loadData(true)">Refresh</button>
+  </div>
+</header>
+
+<div id="filter-bar">
+  <label>Sort by:</label>
+  <select id="sort-select" onchange="render()">
+    <option value="gap">Largest gap</option>
+    <option value="time">Kick-off time</option>
+  </select>
+  <label>Min gap:</label>
+  <input type="range" id="threshold" min="0" max="10" step="0.5" value="0" oninput="onThreshold()">
+  <span id="threshold-val">0%</span>
+  <label>Show:</label>
+  <select id="pm-filter" onchange="render()">
+    <option value="all">All matches</option>
+    <option value="pm">Prediction market data only</option>
+  </select>
+</div>
+
+<div id="legend">
+  <span><span class="dot dot-long"></span> Books LONG (this side overpriced — other outcomes offer value)</span>
+  <span><span class="dot dot-short"></span> Books SHORT (possible value here)</span>
+</div>
+
+<div id="matches"><div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div></div>
+<div id="error-msg"></div>
+
+<script>
+let allMatches = [];
+let threshold = 0;
+
+function onThreshold() {
+  threshold = parseFloat(document.getElementById('threshold').value);
+  document.getElementById('threshold-val').textContent = threshold + '%';
+  render();
+}
+
+async function loadData(force = false) {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  btn.textContent = 'Refreshing...';
+  document.getElementById('matches').innerHTML = '<div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div>';
+
+  try {
+    const url = force ? '/api/refresh' : '/api/divergence';
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    allMatches = data.matches || [];
+
+    const d = new Date(data.fetched_at * 1000);
+    document.getElementById('fetch-time').textContent =
+      'Updated ' + d.toLocaleTimeString();
+
+    render();
+  } catch (e) {
+    document.getElementById('matches').innerHTML = '';
+    const err = document.getElementById('error-msg');
+    err.style.display = 'block';
+    err.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Refresh';
+  }
+}
+
+function render() {
+  const sortBy = document.getElementById('sort-select').value;
+  const pmOnly = document.getElementById('pm-filter').value === 'pm';
+
+  let matches = allMatches.filter(m => {
+    if (pmOnly && !m.has_pm_data) return false;
+    if (Math.abs(m.max_gap) < threshold) return false;
+    return true;
+  });
+
+  if (sortBy === 'gap') {
+    matches.sort((a, b) => Math.abs(b.max_gap) - Math.abs(a.max_gap));
+  } else {
+    matches.sort((a, b) => a.commence.localeCompare(b.commence));
+  }
+
+  const container = document.getElementById('matches');
+  if (matches.length === 0) {
+    container.innerHTML = '<div id="loading"><span>No matches meet the current filters.</span></div>';
+    return;
+  }
+
+  container.innerHTML = matches.map(m => cardHTML(m)).join('');
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })
+      + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  } catch { return iso; }
+}
+
+function cardHTML(m) {
+  const gap = m.max_gap;
+  const absGap = Math.abs(gap);
+  const isLong  = gap >  2;
+  const isShort = gap < -2;
+
+  let cardClass = 'card';
+  if (isLong)  cardClass += ' flag-long';
+  if (isShort) cardClass += ' flag-short';
+
+  let badgeClass = 'badge badge-gap-neutral';
+  let badgeText  = absGap > 0 ? (gap > 0 ? '+' : '') + gap.toFixed(1) + '% gap' : 'no PM data';
+  if (isLong)  { badgeClass = 'badge badge-gap-long';  badgeText = '+' + gap.toFixed(1) + '% gap'; }
+  if (isShort) { badgeClass = 'badge badge-gap-short'; badgeText = gap.toFixed(1) + '% gap'; }
+
+  const rows = m.outcomes.map(o => {
+    const diff = o.diff;
+    const hasDiff = diff !== null;
+    const diffClass = !hasDiff ? 'diff-neutral' : diff > 2 ? 'diff-long' : diff < -2 ? 'diff-short' : 'diff-neutral';
+    const barClass  = !hasDiff ? 'bar-neutral'  : diff > 2 ? 'bar-long'  : diff < -2 ? 'bar-short'  : 'bar-neutral';
+    const barWidth  = hasDiff ? Math.min(Math.abs(diff) / 10 * 100, 100) : 0;
+
+    const diffText = hasDiff ? (diff > 0 ? '+' : '') + diff.toFixed(1) + '%' : '—';
+    const polyText   = o.poly   !== null ? o.poly.toFixed(1)   + '%' : '<span class="pm-missing">—</span>';
+    const kalshiText = o.kalshi !== null ? o.kalshi.toFixed(1) + '%' : '<span class="pm-missing">—</span>';
+
+    const bestText = o.best_price
+      ? o.best_price.toFixed(2) + ' <span style="color:#6e7681;font-size:0.72rem">(' + (o.best_book || '') + ')</span>'
+      : '—';
+
+    return `<tr>
+      <td>${o.outcome}</td>
+      <td>${o.book_fair.toFixed(1)}%</td>
+      <td>${polyText}</td>
+      <td>${kalshiText}</td>
+      <td class="diff-cell ${diffClass}">${diffText}</td>
+      <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill ${barClass}" style="width:${barWidth}%"></div></div></td>
+      <td>${bestText}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="${cardClass}">
+    <div class="card-header">
+      <div>
+        <div class="match-title">${m.label}</div>
+        <div class="match-time">${formatTime(m.commence)}</div>
+      </div>
+      <div class="card-badges">
+        <span class="${badgeClass}">${badgeText}</span>
+        <span class="badge badge-margin">book margin ${m.margin}%</span>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+loadData();
+</script>
+</body>
+</html>

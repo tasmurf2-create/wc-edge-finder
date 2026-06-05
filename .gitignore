@@ -1,0 +1,15 @@
+# API keys — never commit
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual envs
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
