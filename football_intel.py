@@ -241,7 +241,7 @@ def _load_cache():
 
 
 def _save_cache(cache):
-    CACHE_FILE.write_text(json.dumps(cache, indent=2))
+    CACHE_FILE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _cache_key(home, away):
