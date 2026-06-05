@@ -47,6 +47,12 @@ _cache = {"raw": None, "fetched_at": 0}
 _CACHE_TTL = 300
 _lock = threading.Lock()
 
+# Separate intel cache — populated by background thread
+_intel_cache = {}          # {match_label: intel_dict}
+_intel_lock  = threading.Lock()
+_intel_busy  = False       # True while background fetch is running
+_teams_busy  = False       # True while team snapshot fetches are running
+
 
 # ---------------------------------------------------------------------------
 # Bookmaker data helpers
@@ -130,6 +136,106 @@ def _all_h2h_prices(event):
                 continue
             result[bm["title"]] = {o["name"]: o["price"] for o in market["outcomes"]}
     return result
+
+
+# ---------------------------------------------------------------------------
+# Background intel fetch
+# ---------------------------------------------------------------------------
+
+def _build_intel_requests(singles):
+    """Build intel request list from singles, one entry per unique match."""
+    intel_requests = []
+    seen_matches   = set()
+    for s in singles:
+        match_label = s["match"]
+        if match_label in seen_matches:
+            continue
+        seen_matches.add(match_label)
+        parts = match_label.split(" vs ", 1)
+        if len(parts) != 2:
+            continue
+        home_raw, away_raw = parts
+        match_singles = [x for x in singles if x["match"] == match_label]
+        price_notes   = "\n".join(
+            f"- {x['outcome'].upper()}: book fair {x['fair_prob']*100:.1f}% "
+            f"vs best price {x['best_price']} ({x['best_book']}) "
+            f"= +{x['edge']:.1f}% edge"
+            + (f", Kalshi {x['kalshi']}%" if x['kalshi'] else "")
+            + (f", PM gap {x['pm_gap']:+.1f}%" if x['pm_gap'] else "")
+            for x in match_singles
+        )
+        intel_requests.append({
+            "home":        home_raw,
+            "away":        away_raw,
+            "commence":    s["commence"],
+            "price_notes": price_notes,
+        })
+    return intel_requests
+
+
+def _run_intel_bg(intel_requests):
+    global _intel_busy
+    print(f"[intel] background fetch starting for {len(intel_requests)} match(es)...")
+    try:
+        # Step 1: pre-fetch team snapshots for just these matches (concurrently, fast)
+        teams = set()
+        for r in intel_requests:
+            teams.add(r["home"])
+            teams.add(r["away"])
+        store = fintel._load_team_data()
+        now   = time.time()
+        missing_teams = [t for t in teams
+                         if _team_key(t) not in store or
+                         (now - store[_team_key(t)].get("fetched_at", 0)) > fintel.TEAM_DATA_TTL]
+        if missing_teams and os.environ.get("ANTHROPIC_API_KEY"):
+            import concurrent.futures as cf
+            print(f"[team] fetching snapshots for: {', '.join(sorted(missing_teams))}")
+            with cf.ThreadPoolExecutor(max_workers=2) as ex:
+                list(ex.map(fintel.fetch_team_snapshot, missing_teams))
+
+        # Step 2: run match analysis (uses cached team data, no web search)
+        raw_map = fintel.get_intel_batch(intel_requests, max_calls=MAX_INTEL_MATCHES)
+        with _intel_lock:
+            for req in intel_requests:
+                ck = fintel._cache_key(req["home"], req["away"])
+                if ck in raw_map:
+                    label = req["home"] + " vs " + req["away"]
+                    _intel_cache[label] = raw_map[ck]
+        print(f"[intel] background fetch done — {len(_intel_cache)} match(es) cached")
+    except Exception as e:
+        print(f"[intel] background fetch failed: {e}")
+    finally:
+        _intel_busy = False
+
+
+MAX_INTEL_MATCHES = 3   # top N matches analysed sequentially — ~30-45s each with web search
+
+def _team_key(t):
+    return t.lower().strip()
+
+
+def _trigger_intel_bg(singles):
+    """Start background intel fetch only for matches missing from cache."""
+    global _intel_busy
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return
+    if _intel_busy:
+        return
+
+    with _intel_lock:
+        cached_labels = set(_intel_cache.keys())
+
+    all_requests = _build_intel_requests(singles)   # already sorted by edge (singles are sorted)
+    missing = [r for r in all_requests
+               if (r["home"] + " vs " + r["away"]) not in cached_labels]
+    missing = missing[:MAX_INTEL_MATCHES]           # cap to top N
+
+    if not missing:
+        return
+
+    _intel_busy = True
+    t = threading.Thread(target=_run_intel_bg, args=(missing,), daemon=True)
+    t.start()
 
 
 # ---------------------------------------------------------------------------
@@ -284,54 +390,17 @@ def _build_raw():
 
     parlays = _build_parlays(singles)
 
-    # ---- Football intelligence (form, injuries, conditions, weather) --------
-    # Build intel requests for all unique matches that have a value single
-    intel_requests = []
-    seen_matches   = set()
+    # Attach any already-cached intel (from disk or previous background run)
+    with _intel_lock:
+        cached_intel = dict(_intel_cache)
     for s in singles:
-        match_label = s["match"]
-        if match_label in seen_matches:
-            continue
-        seen_matches.add(match_label)
-        parts = match_label.split(" vs ", 1)
-        if len(parts) != 2:
-            continue
-        home_raw, away_raw = parts
-        # Build a plain-English summary of the price signal to give Claude context
-        match_singles = [x for x in singles if x["match"] == match_label]
-        price_notes   = "\n".join(
-            f"- {x['outcome'].upper()}: book fair {x['fair_prob']*100:.1f}% "
-            f"vs best price {x['best_price']} ({x['best_book']}) "
-            f"= +{x['edge']:.1f}% edge"
-            + (f", Kalshi {x['kalshi']}%" if x['kalshi'] else "")
-            + (f", PM gap {x['pm_gap']:+.1f}%" if x['pm_gap'] else "")
-            for x in match_singles
-        )
-        intel_requests.append({
-            "home":        home_raw,
-            "away":        away_raw,
-            "commence":    s["commence"],
-            "price_notes": price_notes,
-        })
-
-    intel_map = {}
-    if intel_requests and os.environ.get("ANTHROPIC_API_KEY"):
-        try:
-            raw_map = fintel.get_intel_batch(intel_requests, max_calls=15)
-            # Rekey by match label for easy lookup
-            for req in intel_requests:
-                ck = fintel._cache_key(req["home"], req["away"])
-                if ck in raw_map:
-                    intel_map[req["home"] + " vs " + req["away"]] = raw_map[ck]
-        except Exception as e:
-            print(f"[intel] batch failed: {e}")
-
-    # Attach intel to singles and parlays
-    for s in singles:
-        s["intel"] = intel_map.get(s["match"])
+        s["intel"] = cached_intel.get(s["match"])
     for p in parlays:
         for leg in p["legs"]:
-            leg["intel"] = intel_map.get(leg["match"])
+            leg["intel"] = cached_intel.get(leg["match"])
+
+    # Kick off background intel fetch (pre-fetches team snapshots then runs analysis)
+    _trigger_intel_bg(singles)
 
     # Sorted bookmaker list for the frontend dropdown
     # Put Paddy Power first if present, then alphabetical
@@ -441,7 +510,63 @@ def divergence():
 @app.get("/api/bets")
 def bets():
     d = get_raw()
-    return JSONResponse({"fetched_at": d["fetched_at"], "bets": d["bets"], "bookmakers": d.get("bookmakers", [])})
+    # Attach latest intel from background cache before responding
+    with _intel_lock:
+        cached_intel = dict(_intel_cache)
+    bets_data = d["bets"]
+    for s in bets_data["singles"]:
+        s["intel"] = cached_intel.get(s["match"])
+    for p in bets_data["parlays"]:
+        for leg in p["legs"]:
+            leg["intel"] = cached_intel.get(leg["match"])
+    return JSONResponse({
+        "fetched_at":   d["fetched_at"],
+        "bets":         bets_data,
+        "bookmakers":   d.get("bookmakers", []),
+        "intel_ready":  len(cached_intel),
+        "intel_loading": _intel_busy,
+    })
+
+
+@app.get("/api/intel")
+def intel():
+    """Returns current intel map — call this to refresh analyst cards without re-fetching odds."""
+    with _intel_lock:
+        cached_intel = dict(_intel_cache)
+    return JSONResponse({
+        "intel":         cached_intel,
+        "intel_ready":   len(cached_intel),
+        "intel_loading": _intel_busy,
+    })
+
+
+@app.get("/api/refresh-teams")
+def refresh_teams():
+    """Force re-fetch of all team snapshots via web search (once per day is enough)."""
+    d = get_raw()
+    singles = d["bets"]["singles"]
+    requests = fintel._build_intel_requests.__wrapped__(singles) if hasattr(fintel._build_intel_requests, '__wrapped__') else None
+    # Build team list from singles
+    teams = set()
+    for s in singles:
+        parts = s["match"].split(" vs ", 1)
+        if len(parts) == 2:
+            teams.add(parts[0])
+            teams.add(parts[1])
+
+    def _do_refresh():
+        for team in sorted(teams):
+            fintel.fetch_team_snapshot(team, force=True)
+        # Clear intel cache so next load re-analyses with fresh team data
+        with _intel_lock:
+            _intel_cache.clear()
+        import pathlib
+        pathlib.Path("intel_cache.json").unlink(missing_ok=True)
+        print(f"[team] forced refresh done for {len(teams)} teams")
+
+    t = threading.Thread(target=_do_refresh, daemon=True)
+    t.start()
+    return JSONResponse({"status": "refreshing", "teams": len(teams)})
 
 
 @app.get("/api/refresh")

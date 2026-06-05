@@ -19,9 +19,11 @@ from pathlib import Path
 
 import anthropic
 
-CACHE_FILE = Path("intel_cache.json")
-CACHE_TTL  = 43200   # 12 hours
-MODEL      = "claude-sonnet-4-6"
+CACHE_FILE      = Path("intel_cache.json")
+TEAM_DATA_FILE  = Path("team_data.json")
+CACHE_TTL       = 43200   # 12 hours — match analysis
+TEAM_DATA_TTL   = 86400   # 24 hours — team form/injury snapshot
+MODEL           = "claude-sonnet-4-6"
 
 _client = None
 
@@ -246,6 +248,103 @@ def _cache_key(home, away):
 
 
 # ---------------------------------------------------------------------------
+# Team data cache — web search once per team per day, store to disk
+# ---------------------------------------------------------------------------
+
+def _load_team_data():
+    if TEAM_DATA_FILE.exists():
+        try:
+            return json.loads(TEAM_DATA_FILE.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+def _save_team_data(data):
+    TEAM_DATA_FILE.write_text(json.dumps(data, indent=2))
+
+
+def _team_key(team):
+    return team.lower().strip()
+
+
+def fetch_team_snapshot(team, force=False):
+    """
+    Fetch a team's current form, injuries and squad news via web search.
+    Cached for 24h. Returns a plain-text summary string.
+    """
+    key   = _team_key(team)
+    store = _load_team_data()
+    entry = store.get(key)
+
+    if not force and entry and (time.time() - entry.get("fetched_at", 0)) < TEAM_DATA_TTL:
+        return entry["snapshot"]
+
+    try:
+        client = _get_client()
+        resp = client.messages.create(
+            model      = MODEL,
+            max_tokens = 400,
+            tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}],
+            messages   = [{
+                "role": "user",
+                "content": (
+                    f"Search for the latest news on the {team} national football team "
+                    f"for the 2026 FIFA World Cup. In 4-6 bullet points cover: "
+                    f"(1) manager and current squad form/results in 2026, "
+                    f"(2) key players to watch, "
+                    f"(3) any confirmed injuries or suspensions, "
+                    f"(4) tactical setup/style. "
+                    f"Be factual and concise. No waffle."
+                )
+            }],
+        )
+        # Extract text from mixed content blocks
+        snapshot = ""
+        for block in resp.content:
+            if getattr(block, "type", None) == "text":
+                snapshot = block.text.strip()
+                break
+
+        if snapshot:
+            store[key] = {"snapshot": snapshot, "fetched_at": int(time.time()), "team": team}
+            _save_team_data(store)
+            print(f"[team] fetched snapshot for {team} ({len(snapshot)} chars)")
+            return snapshot
+    except Exception as e:
+        print(f"[team] web search failed for {team}: {e}")
+
+    # Fallback: return cached even if stale
+    return entry["snapshot"] if entry else ""
+
+
+def get_team_snapshots(home, away, force=False):
+    """Return (home_snapshot, away_snapshot) strings, fetching if needed."""
+    h = fetch_team_snapshot(home, force=force)
+    a = fetch_team_snapshot(away, force=force)
+    return h, a
+
+
+def get_team_snapshots_cached_only(home, away):
+    """Return snapshots from cache only — never triggers a web search."""
+    store = _load_team_data()
+    h = store.get(_team_key(home), {}).get("snapshot", "")
+    a = store.get(_team_key(away), {}).get("snapshot", "")
+    return h, a
+
+
+def refresh_teams_for_matches(match_list, force=False):
+    """Pre-fetch team snapshots for all teams in match_list. Call once per day."""
+    teams = set()
+    for m in match_list:
+        teams.add(m["home"])
+        teams.add(m["away"])
+    for team in sorted(teams):
+        fetch_team_snapshot(team, force=force)
+    print(f"[team] snapshots ready for {len(teams)} teams")
+
+
+# ---------------------------------------------------------------------------
 # Claude prompts
 # ---------------------------------------------------------------------------
 
@@ -260,48 +359,40 @@ your knowledge cutoff), say so clearly. Flag where odds look sharp and where the
 Always output valid JSON matching the exact schema requested — no markdown fences, no extra keys."""
 
 
-def _build_prompt(home, away, commence, price_notes, weather_str):
-    return f"""Analyse this World Cup 2026 group-stage match as a professional betting researcher.
+def _build_prompt(home, away, commence, price_notes, weather_str, home_snap="", away_snap=""):
+    team_section = ""
+    if home_snap or away_snap:
+        team_section = f"""
+LIVE TEAM DATA (fetched today via web search — use this, not your training memory):
+{home.upper()}: {home_snap or 'No data available.'}
 
-MATCH: {home} vs {away}
-KICK-OFF (UTC): {commence}
+{away.upper()}: {away_snap or 'No data available.'}
+"""
+    return f"""WC 2026 match: {home} vs {away} (kick-off UTC: {commence})
 
-VENUE CONDITIONS (June climate data + altitude):
-{weather_str}
-
-PRICE SIGNAL FROM MARKET:
+VENUE: {weather_str}
+{team_section}
+BOOKMAKER PRICE SIGNAL:
 {price_notes}
 
-IMPORTANT CONTEXT:
-- Your knowledge cutoff is August 2025. The WC 2026 starts 11 June 2026.
-- You will not have final squad lists, pre-tournament form from early 2026, or late injuries.
-- Clearly flag what you do not know. Do not invent injury news.
-- The heat/altitude data above is real and should heavily influence your assessment.
-  Teams from cool climates (Northern Europe, UK, South America) will be significantly
-  affected by 35°C+ Texas heat or 2200m Mexico City altitude. Teams from hot regions
-  (North Africa, Middle East, Central America) will have a natural advantage.
-
-Produce ONLY a JSON object with EXACTLY this structure:
-
+Output ONLY this JSON (use the live team data above as your primary source):
 {{
-  "home_form": "Specific: last known results, quality of opposition, goal record, defensive solidity. Note if this is pre-2026 data.",
-  "away_form": "Same for {away}.",
-  "home_strengths": ["up to 3 specific strengths relevant to this fixture"],
-  "away_strengths": ["up to 3 specific strengths relevant to this fixture"],
-  "key_absences": "Known or expected absences — injuries, suspensions, ageing key players. Be honest about what you don't know.",
-  "conditions_impact": "How will the specific temperature, humidity, altitude, and local kick-off time impact each team? Which team benefits? Be explicit about cool-climate vs hot-climate squads.",
-  "tactical_matchup": "Specific: pressing vs deep-block, set-piece threat, pace on the counter, width play. Who does the style matchup favour?",
-  "goals_assessment": "Expected scoring range, likelihood of BTTS, over/under 2.5 reasoning. Which defence is more suspect?",
-  "market_read": "Is the bookmaker pricing fair, too short on the favourite, or too generous on the underdog/draw? What might the market be missing?",
+  "home_form": "Last known form, goal record, key players. 2 sentences.",
+  "away_form": "Same for {away}. 2 sentences.",
+  "key_absences": "Known injuries/suspensions or 'none known'.",
+  "conditions_impact": "How heat/altitude/kickoff time affects each team specifically. Which team benefits?",
+  "tactical_matchup": "Style clash in 2 sentences. Who does it favour?",
+  "goals_assessment": "Over/under 2.5 reasoning. BTTS likelihood.",
+  "market_read": "Is the price fair, favourite too short, or underdog value?",
   "recommendation": {{
-    "outcome": "one of: home_win, draw, away_win, over_2.5, under_2.5, no_clear_edge",
-    "reasoning": "2-3 sentences — specific football and conditions reasons, not just price.",
-    "strength": "one of: strong, moderate, lean",
-    "watch_out": "The single biggest risk that could make this recommendation wrong."
+    "outcome": "home_win|draw|away_win|over_2.5|under_2.5|no_clear_edge",
+    "reasoning": "2 sentences — football reasons, not just price.",
+    "strength": "strong|moderate|lean",
+    "watch_out": "Biggest risk to this call in 1 sentence."
   }},
-  "overall_summary": "4-5 sentences. Plain English match preview a punter can read in 20 seconds. Include conditions impact prominently.",
-  "intel_confidence": "one of: high, medium, low",
-  "knowledge_caveat": "What specific information you're missing that would change your assessment."
+  "overall_summary": "3 sentences a punter can act on. Lead with conditions.",
+  "intel_confidence": "high|medium|low",
+  "knowledge_caveat": "What you don't know that matters most."
 }}"""
 
 
@@ -325,14 +416,17 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
     cond, vk     = get_conditions_for_match(home, away, commence)
     cond_str     = _fmt_conditions(cond, vk)
 
+    # Use team snapshots only if already cached — never block analysis waiting for web search
+    home_snap, away_snap = get_team_snapshots_cached_only(home, away)
+
     try:
         client = _get_client()
         resp   = client.messages.create(
             model      = MODEL,
-            max_tokens = 2500,
+            max_tokens = 1200,
             system     = SYSTEM_PROMPT,
             messages   = [{"role": "user",
-                           "content": _build_prompt(home, away, commence, price_notes, cond_str)}],
+                           "content": _build_prompt(home, away, commence, price_notes, cond_str, home_snap, away_snap)}],
         )
         raw = resp.content[0].text.strip()
         if raw.startswith("```"):
@@ -356,28 +450,40 @@ def get_intel_batch(match_list, max_calls=15):
     """
     Fetch intel for a list of dicts with keys: home, away, commence, price_notes.
     Returns {cache_key: intel_dict}.
-    Caps fresh API calls at max_calls to control cost.
+    Caps fresh API calls at max_calls; runs them concurrently for speed.
     """
+    import concurrent.futures
+
+    cache = _load_cache()
     results = {}
-    calls   = 0
-    cache   = _load_cache()
+    to_fetch = []
 
     for m in match_list:
-        home, away = m["home"], m["away"]
-        ck    = _cache_key(home, away)
+        ck = _cache_key(m["home"], m["away"])
         entry = cache.get(ck)
-
         if entry and (time.time() - entry.get("cached_at", 0)) < CACHE_TTL:
             results[ck] = entry["intel"]
-            continue
+        elif len(to_fetch) < max_calls:
+            to_fetch.append(m)
 
-        if calls >= max_calls:
-            continue
+    if not to_fetch:
+        print(f"[intel] {len(results)} matches from cache, 0 fresh calls")
+        return results
 
-        intel = get_match_intel(home, away, m.get("commence",""), m.get("price_notes",""))
-        if intel:
-            results[ck] = intel
-            calls += 1
+    def _fetch_one(m):
+        intel = get_match_intel(m["home"], m["away"], m.get("commence",""), m.get("price_notes",""))
+        return m["home"], m["away"], intel
 
-    print(f"[intel] {len(results)} matches served ({calls} fresh Claude calls)")
+    # Run sequentially to stay under token-per-minute rate limits
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        futures = [ex.submit(_fetch_one, m) for m in to_fetch]
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                home, away, intel = fut.result()
+                if intel:
+                    results[_cache_key(home, away)] = intel
+            except Exception as e:
+                print(f"[intel] concurrent fetch error: {e}")
+
+    print(f"[intel] {len(results)} matches served ({len(to_fetch)} fresh Claude calls)")
     return results

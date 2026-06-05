@@ -270,6 +270,7 @@ tr:last-child td { border-bottom: none; }
   <div id="meta">
     <span id="fetch-time">Loading...</span>
     <button id="refresh-btn" onclick="loadData(true)">Refresh</button>
+    <button id="team-btn" onclick="refreshTeams()" style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">Update Team News</button>
   </div>
 </header>
 
@@ -359,11 +360,16 @@ function switchTab(tab) {
 }
 
 // ---- data loading ----
+let _intelPollTimer = null;
+
 async function loadData(force = false) {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true; btn.textContent = 'Refreshing...';
   document.getElementById('matches').innerHTML = '<div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div>';
   document.getElementById('bets-panel').innerHTML = '<div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>';
+
+  // Stop any running intel poll
+  if (_intelPollTimer) { clearInterval(_intelPollTimer); _intelPollTimer = null; }
 
   try {
     const [divRes, betsRes] = await Promise.all([
@@ -396,12 +402,69 @@ async function loadData(force = false) {
 
     renderDivergence();
     renderBets();
+
+    // If intel is still loading in background, poll for it every 8s
+    if (betsData.intel_loading) {
+      _intelPollTimer = setInterval(pollIntel, 8000);
+    } else if (betsData.intel_ready === 0) {
+      // Intel finished but got nothing — credits likely exhausted
+      document.querySelectorAll('.intel-loading').forEach(el => {
+        el.innerHTML = '<span style="color:#6e7681;font-size:0.8rem">Analyst unavailable — check Anthropic API credits at console.anthropic.com</span>';
+      });
+    }
   } catch (e) {
     document.getElementById('matches').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
     document.getElementById('bets-panel').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
   } finally {
     btn.disabled = false; btn.textContent = 'Refresh';
   }
+}
+
+async function refreshTeams() {
+  const btn = document.getElementById('team-btn');
+  btn.disabled = true; btn.textContent = 'Fetching team news...';
+  try {
+    const res = await fetch('/api/refresh-teams');
+    const d = await res.json();
+    btn.textContent = `Updating ${d.teams} teams...`;
+    // Wait a bit then reload intel
+    setTimeout(async () => {
+      await loadData(false);
+      btn.disabled = false; btn.textContent = 'Update Team News';
+    }, d.teams * 8000); // ~8s per team
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Update Team News';
+  }
+}
+
+async function pollIntel() {
+  try {
+    const res  = await fetch('/api/intel');
+    const data = await res.json();
+    if (!data.intel || !Object.keys(data.intel).length) return;
+
+    // Merge intel into allSingles and allParlays
+    let changed = false;
+    allSingles.forEach(s => {
+      if (!s.intel && data.intel[s.match]) { s.intel = data.intel[s.match]; changed = true; }
+    });
+    allParlays.forEach(p => p.legs.forEach(l => {
+      if (!l.intel && data.intel[l.match]) { l.intel = data.intel[l.match]; changed = true; }
+    }));
+
+    if (changed) renderBets();
+
+    // Stop polling once intel is done loading
+    if (!data.intel_loading) {
+      clearInterval(_intelPollTimer);
+      _intelPollTimer = null;
+      if (!data.intel_ready) {
+        document.querySelectorAll('.intel-loading').forEach(el => {
+          el.innerHTML = '<span style="color:#6e7681;font-size:0.8rem">Analyst unavailable — check Anthropic API credits at console.anthropic.com</span>';
+        });
+      }
+    }
+  } catch (e) { /* ignore poll errors */ }
 }
 
 // ---- utils ----
@@ -663,7 +726,7 @@ function buildWhy(s) {
 }
 
 function intelHTML(intel) {
-  if (!intel) return '';
+  if (!intel) return `<div class="intel-loading" style="margin-top:10px;border:1px solid #30363d;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;color:#6e7681;font-size:0.82rem"><div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0"></div> Analyst researching form, conditions &amp; injuries...</div>`;
 
   const rec    = intel.recommendation || {};
   const cond   = intel.conditions || {};
