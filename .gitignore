@@ -13,5 +13,9 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime caches
 team_data.json
 intel_cache.json
+weather_cache.json
+outrights_cache.json

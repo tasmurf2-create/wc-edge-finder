@@ -47,6 +47,22 @@ EDGE_MIN   = 0.005         # flag singles with >0.5% edge
 PARLAY_MIN = 0.005         # minimum combined EV to include a parlay
 VALUE_THRESHOLD = 0.015    # 1.5% edge = "clear value"
 
+# Accumulator risk presets — drive _build_parlays().
+#   min_leg_prob      : reject any leg below this fair (de-vigged) probability
+#   legs              : which leg-counts to generate
+#   min_combined_prob : the WHOLE slip must have at least this chance of landing
+# The point: an acca of strong favourites still multiplies your odds up, but the
+# win-probability multiplies *down* fast — so we floor the combined chance, not
+# just the per-leg chance, and rank by chance-of-landing rather than payout.
+ACCA_PRESETS = {
+    "banker":   {"min_leg_prob": 0.62, "legs": (2, 3, 4),    "min_combined_prob": 0.30},
+    "balanced": {"min_leg_prob": 0.55, "legs": (4, 5, 6),    "min_combined_prob": 0.12},
+    "punchy":   {"min_leg_prob": 0.45, "legs": (6, 7, 8),    "min_combined_prob": 0.04},
+}
+# Value guard: with it on, drop any leg whose best price is more than this far
+# (in edge %) below fair. Keeps only well-priced, low-margin legs.
+ACCA_GUARD_TOL_PCT = -2.5
+
 # ---------------------------------------------------------------------------
 # Cache — one shared fetch for all endpoints
 # ---------------------------------------------------------------------------
@@ -271,7 +287,8 @@ def _run_intel_bg(intel_requests):
         _intel_busy = False
 
 
-MAX_INTEL_MATCHES = 3   # top N matches analysed sequentially — ~30-45s each with web search
+MAX_INTEL_MATCHES = 6   # top N matches analysed; sized to fit Tier-1 rate limits
+                        # (30k input tokens/min). Raise once on a higher API tier.
 
 def _team_key(t):
     return t.lower().strip()
@@ -322,7 +339,17 @@ def _build_raw():
 
     matches     = []
     singles     = []
+    acca_pool   = []   # ALL outcomes (incl. favourites) — candidate legs for accas
     all_books   = set()
+    weather_by_label = {}   # match label -> weather signal (or None)
+
+    # Warm the forecast cache concurrently so per-match weather lookups are instant
+    try:
+        fintel.prewarm_weather(
+            (ev["home_team"], ev["away_team"], ev.get("commence_time", "")) for ev in events
+        )
+    except Exception as e:
+        print(f"[weather] prewarm failed: {e}")
 
     for ev in events:
         h2h_r = _analyse_h2h(ev)
@@ -333,6 +360,7 @@ def _build_raw():
         mk    = pmkt.match_key(home, away)
         label = f"{home} vs {away}"
         comm  = h2h_r["commence"]
+        weather_by_label[label] = fintel.weather_signal(home, away, comm)
 
         kl_probs   = kal.get(mk, {}).get("probs", {})
         pm_probs   = poly.get(mk, {}).get("probs", {})
@@ -398,6 +426,23 @@ def _build_raw():
             }
             h2h_outcomes.append(outcome_obj)
 
+            # Collect EVERY priced outcome as an acca candidate (favourites
+            # included — these never reach the value-singles list below).
+            if bp_price:
+                acca_pool.append({
+                    "match":       label,
+                    "commence":    comm,
+                    "market":      "h2h",
+                    "outcome":     norm,
+                    "fair_prob":   fair_p,
+                    "best_price":  bp_price,
+                    "best_book":   bp_book,
+                    "per_book":    per_book,
+                    "paddy":       paddy,
+                    "edge":        edge if edge is not None else 0.0,
+                    "confidence":  confidence or "low",
+                })
+
             # Collect as value single if it has any edge
             if edge is not None and edge > EDGE_MIN * 100:
                 singles.append({
@@ -426,6 +471,20 @@ def _build_raw():
         for line, td in sorted(totals_data.items()):
             for name, od in td["outcomes"].items():
                 edge = od["edge"]
+                if od.get("best_price") and od.get("fair") is not None:
+                    acca_pool.append({
+                        "match":      label,
+                        "commence":   comm,
+                        "market":     "totals",
+                        "outcome":    f"{name} {line}",
+                        "fair_prob":  od["fair"] / 100,
+                        "best_price": od["best_price"],
+                        "best_book":  od["best_book"],
+                        "per_book":   {},
+                        "paddy":      None,
+                        "edge":       edge if edge is not None else 0.0,
+                        "confidence": "low",
+                    })
                 if edge is not None and edge > EDGE_MIN * 100:
                     singles.append({
                         "match":      label,
@@ -448,7 +507,7 @@ def _build_raw():
         # ---- spreads (Asian handicap) ---------------------------------------
         spreads_data = _analyse_spreads(ev)
         for (team_name, point), sd in spreads_data.items():
-            if sd["edge"] is None or sd["edge"] <= EDGE_MIN * 100:
+            if sd.get("fair_prob") is None:
                 continue
             per_book = _all_spread_prices(ev, team_name, point)
             per_book = {k: v for k, v in per_book.items() if k in BOOKMAKER_WHITELIST}
@@ -459,13 +518,15 @@ def _build_raw():
             else:
                 bp_price = sd["best_price"]
                 bp_book  = sd["best_book"]
-            edge = round((sd["fair_prob"] - 1.0/bp_price) * 100, 2) if bp_price else None
-            if edge is None or edge <= EDGE_MIN * 100:
+            if not bp_price:
                 continue
+            edge = round((sd["fair_prob"] - 1.0/bp_price) * 100, 2)
             # Human-readable: "Germany (-1.5)" = Germany wins by 2+
             sign = "+" if point > 0 else ""
             outcome_label = f"{team_name} ({sign}{point:g})"
-            singles.append({
+
+            # Every priced handicap is an acca candidate (e.g. a nailed-on +2).
+            acca_pool.append({
                 "match":      label,
                 "commence":   comm,
                 "market":     "spreads",
@@ -476,14 +537,29 @@ def _build_raw():
                 "per_book":   per_book,
                 "paddy":      paddy,
                 "edge":       edge,
-                "pm_gap":     None,
-                "confidence": "medium" if edge > VALUE_THRESHOLD * 100 else "low",
-                "kalshi":     None,
-                "poly":       None,
-                # Keep raw handicap info for analyst matching
-                "spread_team":  team_name,
-                "spread_point": point,
+                "confidence": "low",
             })
+
+            if edge > EDGE_MIN * 100:
+                singles.append({
+                    "match":      label,
+                    "commence":   comm,
+                    "market":     "spreads",
+                    "outcome":    outcome_label,
+                    "fair_prob":  sd["fair_prob"],
+                    "best_price": bp_price,
+                    "best_book":  bp_book,
+                    "per_book":   per_book,
+                    "paddy":      paddy,
+                    "edge":       edge,
+                    "pm_gap":     None,
+                    "confidence": "medium" if edge > VALUE_THRESHOLD * 100 else "low",
+                    "kalshi":     None,
+                    "poly":       None,
+                    # Keep raw handicap info for analyst matching
+                    "spread_team":  team_name,
+                    "spread_point": point,
+                })
 
         matches.append({
             "label":      label,
@@ -493,12 +569,19 @@ def _build_raw():
             "has_pm_data": bool(kl_probs or pm_probs),
             "outcomes":   h2h_outcomes,
             "totals":     totals_list,
+            "weather":    weather_by_label.get(label),
         })
+
+    # Attach the weather signal to every leg/single by match label
+    for s in singles:
+        s["weather"] = weather_by_label.get(s["match"])
+    for c in acca_pool:
+        c["weather"] = weather_by_label.get(c["match"])
 
     matches.sort(key=lambda m: (-abs(m["max_gap"]) if m["has_pm_data"] else 999, m["commence"]))
     singles.sort(key=lambda s: -s["edge"])
 
-    parlays = _build_parlays(singles)
+    parlays = _build_parlays(acca_pool)
 
     # Attach any already-cached intel (from disk or previous background run)
     with _intel_lock:
@@ -527,6 +610,7 @@ def _build_raw():
         "bets": {
             "singles": singles,
             "parlays": parlays,
+            "acca_pool": acca_pool,
         },
     }
 
@@ -602,37 +686,60 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
 # Parlay builder
 # ---------------------------------------------------------------------------
 
-def _build_parlays(singles, max_legs=3, top_n=10):
+def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12):
     """
-    Generate 2- and 3-leg parlays from value singles.
-    Rules:
-    - No two legs from the same match
-    - Combined EV = prod(fair_prob) * prod(best_price) - 1 must be > PARLAY_MIN
-    - Sort by combined EV descending
+    Generate high-probability accumulators from the value singles.
+
+    risk         : "banker" | "balanced" | "punchy"  -> see ACCA_PRESETS
+    value_guard  : True  -> drop legs whose best price is worse than ~2.5% under
+                            fair, i.e. keep only well-priced (low-margin) legs.
+                            A high-probability favourites acca is never strictly
+                            +EV (books shade favourites), so the guard minimises
+                            the bookmaker margin rather than eliminating it.
+                   False -> pick the most-likely outcomes regardless of price.
+
+    Legs are floored on per-leg probability; the whole slip is floored on
+    combined probability; results are ranked by chance-of-landing, not payout.
     """
+    preset = ACCA_PRESETS.get(risk, ACCA_PRESETS["balanced"])
+    min_leg_prob      = preset["min_leg_prob"]
+    leg_counts        = preset["legs"]
+    min_combined_prob = preset["min_combined_prob"]
+
+    # Eligible legs across ALL markets (1X2, totals, handicaps): high enough
+    # single-outcome probability. When the value guard is on we also drop legs
+    # priced well below fair, so we line-shop into the lowest-margin price.
+    eligible = [
+        s for s in singles
+        if s["fair_prob"] >= min_leg_prob and (s["edge"] >= ACCA_GUARD_TOL_PCT if value_guard else True)
+    ]
+
+    # One leg per match (a standard acca can't combine correlated same-match
+    # outcomes — that's a Same-Game Multi). Keep each match's most nailed-on leg,
+    # whatever market it's in. This also bounds the combinatorics cleanly.
+    best_by_match = {}
+    for s in eligible:
+        cur = best_by_match.get(s["match"])
+        if cur is None or s["fair_prob"] > cur["fair_prob"]:
+            best_by_match[s["match"]] = s
+    candidates = sorted(best_by_match.values(), key=lambda s: -s["fair_prob"])[:16]
+
     parlays = []
-
-    # Only use positively-edged singles where fair_prob >= 12%
-    # This prevents combining low-probability draws/upsets that produce
-    # misleadingly huge combined prices but near-zero real chance of winning
-    candidates = [s for s in singles if s["edge"] > 0 and s["fair_prob"] >= 0.12][:20]
-
-    for n_legs in (2, 3):
+    for n_legs in leg_counts:
+        if n_legs > len(candidates):
+            continue
         for combo in itertools.combinations(candidates, n_legs):
-            # Reject if any two legs share the same match
-            matches_used = [c["match"] for c in combo]
-            if len(set(matches_used)) < n_legs:
-                continue
-
             combined_fair  = 1.0
             combined_price = 1.0
             for leg in combo:
                 combined_fair  *= leg["fair_prob"]
                 combined_price *= leg["best_price"]
 
-            ev = combined_fair * combined_price - 1.0
-            if ev < PARLAY_MIN:
+            # The whole slip must clear the combined-probability floor.
+            if combined_fair < min_combined_prob:
                 continue
+
+            ev = combined_fair * combined_price - 1.0
 
             confidence_scores = {"high": 3, "medium": 2, "low": 1}
             min_conf = min(combo, key=lambda c: confidence_scores.get(c["confidence"], 0))["confidence"]
@@ -640,13 +747,24 @@ def _build_parlays(singles, max_legs=3, top_n=10):
             parlays.append({
                 "legs":           [_leg_summary(c) for c in combo],
                 "combined_price": round(combined_price, 2),
-                "combined_fair":  round(combined_fair * 100, 3),
+                "combined_fair":  round(combined_fair * 100, 2),
                 "ev_pct":         round(ev * 100, 1),
                 "confidence":     min_conf,
+                "n_legs":         n_legs,
             })
 
-    parlays.sort(key=lambda p: -p["ev_pct"])
-    return parlays[:top_n]
+    # Show a spread across leg counts. Ranking purely by chance would only ever
+    # surface the shortest slips (fewer legs = higher combined prob), so the
+    # bigger-odds accas would never appear. Keep the best few of EACH leg count.
+    by_legs = {}
+    for p in parlays:
+        by_legs.setdefault(p["n_legs"], []).append(p)
+    per_count = max(4, top_n // max(1, len(leg_counts)))
+    out = []
+    for n in leg_counts:
+        best = sorted(by_legs.get(n, []), key=lambda p: (-p["combined_fair"], -p["ev_pct"]))
+        out.extend(best[:per_count])
+    return out
 
 
 def _leg_summary(s):
@@ -661,6 +779,7 @@ def _leg_summary(s):
         "paddy":      s.get("paddy"),
         "edge":       s["edge"],
         "confidence": s["confidence"],
+        "weather":    s.get("weather"),
     }
 
 
@@ -688,20 +807,32 @@ def divergence():
 
 
 @app.get("/api/bets")
-def bets():
+def bets(risk: str = "balanced", value_guard: bool = True):
     d = get_raw()
     # Attach latest intel from background cache before responding
     with _intel_lock:
         cached_intel = dict(_intel_cache)
     bets_data = d["bets"]
+    # Rebuild accumulators per requested risk/value preset. Cheap (itertools over
+    # ~24 cached singles), so the user can flip presets without re-fetching odds.
+    if risk not in ACCA_PRESETS:
+        risk = "balanced"
+    pool = bets_data.get("acca_pool", [])
+    parlays = _build_parlays(pool, risk=risk, value_guard=value_guard)
     for s in bets_data["singles"]:
         s["intel"] = cached_intel.get(s["match"])
-    for p in bets_data["parlays"]:
+    for p in parlays:
         for leg in p["legs"]:
             leg["intel"] = cached_intel.get(leg["match"])
+    # Which markets the current odds feed actually offers, so the UI can be
+    # honest about coverage (e.g. Asian handicaps aren't posted this far out).
+    markets_available = sorted({p["market"] for p in pool})
     return JSONResponse({
         "fetched_at":   d["fetched_at"],
-        "bets":         bets_data,
+        "bets":         {"singles": bets_data["singles"], "parlays": parlays},
+        "risk":         risk,
+        "value_guard":  value_guard,
+        "markets_available": markets_available,
         "bookmakers":   d.get("bookmakers", []),
         "intel_ready":  len(cached_intel),
         "intel_loading": _intel_busy,

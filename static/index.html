@@ -263,6 +263,38 @@ tr:last-child td { border-bottom: none; }
 .parlay-leg-book { font-size: 0.73rem; color: #8b949e; }
 .parlay-leg-pp   { font-size: 0.73rem; color: #88c0d0; }
 
+/* ---- acca controls ---- */
+.acca-controls {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 24px 4px;
+}
+.acca-risk-group { display: flex; align-items: center; gap: 6px; }
+.acca-ctrl-label { font-size: 0.73rem; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+.acca-risk-btn {
+  background: #161b22; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 6px; padding: 5px 12px; font-size: 0.8rem; cursor: pointer;
+}
+.acca-risk-btn:hover { border-color: #58a6ff66; }
+.acca-risk-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; font-weight: 600; }
+.acca-guard { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #c9d1d9; cursor: pointer; }
+.acca-guard input { accent-color: #3fb950; }
+.acca-ctrl-note { font-size: 0.73rem; color: #6e7681; margin-left: auto; }
+.parlay-chance {
+  font-size: 1.05rem; font-weight: 700; color: #3fb950;
+}
+/* weather flag on legs / singles */
+.wflag { font-size: 0.72rem; margin-top: 4px; cursor: help; line-height: 1.3; }
+.wflag.good    { color: #3fb950; }
+.wflag.warn    { color: #d29922; }
+.wflag.neutral { color: #8b949e; }
+/* hoverable term — dotted underline + help cursor hints there's a tooltip */
+.help { cursor: help; border-bottom: 1px dotted #6e7681; }
+.parlay-leg-price.help { border-bottom: 1px dotted #58506e; }
+.acca-legend {
+  padding: 0 24px 10px; font-size: 0.74rem; color: #6e7681; line-height: 1.5;
+}
+.acca-legend strong { color: #8b949e; }
+
 /* ---- loading / empty ---- */
 #loading, .loading-inner {
   display: flex; flex-direction: column;
@@ -430,6 +462,10 @@ let allFutures    = {};
 let threshold     = 0;
 let betsSubTab    = 'singles';
 let _futuresLoaded = false;
+let accaRisk      = 'balanced';   // 'banker' | 'balanced' | 'punchy'
+let accaGuard     = true;         // value guard: legs must be priced at/above fair
+let _accaBusy     = false;
+let accaMarkets   = [];           // market keys currently in the odds feed
 
 // ---- tab switching ----
 function switchTab(tab) {
@@ -468,6 +504,7 @@ async function loadData(force = false) {
     allSingles    = betsData.bets?.singles || [];
     allParlays    = betsData.bets?.parlays || [];
     allBookmakers = betsData.bookmakers   || [];
+    accaMarkets   = betsData.markets_available || [];
 
     // Populate bookmaker dropdowns once (bets tab + picks tab + futures tab)
     ['book-select', 'picks-book-select', 'futures-book-select'].forEach(selId => {
@@ -713,6 +750,81 @@ function switchBetsTab(tab) {
   renderBets();
 }
 
+const ACCA_RISK_INFO = {
+  banker:   { label: 'Banker',   blurb: 'nailed-on legs · 2–4 legs · ≥30% chance · all markets' },
+  balanced: { label: 'Balanced', blurb: 'solid legs · 4–6 legs · ≥12% chance · all markets' },
+  punchy:   { label: 'Punchy',   blurb: 'long slips · 6–8 legs · ≥4% chance · all markets' },
+};
+
+function accaControlsHTML() {
+  const riskBtns = Object.entries(ACCA_RISK_INFO).map(([key, info]) =>
+    `<button class="acca-risk-btn${accaRisk === key ? ' active' : ''}" onclick="setAccaRisk('${key}')" title="${info.blurb}">${info.label}</button>`
+  ).join('');
+  return `
+    <div class="acca-controls">
+      <div class="acca-risk-group">
+        <span class="acca-ctrl-label">Risk</span>
+        ${riskBtns}
+      </div>
+      <label class="acca-guard" title="Drop legs priced well below fair (after line-shopping all books). Favourite accas are never strictly +EV, so this minimises the bookmaker margin rather than eliminating it.">
+        <input type="checkbox" ${accaGuard ? 'checked' : ''} onchange="toggleAccaGuard(this.checked)">
+        Value guard <span style="color:#6e7681">(low-margin legs)</span>
+      </label>
+      <span class="acca-ctrl-note">${ACCA_RISK_INFO[accaRisk].blurb}${_accaBusy ? ' · updating…' : ''}</span>
+    </div>`;
+}
+
+const MARKET_LABELS = { h2h: 'Match Result', totals: 'Goals Over/Under', spreads: 'Asian Handicap' };
+
+function accaMarketsNote() {
+  const have = accaMarkets.length
+    ? accaMarkets.map(m => MARKET_LABELS[m] || m).join(' · ')
+    : 'Match Result';
+  const handicapMissing = !accaMarkets.includes('spreads');
+  const note = handicapMissing
+    ? `<span style="color:#d29922">⚠ Asian handicaps (e.g. +2) aren't posted by the bookmakers this far out — they'll be folded into accas automatically as books publish them closer to kick-off.</span>`
+    : `<span style="color:#3fb950">✓ incl. Asian handicaps</span>`;
+  return `<div style="padding:2px 24px 8px;font-size:0.74rem;color:#8b949e">
+            Markets in current odds feed: <strong style="color:#c9d1d9">${have}</strong><br>${note}
+          </div>`;
+}
+
+function accaLegendHTML() {
+  return `<div class="acca-legend">
+    💡 Odds are <strong>decimal</strong>: e.g. <strong>Paddy Power 1.04</strong> means a €100 bet returns €104
+    (just €4 profit) — a very strong favourite, ~96% to win. Lower number = bigger favourite.
+    A leg at 2.00 doubles your money (~50%); 5.00 returns 5× (~20%).
+    <br><em>Hover any underlined figure for a plain-English explanation.</em>
+  </div>`;
+}
+
+function setAccaRisk(risk) {
+  if (risk === accaRisk) return;
+  accaRisk = risk;
+  refetchParlays();
+}
+
+function toggleAccaGuard(on) {
+  accaGuard = on;
+  refetchParlays();
+}
+
+async function refetchParlays() {
+  _accaBusy = true;
+  if (betsSubTab === 'parlays') renderBets();   // reflect busy state immediately
+  try {
+    const res  = await fetch(`/api/bets?risk=${encodeURIComponent(accaRisk)}&value_guard=${accaGuard}`);
+    const data = await res.json();
+    allParlays = data.bets?.parlays || [];
+    accaMarkets = data.markets_available || accaMarkets;
+  } catch (e) {
+    allParlays = [];
+  } finally {
+    _accaBusy = false;
+    renderBets();
+  }
+}
+
 function renderBets() {
   const book         = chosenBook();
   const stake        = chosenStake();
@@ -724,25 +836,29 @@ function renderBets() {
     allowedConf.includes(s.confidence) &&
     (marketFilter === 'all' || s.market === marketFilter)
   );
-  const parlays = allParlays.filter(p => allowedConf.includes(p.confidence));
+  // Accas are driven by their own risk/value preset, not the singles confidence filter.
+  const parlays = allParlays;
 
   const panel = document.getElementById('bets-panel');
 
   if (betsSubTab === 'parlays') {
-    if (!parlays.length) {
-      panel.innerHTML = '<div class="empty" style="padding:24px">No positive-EV multi-bets at this confidence level.<br><small style="color:#6e7681">Try lowering the confidence filter or refreshing to get more data.</small></div>';
-      return;
-    }
+    const controls = accaControlsHTML();
+    const body = !parlays.length
+      ? `<div class="empty" style="padding:24px">No accumulators clear the <strong>${accaRisk}</strong> threshold${accaGuard ? ' with the value guard on' : ''}.<br><small style="color:#6e7681">Try a punchier risk level, turn the value guard off, or refresh for more data.</small></div>`
+      : `<div class="parlay-list" style="padding:0 24px 24px">
+           ${parlays.map(p => parlayHTML(p, book, stake)).join('')}
+         </div>`;
     panel.innerHTML = `
       <div style="padding:18px 24px 0">
         <div class="bets-section-title">
-          Multi-Bets
-          <small>${parlays.length} combination${parlays.length !== 1 ? 's' : ''} where combined price beats fair odds · ${book === 'best' ? 'best available price' : book}</small>
+          High-Probability Accumulators
+          <small>${parlays.length} slip${parlays.length !== 1 ? 's' : ''}, ranked by chance of landing · ${book === 'best' ? 'best available price' : book}</small>
         </div>
       </div>
-      <div class="parlay-list" style="padding:0 24px 24px">
-        ${parlays.map(p => parlayHTML(p, book, stake)).join('')}
-      </div>`;
+      ${controls}
+      ${accaMarketsNote()}
+      ${accaLegendHTML()}
+      ${body}`;
   } else {
     if (!singles.length) {
       panel.innerHTML = '<div class="empty" style="padding:24px">No value singles found under current filters.</div>';
@@ -826,6 +942,7 @@ function singleHTML(s, book, stake) {
       <div>
         <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
         <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mktLabel}</div>
+        ${weatherFlagHTML(s)}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>
@@ -921,6 +1038,24 @@ function intelHTML(intel) {
   </div>`;
 }
 
+function weatherFlagHTML(item) {
+  const w = item.weather;
+  if (!w) return '';
+  const o   = (item.outcome || '').toLowerCase();
+  const fav = (w.favours || '').toLowerCase();
+  const dis = (w.disfavours || '').toLowerCase();
+  const hits = (name) => name && (name.includes(o) || o.includes(name));
+  let cls = 'wflag neutral', prefix = '';
+  if (hits(fav))                                       { cls = 'wflag good'; prefix = '✓ conditions favour this — '; }
+  else if (hits(dis))                                  { cls = 'wflag warn'; prefix = '⚠ conditions against this — '; }
+  else if (w.goals_lean === 'under' && o.includes('under')) { cls = 'wflag good'; prefix = '✓ heat suits Under — '; }
+  else if (w.goals_lean === 'under' && o.includes('over'))  { cls = 'wflag warn'; prefix = '⚠ heat works against Over — '; }
+  else if (w.goals_lean === 'over'  && o.includes('over'))  { cls = 'wflag good'; prefix = '✓ altitude suits Over — '; }
+  else if (w.goals_lean === 'over'  && o.includes('under')) { cls = 'wflag warn'; prefix = '⚠ altitude works against Under — '; }
+  const tip = (w.detail || '').replace(/"/g, '&quot;');
+  return `<div class="${cls}" title="${tip}">${w.emoji} ${prefix}${w.headline}</div>`;
+}
+
 function parlayHTML(p, book, stake) {
   // Recalculate combined price using the chosen book's prices per leg
   let combinedPrice = 1;
@@ -945,15 +1080,23 @@ function parlayHTML(p, book, stake) {
     const fallNote = l.fallback
       ? `<span style="color:#d29922;font-size:0.7rem"> ⚠ ${l.usedBook}</span>`
       : '';
+    const impl   = (100 / l.usedPrice).toFixed(0);
+    const ret    = eur(stake * l.usedPrice);
+    const priceTip = `Decimal odds at ${l.usedBook}: ${l.usedPrice.toFixed(2)}.\n`
+      + `• Implied chance ≈ ${impl}% (= 1 ÷ ${l.usedPrice.toFixed(2)}).\n`
+      + `• A winning ${l.usedPrice.toFixed(2)} leg multiplies your stake by ${l.usedPrice.toFixed(2)} `
+      + `(on its own, ${eur(stake)} → ${ret}).\n`
+      + `The lower the number, the bigger the favourite.`;
     return `<div class="parlay-leg">
       <div class="parlay-leg-left">
-        <div><strong>${l.outcome.toUpperCase()}</strong></div>
+        <div><strong title="Your selection for this match">${l.outcome.toUpperCase()}</strong></div>
         <div class="parlay-leg-match">${l.match} &middot; ${fmt(l.commence)}</div>
+        ${weatherFlagHTML(l)}
       </div>
       <div class="parlay-leg-right">
         ${fallNote}
-        <span class="parlay-leg-book">${l.usedBook}</span>
-        <span class="parlay-leg-price">${l.usedPrice.toFixed(2)}</span>
+        <span class="parlay-leg-book" title="Bookmaker offering this price (best of your accounts, unless you picked a specific book above)">${l.usedBook}</span>
+        <span class="parlay-leg-price help" title="${priceTip}">${l.usedPrice.toFixed(2)}</span>
       </div>
     </div>`;
   }).join('');
@@ -966,31 +1109,31 @@ function parlayHTML(p, book, stake) {
     <div class="parlay-header">
       <div style="flex:1">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span class="badge badge-${p.confidence}">${p.confidence.charAt(0).toUpperCase()+p.confidence.slice(1)}</span>
-          <span class="badge badge-neutral">${p.legs.length}-leg parlay</span>
-          <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${combinedEdge}%</span>
+          <span class="parlay-chance help" title="Our model's estimate that ALL legs win together, using the de-vigged (margin-removed) consensus of your bookmakers. It falls fast as you add legs — that's the trade-off for bigger odds.">${p.combined_fair.toFixed(1)}% chance it lands</span>
+          <span class="badge badge-neutral help" title="Accumulator (a.k.a. parlay): all ${p.legs.length} selections must win. The odds multiply together for a bigger payout, but a single losing leg loses the whole bet.">${p.legs.length}-leg acca</span>
+          <span class="badge badge-neutral help" style="color:${edgeRaw >= 0 ? '#3fb950' : '#f85149'};border-color:${edgeRaw >= 0 ? '#3fb95044' : '#f8514944'}" title="Expected value — long-run return per €1 staked. Positive = the price is in your favour; negative = the bookmaker's margin is against you (normal for favourite accas).">EV ${edgeRaw >= 0 ? '+' : ''}${combinedEdge}%</span>
         </div>
         <div style="font-size:0.75rem;color:#8b949e;margin-top:5px">
-          Fair chance all legs win: <strong style="color:#c9d1d9">${p.combined_fair < 1 ? p.combined_fair.toFixed(2) : p.combined_fair.toFixed(1)}%</strong>
-          &nbsp;&middot;&nbsp; Price implies: <strong style="color:#c9d1d9">${(impliedProb*100).toFixed(2)}%</strong>
-          &nbsp;&middot;&nbsp; You're getting overpaid by <strong style="color:#3fb950">+${combinedEdge}%</strong>
+          <span class="help" title="Same as 'chance it lands' — the model's probability that every leg wins.">Fair chance all legs win:</span> <strong style="color:#c9d1d9">${p.combined_fair.toFixed(1)}%</strong>
+          &nbsp;&middot;&nbsp; <span class="help" title="The chance implied by the combined odds alone (= 1 ÷ combined price). If this is lower than the fair chance, the price is in your favour.">Price implies:</span> <strong style="color:#c9d1d9">${(impliedProb*100).toFixed(1)}%</strong>
+          &nbsp;&middot;&nbsp; ${edgeRaw >= 0 ? `You're getting overpaid by <strong style="color:#3fb950">+${combinedEdge}%</strong>` : `Bookmaker margin against you <strong style="color:#f85149">${combinedEdge}%</strong>`}
         </div>
         <div style="display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap">
           <div>
-            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Stake</div>
+            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="The amount you'd put on this acca. Change it in the Stake box above.">Stake</div>
             <div style="font-weight:700;color:#f0f6fc">${eur(stake)}</div>
           </div>
           <div style="color:#484f58">→</div>
           <div>
-            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Combined price</div>
+            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="All the leg odds multiplied together (${legData.map(l=>l.usedPrice.toFixed(2)).join(' × ')}). This is your total payout multiplier.">Combined price</div>
             <div style="font-weight:700;color:#f0f6fc">${combinedPrice.toFixed(2)}</div>
           </div>
           <div>
-            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Gross return</div>
+            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="What you get back if every leg wins = stake × combined price (includes your stake).">Gross return</div>
             <div style="font-weight:700;color:#f0f6fc">${eur(grossReturn)}</div>
           </div>
           <div>
-            <div style="font-size:0.7rem;color:#6e7681;margin-bottom:1px">Profit if wins</div>
+            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="Your winnings = gross return minus your stake.">Profit if wins</div>
             <div style="font-weight:700;color:#3fb950">+${eur(profit)}</div>
           </div>
         </div>

@@ -12,6 +12,8 @@ import os
 import json
 import time
 import hashlib
+import threading
+import concurrent.futures
 import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
@@ -22,11 +24,27 @@ import anthropic
 CACHE_FILE      = Path("intel_cache.json")
 PROFILES_FILE   = Path("team_profiles.json")   # squad announcements — never expires
 INJURIES_FILE   = Path("team_injuries.json")   # injuries/suspensions — refreshed daily
+WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+date
 CACHE_TTL       = 43200    # 12 hours — match analysis
 INJURIES_TTL    = 43200    # 12 hours — injury data
-MODEL           = "claude-sonnet-4-6"
+WEATHER_TTL     = 21600    # 6 hours — weather forecast (refreshes a few times daily)
+WEATHER_HORIZON_DAYS = 15  # Open-Meteo forecasts ~16 days ahead; use live data inside this
+MODEL           = "claude-sonnet-4-6"          # match analysis (reasoning)
+SEARCH_MODEL    = "claude-haiku-4-5-20251001"  # web-search snapshots — cheaper +
+                                               # a SEPARATE rate-limit bucket, so
+                                               # token-heavy searches don't starve
+                                               # the Sonnet analysis budget.
+# On Tier 1 the org rate limit (30k input tokens/min) is the real bottleneck, not
+# latency. The SDK auto-retries 429s with backoff respecting retry-after headers;
+# give it plenty of headroom so a burst self-paces instead of failing.
+MAX_RETRIES     = 8
 
 _client = None
+_search_client = None
+# Guards read-modify-write of the on-disk caches when intel is fetched
+# concurrently across matches/teams. Held only around the quick file I/O,
+# never around the network calls.
+_io_lock = threading.Lock()
 
 def _get_client():
     global _client
@@ -34,8 +52,19 @@ def _get_client():
         key = os.environ.get("ANTHROPIC_API_KEY")
         if not key:
             raise RuntimeError("ANTHROPIC_API_KEY not set in .env")
-        _client = anthropic.Anthropic(api_key=key)
+        _client = anthropic.Anthropic(api_key=key, max_retries=MAX_RETRIES)
     return _client
+
+
+def _get_search_client():
+    """Separate client for web-search snapshots (Haiku, its own rate bucket)."""
+    global _search_client
+    if _search_client is None:
+        key = os.environ.get("ANTHROPIC_API_KEY")
+        if not key:
+            raise RuntimeError("ANTHROPIC_API_KEY not set in .env")
+        _search_client = anthropic.Anthropic(api_key=key, max_retries=MAX_RETRIES)
+    return _search_client
 
 
 # ---------------------------------------------------------------------------
@@ -190,41 +219,266 @@ def _local_kickoff(iso_datetime, tz):
         return "unknown"
 
 
+def _match_local_date(iso_datetime, tz):
+    """The match's calendar date in the venue's local timezone (a date object)."""
+    try:
+        import zoneinfo
+        dt_utc = datetime.fromisoformat(iso_datetime.replace("Z", "+00:00"))
+        return dt_utc.astimezone(zoneinfo.ZoneInfo(tz)).date()
+    except Exception:
+        try:
+            return datetime.fromisoformat(iso_datetime.replace("Z", "+00:00")).date()
+        except Exception:
+            return None
+
+
 def _fetch_weather(lat, lon, iso_datetime, tz):
-    """Stub — Open-Meteo only forecasts ~16 days ahead; WC 2026 is future.
-    Climate normals are used instead via JUNE_CLIMATE lookup."""
-    return None
+    """Real Open-Meteo daily forecast for the match's local date — free, no API key.
+    Returns a dict, or None when the match is outside the ~16-day forecast horizon
+    (caller then falls back to JUNE_CLIMATE normals). Cached on disk for WEATHER_TTL.
+    """
+    local_date = _match_local_date(iso_datetime, tz)
+    if local_date is None:
+        return None
+    days_out = (local_date - datetime.now(timezone.utc).date()).days
+    if days_out < 0 or days_out > WEATHER_HORIZON_DAYS:
+        return None   # beyond forecast range → use climate normals
+
+    ds = local_date.isoformat()
+    ck = f"{lat:.3f},{lon:.3f},{ds}"
+    with _io_lock:
+        entry = _load_json(WEATHER_FILE).get(ck)
+    if entry and (time.time() - entry.get("fetched_at", 0)) < WEATHER_TTL:
+        return entry["weather"]
+
+    url = "https://api.open-meteo.com/v1/forecast?" + urllib.parse.urlencode({
+        "latitude":  f"{lat:.4f}",
+        "longitude": f"{lon:.4f}",
+        "daily": ("temperature_2m_max,apparent_temperature_max,relative_humidity_2m_mean,"
+                  "precipitation_probability_max,wind_speed_10m_max"),
+        "timezone":   "auto",
+        "start_date": ds,
+        "end_date":   ds,
+    })
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+        daily = data.get("daily", {})
+        def first(key):
+            v = daily.get(key)
+            return v[0] if isinstance(v, list) and v else None
+        if first("temperature_2m_max") is None:
+            return None
+        weather = {
+            "temp_max_c":      first("temperature_2m_max"),
+            "feels_like_c":    first("apparent_temperature_max"),
+            "humidity_pct":    first("relative_humidity_2m_mean"),
+            "precip_prob_pct": first("precipitation_probability_max"),
+            "wind_max_kmh":    first("wind_speed_10m_max"),
+            "forecast_date":   ds,
+            "days_out":        days_out,
+        }
+        with _io_lock:
+            store = _load_json(WEATHER_FILE)
+            store[ck] = {"weather": weather, "fetched_at": int(time.time())}
+            _save_json(WEATHER_FILE, store)
+        print(f"[weather] {ck}: {weather['temp_max_c']}°C (feels {weather['feels_like_c']}°C), {days_out}d out")
+        return weather
+    except Exception as e:
+        print(f"[weather] fetch failed for {ck}: {e}")
+        return None
 
 
 def get_conditions_for_match(home, away, commence):
-    """Return conditions dict for a match using climate normals."""
+    """Return conditions dict for a match. Uses a live Open-Meteo forecast when the
+    match is within the forecast horizon, otherwise June climate normals."""
     vk = _venue_for_match(home, away)
     if not vk:
         return None, None
     lat, lon, alt, tz, city, venue_notes = WC_VENUES[vk]
-    climate = JUNE_CLIMATE.get(vk, {})
+    climate  = JUNE_CLIMATE.get(vk, {})
     local_ko = _local_kickoff(commence, tz)
-    return {
-        "city":          city,
-        "altitude_m":    alt,
-        "local_kickoff": local_ko,
-        "avg_high_c":    climate.get("avg_high_c"),
-        "feels_like_c":  climate.get("feels_like_c"),
-        "humidity_pct":  climate.get("humidity_pct"),
-        "notes":         climate.get("notes", venue_notes),
-    }, vk
+
+    fc = _fetch_weather(lat, lon, commence, tz)
+    if fc:
+        def pick(val, fallback):
+            return round(val) if isinstance(val, (int, float)) else fallback
+        cond = {
+            "city":            city,
+            "altitude_m":      alt,
+            "local_kickoff":   local_ko,
+            "avg_high_c":      pick(fc.get("temp_max_c"),   climate.get("avg_high_c")),
+            "feels_like_c":    pick(fc.get("feels_like_c"), climate.get("feels_like_c")),
+            "humidity_pct":    pick(fc.get("humidity_pct"), climate.get("humidity_pct")),
+            "precip_prob_pct": fc.get("precip_prob_pct"),
+            "wind_max_kmh":    pick(fc.get("wind_max_kmh"), None),
+            "notes":           climate.get("notes", venue_notes),
+            "source":          "forecast",
+            "days_out":        fc.get("days_out"),
+        }
+    else:
+        cond = {
+            "city":            city,
+            "altitude_m":      alt,
+            "local_kickoff":   local_ko,
+            "avg_high_c":      climate.get("avg_high_c"),
+            "feels_like_c":    climate.get("feels_like_c"),
+            "humidity_pct":    climate.get("humidity_pct"),
+            "precip_prob_pct": None,
+            "wind_max_kmh":    None,
+            "notes":           climate.get("notes", venue_notes),
+            "source":          "climate_normal",
+            "days_out":        None,
+        }
+    return cond, vk
 
 
 def _fmt_conditions(cond, vk):
     if not cond:
         return "Venue not confirmed in schedule — reason from your knowledge about likely host city."
     alt_note = f" *** ALTITUDE {cond['altitude_m']}m ***" if cond["altitude_m"] > 800 else ""
+    if cond.get("source") == "forecast":
+        extra = ""
+        if cond.get("precip_prob_pct") is not None:
+            extra += f"  |  Rain chance: {cond['precip_prob_pct']}%"
+        if cond.get("wind_max_kmh") is not None:
+            extra += f"  |  Wind: {cond['wind_max_kmh']} km/h"
+        weather_line = (f"LIVE FORECAST ({cond['days_out']}d out) — high: {cond['avg_high_c']}°C  |  "
+                        f"Feels like: {cond['feels_like_c']}°C  |  Humidity: {cond['humidity_pct']}%{extra}")
+    else:
+        weather_line = (f"June climate normal — high: {cond['avg_high_c']}°C  |  "
+                        f"Feels like: {cond['feels_like_c']}°C  |  Humidity: {cond['humidity_pct']}%")
     return (
         f"Venue: {cond['city']}{alt_note}\n"
         f"Local kick-off: {cond['local_kickoff']}\n"
-        f"June avg high: {cond['avg_high_c']}°C  |  Feels like: {cond['feels_like_c']}°C  |  Humidity: {cond['humidity_pct']}%\n"
+        f"{weather_line}\n"
         f"Assessment: {cond['notes']}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Climate tolerance — which nations cope with heat / altitude (static, no API)
+# ---------------------------------------------------------------------------
+HEAT_TOLERANCE = {
+    # low — cold-climate sides that wilt in heat/humidity
+    "norway": "low", "denmark": "low", "sweden": "low", "scotland": "low",
+    "england": "low", "netherlands": "low", "germany": "low", "belgium": "low",
+    "switzerland": "low", "austria": "low", "czech republic": "low", "poland": "low",
+    "ukraine": "low", "ireland": "low", "russia": "low", "canada": "low",
+    "bosnia & herzegovina": "low", "bosnia and herzegovina": "low",
+    # high — heat/humidity adapted
+    "costa rica": "high", "mexico": "high", "saudi arabia": "high", "qatar": "high",
+    "iran": "high", "iraq": "high", "egypt": "high", "morocco": "high", "tunisia": "high",
+    "algeria": "high", "senegal": "high", "ivory coast": "high", "ghana": "high",
+    "dr congo": "high", "nigeria": "high", "cape verde": "high", "brazil": "high",
+    "colombia": "high", "ecuador": "high", "paraguay": "high", "uruguay": "high",
+    "haiti": "high", "curacao": "high", "curaçao": "high", "panama": "high",
+    "jordan": "high", "uzbekistan": "high", "south africa": "high", "cameroon": "high",
+    "mali": "high",
+    # medium — temperate / adaptable
+    "united states": "medium", "usa": "medium", "australia": "medium", "japan": "medium",
+    "south korea": "medium", "spain": "medium", "portugal": "medium", "italy": "medium",
+    "france": "medium", "croatia": "medium", "argentina": "medium", "new zealand": "medium",
+    "turkey": "medium",
+}
+# Nations whose footballers are accustomed to high-altitude home venues
+ALTITUDE_ADAPTED = {"mexico", "bolivia", "ecuador", "colombia", "peru"}
+_TOL_RANK = {"low": 0, "medium": 1, "high": 2}
+
+
+def _heat_tol(team):
+    return HEAT_TOLERANCE.get(team.lower().strip(), "medium")
+
+
+def weather_signal(home, away, commence):
+    """Turn the venue forecast + each team's climate tolerance into a signal:
+    which side the conditions favour, a goals lean, and a human-readable flag.
+    Returns None when conditions are mild (no meaningful edge). Cheap — reads the
+    cached forecast via get_conditions_for_match."""
+    cond, vk = get_conditions_for_match(home, away, commence)
+    if not cond:
+        return None
+    feels    = cond.get("feels_like_c") or cond.get("avg_high_c") or 0
+    humidity = cond.get("humidity_pct") or 0
+    alt      = cond.get("altitude_m") or 0
+
+    favours = disfavours = goals_lean = None
+    types = []
+
+    # --- heat / humidity ---
+    heat_sev = None
+    if feels >= 38 or (feels >= 34 and humidity >= 65):
+        heat_sev = "extreme"
+    elif feels >= 33:
+        heat_sev = "hot"
+    if heat_sev:
+        types.append("heat")
+        rh, ra = _TOL_RANK[_heat_tol(home)], _TOL_RANK[_heat_tol(away)]
+        if rh != ra:
+            favours, disfavours = (home, away) if rh > ra else (away, home)
+        goals_lean = "under"   # heat slows games down
+
+    # --- altitude ---
+    alt_sev = None
+    if alt >= 2000:
+        alt_sev = "extreme"
+    elif alt >= 1500:
+        alt_sev = "notable"
+    if alt_sev:
+        types.append("altitude")
+        ha = home.lower().strip() in ALTITUDE_ADAPTED
+        aa = away.lower().strip() in ALTITUDE_ADAPTED
+        if ha != aa and favours is None:
+            favours, disfavours = (home, away) if ha else (away, home)
+        if goals_lean is None:
+            goals_lean = "over"   # thin air tends to open games up
+
+    if not types:
+        return None
+
+    cond_txt = ""
+    if "heat" in types:
+        cond_txt = f"{cond['feels_like_c']}°C feels-like, {humidity}% humidity"
+    if "altitude" in types:
+        cond_txt = (cond_txt + ", " if cond_txt else "") + f"{alt}m altitude"
+
+    severity = "extreme" if "extreme" in (heat_sev, alt_sev) else (heat_sev or alt_sev)
+    emoji = "🌡️" if "heat" in types else "⛰️"
+    if "heat" in types and "altitude" in types:
+        emoji = "🌡️⛰️"
+
+    if favours:
+        headline = f"{cond_txt} — favours {favours}"
+        detail = (f"{disfavours} ({_heat_tol(disfavours)} heat tolerance) likely to struggle in "
+                  f"{cond_txt}; conditions favour {favours}.")
+    else:
+        headline = f"{cond_txt} — demanding for both"
+        detail = f"Tough conditions ({cond_txt}) — affects both sides similarly."
+    if goals_lean:
+        detail += f" Goals lean: {goals_lean.upper()}."
+
+    return {
+        "types": types, "severity": severity, "emoji": emoji,
+        "favours": favours, "disfavours": disfavours, "goals_lean": goals_lean,
+        "headline": headline, "detail": detail,
+        "source": cond.get("source"), "days_out": cond.get("days_out"),
+        "feels_like_c": cond.get("feels_like_c"), "humidity_pct": humidity, "altitude_m": alt,
+    }
+
+
+def prewarm_weather(triples, max_workers=8):
+    """Concurrently warm the on-disk forecast cache for a list of (home, away,
+    commence) tuples, so per-match weather_signal() calls are then instant."""
+    triples = list(triples)
+    if not triples:
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(triples))) as ex:
+        futs = [ex.submit(get_conditions_for_match, h, a, c) for (h, a, c) in triples]
+        for f in concurrent.futures.as_completed(futs):
+            try:
+                f.result()
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -272,10 +526,10 @@ def _team_key(team):
 
 
 def _web_search_text(prompt, max_uses=2, max_tokens=500):
-    """Run a single Claude web-search call and return the concatenated text."""
-    client = _get_client()
+    """Run a single web-search call on the search model and return the text."""
+    client = _get_search_client()
     resp = client.messages.create(
-        model      = MODEL,
+        model      = SEARCH_MODEL,
         max_tokens = max_tokens,
         tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
         messages   = [{"role": "user", "content": prompt}],
@@ -349,34 +603,67 @@ def fetch_team_injuries(team, force=False):
     return entry.get("injuries", "No injury data available.")
 
 
-def get_team_context(home, away):
-    """Return (home_profile, away_profile, home_injuries, away_injuries) from cache only."""
-    profiles  = _load_json(PROFILES_FILE)
-    injuries  = _load_json(INJURIES_FILE)
-    hp = profiles.get(_team_key(home), {}).get("profile", "")
-    ap = profiles.get(_team_key(away), {}).get("profile", "")
-    hi = injuries.get(_team_key(home), {}).get("injuries", "")
-    ai = injuries.get(_team_key(away), {}).get("injuries", "")
-    return hp, ap, hi, ai
+def fetch_team_snapshot(team, force=False):
+    """
+    ONE web search per team covering BOTH the confirmed WC 2026 squad AND the
+    latest injuries/suspensions. Cached 12h in INJURIES_FILE under "snapshot".
+    Halves the web-search calls versus the old squad+injuries split.
+    Returns plain text. Concurrency-safe.
+    """
+    key = _team_key(team)
+    with _io_lock:
+        entry = _load_json(INJURIES_FILE).get(key, {})
+    if not force and entry.get("snapshot") and (time.time() - entry.get("fetched_at", 0)) < INJURIES_TTL:
+        return entry["snapshot"]
+
+    try:
+        text = _web_search_text(
+            f"For {team} at the 2026 FIFA World Cup, provide BOTH: "
+            f"(1) SQUAD — manager, key players by position (GK/DEF/MID/FWD), formation/style; "
+            f"(2) INJURIES & SUSPENSIONS — confirmed absences, doubtful players and fitness "
+            f"concerns with player names and injury type. If none, say 'No significant injuries "
+            f"reported'. Be specific and factual. Up to 10 short bullet points total.",
+            max_uses=1, max_tokens=550,
+        )
+        if text:
+            with _io_lock:
+                store = _load_json(INJURIES_FILE)
+                store[key] = {"snapshot": text, "fetched_at": int(time.time()), "team": team}
+                _save_json(INJURIES_FILE, store)
+            print(f"[snapshot] {team} ({len(text)} chars)")
+            return text
+    except Exception as e:
+        print(f"[snapshot] failed for {team}: {e}")
+
+    return entry.get("snapshot", "")
 
 
-def prefetch_team_data(home, away):
-    """
-    Ensure profile + injuries are cached for both teams before analysis.
-    Profiles fetched once ever. Injuries fetched if stale (>12h).
-    """
-    for team in (home, away):
-        fetch_team_profile(team)
-        fetch_team_injuries(team)
+def get_team_snapshots(home, away):
+    """Fetch both teams' snapshots concurrently (2 web searches in parallel)."""
+    out = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        futs = {ex.submit(fetch_team_snapshot, t): t for t in (home, away)}
+        for f in concurrent.futures.as_completed(futs):
+            try:
+                out[futs[f]] = f.result()
+            except Exception as e:
+                print(f"[snapshot] {futs[f]} failed: {e}")
+                out[futs[f]] = ""
+    return out.get(home, ""), out.get(away, "")
 
 
 def refresh_injuries_for_teams(teams, force=True):
-    """Force-refresh injury data for a list of teams."""
-    for team in teams:
-        try:
-            fetch_team_injuries(team, force=force)
-        except Exception as e:
-            print(f"[injuries] refresh failed for {team}: {e}")
+    """Force-refresh team snapshots (squad + injuries) for a list of teams, concurrently."""
+    teams = list(teams)
+    if not teams:
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(teams))) as ex:
+        futs = {ex.submit(fetch_team_snapshot, t, True): t for t in teams}
+        for f in concurrent.futures.as_completed(futs):
+            try:
+                f.result()
+            except Exception as e:
+                print(f"[snapshot] refresh failed for {futs[f]}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -397,26 +684,19 @@ Always output valid JSON matching the exact schema requested — no markdown fen
 
 
 def _build_prompt(home, away, commence, price_notes, weather_str,
-                  home_profile="", away_profile="", home_injuries="", away_injuries=""):
-    profile_section = ""
-    if home_profile or away_profile:
-        profile_section = f"""
-CONFIRMED SQUADS (from official WC 2026 announcements):
-{home.upper()}: {home_profile or 'Not available.'}
+                  home_ctx="", away_ctx=""):
+    context_section = ""
+    if home_ctx or away_ctx:
+        context_section = f"""
+TEAM INTEL — squad + latest injuries/suspensions (from WC 2026 web search):
+{home.upper()}: {home_ctx or 'Not available.'}
 
-{away.upper()}: {away_profile or 'Not available.'}
-"""
-    injury_section = ""
-    if home_injuries or away_injuries:
-        injury_section = f"""
-LATEST INJURY & SUSPENSION NEWS:
-{home.upper()}: {home_injuries or 'None reported.'}
-{away.upper()}: {away_injuries or 'None reported.'}
+{away.upper()}: {away_ctx or 'Not available.'}
 """
     return f"""WC 2026 match: {home} vs {away} (kick-off UTC: {commence})
 
 VENUE & CONDITIONS: {weather_str}
-{profile_section}{injury_section}
+{context_section}
 BOOKMAKER PRICE SIGNAL (for context — your recommendation must be driven by football logic first):
 {price_notes}
 
@@ -480,20 +760,22 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
     Return football intelligence for a match. Cached for CACHE_TTL seconds.
     Returns None if API key missing or call fails.
     """
-    cache = _load_cache()
-    ck    = _cache_key(home, away)
-    entry = cache.get(ck)
-
+    ck = _cache_key(home, away)
+    with _io_lock:
+        entry = _load_cache().get(ck)
     if entry and (time.time() - entry.get("cached_at", 0)) < CACHE_TTL:
         return entry["intel"]
 
-    # Get venue conditions (climate normals for June)
+    # Get venue conditions (live forecast inside 16 days, else June normals)
     cond, vk     = get_conditions_for_match(home, away, commence)
     cond_str     = _fmt_conditions(cond, vk)
+    # Add the explicit climate-tolerance read so the analyst reasons consistently
+    sig = weather_signal(home, away, commence)
+    if sig:
+        cond_str += f"\nClimate edge: {sig['detail']}"
 
-    # Pre-fetch squad profile (once ever) + injuries (daily) before analysis
-    prefetch_team_data(home, away)
-    home_profile, away_profile, home_injuries, away_injuries = get_team_context(home, away)
+    # Fetch both teams' snapshots (squad + injuries) concurrently before analysis
+    home_ctx, away_ctx = get_team_snapshots(home, away)
 
     try:
         client = _get_client()
@@ -504,7 +786,7 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
             messages   = [{"role": "user",
                            "content": _build_prompt(
                                home, away, commence, price_notes, cond_str,
-                               home_profile, away_profile, home_injuries, away_injuries,
+                               home_ctx, away_ctx,
                            )}],
         )
         raw = resp.content[0].text.strip()
@@ -516,9 +798,11 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
         intel["conditions"] = cond
         intel["cached_at"]  = int(time.time())
 
-        cache[ck] = {"intel": intel, "cached_at": int(time.time()),
-                      "label": f"{home} vs {away}"}
-        _save_cache(cache)
+        with _io_lock:
+            cache = _load_cache()
+            cache[ck] = {"intel": intel, "cached_at": int(time.time()),
+                          "label": f"{home} vs {away}"}
+            _save_cache(cache)
         return intel
 
     except Exception as e:
@@ -544,10 +828,8 @@ def get_intel_batch(match_list, max_calls=15):
     """
     Fetch intel for a list of dicts with keys: home, away, commence, price_notes.
     Returns {cache_key: intel_dict}.
-    Caps fresh API calls at max_calls; runs them concurrently for speed.
+    Caps fresh matches at max_calls; runs them concurrently for speed.
     """
-    import concurrent.futures
-
     cache = _load_cache()
     results = {}
     to_fetch = []
@@ -564,11 +846,27 @@ def get_intel_batch(match_list, max_calls=15):
         print(f"[intel] {len(results)} matches from cache, 0 fresh calls")
         return results
 
-    # Run sequentially — analysis calls are small (~3k tokens each), no gap needed
-    for m in to_fetch:
-        intel = get_match_intel(m["home"], m["away"], m.get("commence",""), m.get("price_notes",""))
-        if intel:
-            results[_cache_key(m["home"], m["away"])] = intel
+    # Concurrency is capped by ACCA env-tunable INTEL_WORKERS (default 1).
+    # On Tier-1 limits, serialising the Sonnet analysis (1 worker) is actually
+    # fastest end-to-end: parallel calls all 429 and then each burns its retry
+    # budget re-sending tokens, which saturates the shared 30k/min bucket and
+    # makes *everything* fail. One-at-a-time stays under the limit and completes.
+    # Bump INTEL_WORKERS on a higher API tier for real parallelism.
+    workers = max(1, min(int(os.environ.get("INTEL_WORKERS", "1")), len(to_fetch)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {
+            ex.submit(get_match_intel, m["home"], m["away"],
+                      m.get("commence", ""), m.get("price_notes", "")): m
+            for m in to_fetch
+        }
+        for f in concurrent.futures.as_completed(futs):
+            m = futs[f]
+            try:
+                intel = f.result()
+                if intel:
+                    results[_cache_key(m["home"], m["away"])] = intel
+            except Exception as e:
+                print(f"[intel] {m['home']} vs {m['away']} failed: {e}")
 
-    print(f"[intel] {len(results)} matches served ({len(to_fetch)} fresh Claude calls)")
+    print(f"[intel] {len(results)} matches served ({len(to_fetch)} fresh, {workers} workers)")
     return results
