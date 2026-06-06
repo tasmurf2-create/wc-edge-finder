@@ -1,73 +1,100 @@
-# World Cup 2026 — Betting Edge Finder
+# WC 2026 Edge Finder
 
-A research toolkit that finds value across the 2026 World Cup betting markets by
-combining three probability sources and flagging where they disagree.
+A betting edge finder for the 2026 FIFA World Cup. Combines bookmaker odds, prediction markets (Kalshi/Polymarket), and AI-powered football analysis to surface genuine value bets across match and tournament markets.
 
-## What each file does
+## What it does
 
-| File | Role |
+- **De-vigs** bookmaker prices to expose the true consensus fair probability
+- **Compares** that fair prob against Kalshi and Polymarket implied prices — divergence is the edge signal
+- **AI analyst** (Claude Sonnet) analyses form, injuries, altitude, heat and tactics for each match, then recommends specific bets across all markets
+- **Confirms or contradicts** each price-edge bet with analyst logic — so a +1.5% edge on a 10/1 shot the analyst disagrees with is flagged, not promoted
+- **Outright/futures markets** — Tournament Winner, To Reach Semi-finals, Group Winner, Golden Boot — with the same PM divergence logic
+
+## Tabs
+
+| Tab | What it shows |
 |---|---|
-| `wc_odds.py` | Pulls 1X2 odds from **The Odds API**, de-vigs each book, builds a consensus "fair" probability, and flags line-shopping value (best price vs fair). |
-| `prediction_markets.py` | Fetches implied probabilities from **Polymarket** (Gamma API) and **Kalshi**. Includes the team-name normalization layer so the same fixture lines up across sources. |
-| `compare.py` | Joins bookmaker consensus + Polymarket + Kalshi into one report and flags **divergence** — the strongest signal. |
-| `.env.example` | Template for your API key. |
+| **Market Divergence** | Every match ranked by bookmaker vs prediction-market gap. Red = books overpricing that side. Green = potential value. |
+| **Recommended Bets** | Value singles (1X2, Over/Under, Asian Handicap) + Multi-Bets, with analyst confirmation badge on each card. |
+| **Top Picks** | Top 5 analyst-confirmed bets, grouped by tournament round (Group Stage R1/R2/R3, then knockouts). |
+| **Futures & Outrights** | Tournament Winner, Semi-final progression, Group Winner, Golden Boot — book vs PM divergence. |
 
-## The core idea
+## Bet types covered
 
-1. **De-vig** removes the bookmaker margin to expose the true probability a price implies.
-2. **Prediction markets** (Polymarket/Kalshi) run far lower margins and are often sharper.
-3. **Divergence** = where the de-vigged bookmaker probability disagrees with the prediction-market probability. That gap is where mispricing — and value — lives.
+- **1X2** — Home win / Draw / Away win
+- **Over/Under** — Goals totals (1.5, 2.5, 3.5)
+- **Asian Handicap** — Win by 2+, cover a handicap, etc.
+- **Tournament Winner** — Full outright
+- **Stage progression** — To Reach Final / Semi-finals / Quarter-finals
+- **Group Winner / To Qualify**
+- **Golden Boot** — Top goalscorer
 
-Two structural edges to layer on top (build these next):
-- **Line-shopping**: always take the best available price across books. Already in `wc_odds.py`.
-- **Format edge**: 32 of 48 teams advance (top 2 per group **+** 8 best third-place teams = two-thirds of the field). "To qualify" markets on solid-but-unspectacular sides are systematically generous. Build a qualification module.
+## Bookmakers covered
 
-## Quick start (local or in Claude Code)
+Irish-accessible books only: **Paddy Power · Betfair · Bet365 · BoyleSports · Ladbrokes · William Hill**
+
+## AI Analyst
+
+Each match gets a Claude analysis covering:
+- Squad profile (from official WC 2026 announcements — cached permanently)
+- Injury & suspension news (refreshed every 12 hours)
+- Venue conditions: altitude (Mexico City 2240m, Guadalajara 1560m), heat (Monterrey 37°C+, Houston, Dallas), humidity
+- Tactical matchup and form
+- Specific `recommended_bets[]` — up to 3 bets with clear football reasoning, not just price signal
+
+Analyst cards show **✓ Analyst backed** (green) or **⚠ Analyst prefers other outcome** (amber) on every bet card.
+
+## Architecture
+
+```
+wc_odds.py          — Odds API fetch + de-vig + line-shopping
+prediction_markets.py — Kalshi + Polymarket implied probs
+football_intel.py   — Claude analyst: team profiles, injuries, conditions, recommended bets
+outrights.py        — Outright/futures: Tournament Winner, Semis, Groups, Golden Boot
+server.py           — FastAPI backend, caching, background intel fetch
+static/index.html   — Single-page dashboard (4 tabs)
+```
+
+## Setup
 
 ```bash
-# 1. put the files in one folder, then:
 cp .env.example .env
-# 2. edit .env and paste your free Odds API key
-# 3. run the pieces individually first:
-python wc_odds.py              # bookmaker odds + line-shopping value
-python prediction_markets.py   # confirms Polymarket/Kalshi parsing works
-python compare.py              # the three-way divergence report
+# Add your keys:
+#   ODDS_API_KEY    — free tier at https://the-odds-api.com (500 req/month)
+#   ANTHROPIC_API_KEY — at https://console.anthropic.com
+
+pip install fastapi uvicorn python-dotenv
+python server.py
+# Open http://localhost:8000
 ```
 
-No pip installs needed — everything is Python standard library.
+## Caching
 
-## IMPORTANT: verify the prediction-market endpoints live
+| Cache | TTL | File |
+|---|---|---|
+| Match odds | 5 min | in-memory |
+| Match intel (analyst) | 12 hours | `intel_cache.json` |
+| Team squad profiles | Permanent | `team_profiles.json` |
+| Injury/suspension news | 12 hours | `team_injuries.json` |
+| Outright/futures | 1 hour | `outrights_cache.json` |
 
-The Polymarket and Kalshi endpoint URLs and JSON field names in
-`prediction_markets.py` are best-known shapes and **change over time**. Before
-trusting the output, have Claude Code confirm them live. Search the file for
-`VERIFY`. Quick checks:
+## Edge logic
 
-```bash
-# Polymarket — should return a JSON array of events:
-curl "https://gamma-api.polymarket.com/events?active=true&closed=false&limit=5"
-
-# Kalshi — if this host errors, try the trading-api.kalshi.com host instead:
-curl "https://api.elections.kalshi.com/trade-api/v2/events?status=open&limit=5"
 ```
+fair_prob   = de-vigged consensus across all books
+best_price  = best available decimal price from whitelisted books
+edge %      = (fair_prob − 1/best_price) × 100
 
-Adjust the parsing (`groupItemTitle`, `outcomePrices`, `yes_bid/yes_ask`,
-`yes_sub_title`) to match what the live responses actually contain.
+pm_gap      = (kalshi/polymarket implied − fair_prob) × 100
+              positive = PM thinks this outcome is MORE likely than books
+              negative = PM thinks it's LESS likely
 
-## Hand this to Claude Code to build the full app
-
-> Build a World Cup 2026 betting-edge app around the four attached files.
-> - **Data layer:** keep The Odds API (UK/EU + US books), Polymarket, and Kalshi as sources. First, curl each prediction-market endpoint and fix any URL/field mismatches in `prediction_markets.py` (see the VERIFY notes).
-> - **Engine:** reuse the de-vig + consensus logic; surface (a) line-shopping value and (b) book-vs-prediction-market divergence, sorted by gap size.
-> - **Format module:** add a "to qualify" model — each team's chance of finishing top-2 OR top-8 third place — and compare to bookmaker qualification prices.
-> - **Persistence:** snapshot every poll into SQLite (timestamp, match, source, outcome, price) so line movement is tracked, not just one frame. Schedule with APScheduler or cron.
-> - **Interface:** FastAPI backend + a small dashboard (React or plain HTML) listing matches ranked by edge, with a line-movement chart per match.
-> - **Hygiene:** key stays in `.env`; cache responses to respect the 500-req/month free quota; make all network calls fail soft.
-> Start by getting `compare.py` returning real divergence numbers, then build outward.
+confidence:
+  high   = edge > 1.5% AND pm_gap confirms (PM > books)
+  medium = edge > 0.5% OR strong PM signal
+  low    = small edge, no PM confirmation
+```
 
 ## Reality check
 
-These are small +EV leans and pricing soft-spots, not predictions. World Cup
-match markets are highly efficient; variance dominates over a handful of games.
-Line-shop everything, stake in flat units (1–2% of bankroll), and treat the
-qualification markets as where the steadiest value sits.
+These are +EV leans and pricing soft-spots — not predictions. World Cup match markets are efficient; variance dominates over a small sample. The analyst confirmation layer filters out mathematically-edged bets that have no football logic behind them. Stake in flat units, treat the analyst as a second opinion, and always line-shop.
