@@ -607,60 +607,37 @@ def _web_search_text(prompt, max_uses=2, max_tokens=500):
 
 # --- Profiles (squad announcements, one-time) ---
 
-def fetch_team_profile(team, force=False):
-    """
-    Fetch the confirmed WC 2026 squad for a team. Cached permanently.
-    Returns a plain-text summary.
-    """
-    key   = _team_key(team)
-    store = _load_json(PROFILES_FILE)
-    if not force and key in store:
-        return store[key]["profile"]
-
-    try:
-        text = _web_search_text(
-            f"What is the confirmed {team} squad for the 2026 FIFA World Cup? "
-            f"Include: manager name, key players by position (GK, DEF, MID, FWD), "
-            f"formation/style, and any notable players who missed selection. "
-            f"Be specific and factual. 6-8 bullet points.",
-            max_uses=1, max_tokens=400,
-        )
-        if text:
-            store[key] = {"profile": text, "fetched_at": int(time.time()), "team": team}
-            _save_json(PROFILES_FILE, store)
-            print(f"[profile] {team} ({len(text)} chars)")
-            return text
-    except Exception as e:
-        print(f"[profile] failed for {team}: {e}")
-
-    return store.get(key, {}).get("profile", "")
-
+# Squad data is now SOURCED from the official FIFA list (players.csv via
+# static_data.squad_text) — no web search, no fabrication. See _team_context().
 
 # --- Injuries (daily refresh) ---
 
 def fetch_team_injuries(team, force=False):
     """
-    Fetch current injury/suspension news for a team. Cached 12h.
-    Returns a plain-text summary.
+    Fetch current injury/suspension news for a team via web search. Cached 12h.
+    This is the one genuinely *dynamic* team input — it cannot be static.
+    Returns a plain-text summary. Concurrency-safe.
     """
-    key   = _team_key(team)
-    store = _load_json(INJURIES_FILE)
-    entry = store.get(key, {})
-
-    if not force and entry and (time.time() - entry.get("fetched_at", 0)) < INJURIES_TTL:
+    key = _team_key(team)
+    with _io_lock:
+        entry = _load_json(INJURIES_FILE).get(key, {})
+    if (not force and entry.get("injuries")
+            and (time.time() - entry.get("fetched_at", 0)) < INJURIES_TTL):
         return entry["injuries"]
 
     try:
         text = _web_search_text(
-            f"What are the latest injury and suspension news for {team} "
-            f"at the 2026 FIFA World Cup? List confirmed absences, doubtful players, "
-            f"and any fitness concerns. Be specific — player names and injury type. "
+            f"What are the latest injury and suspension news for the {team} national "
+            f"team ahead of the 2026 FIFA World Cup? List confirmed absences, doubtful "
+            f"players, and fitness concerns with player names and injury type. "
             f"If none reported, say 'No significant injuries reported'.",
             max_uses=1, max_tokens=250,
         )
         if text:
-            store[key] = {"injuries": text, "fetched_at": int(time.time()), "team": team}
-            _save_json(INJURIES_FILE, store)
+            with _io_lock:
+                store = _load_json(INJURIES_FILE)
+                store[key] = {"injuries": text, "fetched_at": int(time.time()), "team": team}
+                _save_json(INJURIES_FILE, store)
             print(f"[injuries] {team} ({len(text)} chars)")
             return text
     except Exception as e:
@@ -669,67 +646,48 @@ def fetch_team_injuries(team, force=False):
     return entry.get("injuries", "No injury data available.")
 
 
-def fetch_team_snapshot(team, force=False):
-    """
-    ONE web search per team covering BOTH the confirmed WC 2026 squad AND the
-    latest injuries/suspensions. Cached 12h in INJURIES_FILE under "snapshot".
-    Halves the web-search calls versus the old squad+injuries split.
-    Returns plain text. Concurrency-safe.
-    """
-    key = _team_key(team)
-    with _io_lock:
-        entry = _load_json(INJURIES_FILE).get(key, {})
-    if not force and entry.get("snapshot") and (time.time() - entry.get("fetched_at", 0)) < INJURIES_TTL:
-        return entry["snapshot"]
-
-    try:
-        text = _web_search_text(
-            f"For {team} at the 2026 FIFA World Cup, provide BOTH: "
-            f"(1) SQUAD — manager, key players by position (GK/DEF/MID/FWD), formation/style; "
-            f"(2) INJURIES & SUSPENSIONS — confirmed absences, doubtful players and fitness "
-            f"concerns with player names and injury type. If none, say 'No significant injuries "
-            f"reported'. Be specific and factual. Up to 10 short bullet points total.",
-            max_uses=1, max_tokens=550,
-        )
-        if text:
-            with _io_lock:
-                store = _load_json(INJURIES_FILE)
-                store[key] = {"snapshot": text, "fetched_at": int(time.time()), "team": team}
-                _save_json(INJURIES_FILE, store)
-            print(f"[snapshot] {team} ({len(text)} chars)")
-            return text
-    except Exception as e:
-        print(f"[snapshot] failed for {team}: {e}")
-
-    return entry.get("snapshot", "")
+def _team_context(team, injuries):
+    """Combine the SOURCED squad (official FIFA list) with web-searched injuries,
+    each clearly labelled by reliability for the analyst."""
+    squad = static_data.squad_text(team)
+    parts = []
+    if squad:
+        parts.append("SQUAD (official FIFA 2026 squad list — authoritative):\n" + squad)
+    else:
+        parts.append("SQUAD: not found in official list.")
+    parts.append("INJURY / AVAILABILITY (web search — may be incomplete, treat as indicative):\n"
+                 + (injuries or "No injury data available."))
+    return "\n\n".join(parts)
 
 
 def get_team_snapshots(home, away):
-    """Fetch both teams' snapshots concurrently (2 web searches in parallel)."""
-    out = {}
+    """Build each team's context: SOURCED squad from players.csv + injuries from a
+    focused web search (fetched concurrently). Squad is factual; only injuries hit
+    the network."""
+    inj = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-        futs = {ex.submit(fetch_team_snapshot, t): t for t in (home, away)}
+        futs = {ex.submit(fetch_team_injuries, t): t for t in (home, away)}
         for f in concurrent.futures.as_completed(futs):
             try:
-                out[futs[f]] = f.result()
+                inj[futs[f]] = f.result()
             except Exception as e:
-                print(f"[snapshot] {futs[f]} failed: {e}")
-                out[futs[f]] = ""
-    return out.get(home, ""), out.get(away, "")
+                print(f"[injuries] {futs[f]} failed: {e}")
+                inj[futs[f]] = ""
+    return _team_context(home, inj.get(home, "")), _team_context(away, inj.get(away, ""))
 
 
 def refresh_injuries_for_teams(teams, force=True):
-    """Force-refresh team snapshots (squad + injuries) for a list of teams, concurrently."""
+    """Force-refresh injury data for a list of teams, concurrently."""
     teams = list(teams)
     if not teams:
         return
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(teams))) as ex:
-        futs = {ex.submit(fetch_team_snapshot, t, True): t for t in teams}
+        futs = {ex.submit(fetch_team_injuries, t, True): t for t in teams}
         for f in concurrent.futures.as_completed(futs):
             try:
                 f.result()
             except Exception as e:
-                print(f"[snapshot] refresh failed for {futs[f]}: {e}")
+                print(f"[injuries] refresh failed for {futs[f]}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -754,7 +712,7 @@ def _build_prompt(home, away, commence, price_notes, weather_str,
     context_section = ""
     if home_ctx or away_ctx:
         context_section = f"""
-TEAM INTEL — squad + latest injuries/suspensions (from WC 2026 web search):
+TEAM INTEL — official squad (authoritative) + injury/availability (web, indicative):
 {home.upper()}: {home_ctx or 'Not available.'}
 
 {away.upper()}: {away_ctx or 'Not available.'}

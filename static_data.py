@@ -133,6 +133,40 @@ def squad(name):
     return _squads.get(code, []) if code else []
 
 
+def _age_from_dob(dob):
+    try:
+        d, m, y = dob.split("/")
+        from datetime import date
+        b = date(int(y), int(m), int(d))
+        today = date(2026, 6, 11)   # tournament start
+        return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+    except Exception:
+        return None
+
+
+def squad_text(name):
+    """Concise, sourced squad block for the analyst prompt — by position, with
+    club and age. From the official FIFA squad list (players.csv)."""
+    sq = squad(name)
+    if not sq:
+        return ""
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for p in sq:
+        groups[p.get("position", "?")].append(p)
+    lines = []
+    for pos in ("GK", "DF", "MF", "FW"):
+        items = []
+        for p in groups.get(pos, []):
+            nm = (p.get("name_on_shirt") or p.get("player_name") or "").strip()
+            club = (p.get("club") or "").strip()
+            age = _age_from_dob(p.get("dob", ""))
+            items.append(f"{nm} ({club}{', ' + str(age) if age else ''})")
+        if items:
+            lines.append(f"{pos}: " + "; ".join(items))
+    return "\n".join(lines)
+
+
 def squad_league_countries(name):
     """Distribution of league-country codes the squad's players are based in
     (e.g. {'FRA': 8, 'ENG': 7}) — proxy for what climate they're acclimatised to."""
