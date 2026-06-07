@@ -23,8 +23,7 @@ import anthropic
 import static_data
 
 CACHE_FILE      = Path("intel_cache.json")
-PROFILES_FILE   = Path("team_profiles.json")   # squad announcements — never expires
-INJURIES_FILE   = Path("team_injuries.json")   # injuries/suspensions — refreshed daily
+INJURIES_FILE   = Path("team_injuries.json")   # injuries/suspensions — refreshed daily (runtime cache)
 WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+date
 CACHE_TTL       = 43200    # 12 hours — match analysis
 INJURIES_TTL    = 43200    # 12 hours — injury data
