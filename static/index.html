@@ -482,6 +482,7 @@ let _accaBusy     = false;
 let accaMarkets   = [];           // market keys currently in the odds feed
 let accaRound     = '';           // round filter ('' = all rounds)
 let roundsAvailable = [];         // round labels present in the schedule
+let accaSort      = 'chance';     // 'chance' | 'return'
 
 // ---- tab switching ----
 function switchTab(tab) {
@@ -792,6 +793,13 @@ function accaControlsHTML() {
         <input type="checkbox" ${accaGuard ? 'checked' : ''} onchange="toggleAccaGuard(this.checked)">
         Value guard <span style="color:#6e7681">(low-margin legs)</span>
       </label>
+      <span class="acca-risk-group">
+        <span class="acca-ctrl-label">Sort</span>
+        <select onchange="setAccaSort(this.value)" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px;font-size:0.8rem">
+          <option value="chance" ${accaSort==='chance'?'selected':''}>Chance to land (high→low)</option>
+          <option value="return" ${accaSort==='return'?'selected':''}>Return / odds (high→low)</option>
+        </select>
+      </span>
       <span class="acca-ctrl-note">${ACCA_RISK_INFO[accaRisk].blurb}${_accaBusy ? ' · updating…' : ''}</span>
     </div>`;
 }
@@ -829,6 +837,11 @@ function setAccaRisk(risk) {
 function toggleAccaGuard(on) {
   accaGuard = on;
   refetchParlays();
+}
+
+function setAccaSort(v) {
+  accaSort = v;
+  renderBets();   // client-side re-sort, no refetch needed
 }
 
 function populateRoundFilter() {
@@ -877,7 +890,10 @@ function renderBets() {
     (accaRound === '' || (s.round && s.round.label === accaRound))
   );
   // Accas are driven by their own risk/value preset, not the singles confidence filter.
-  const parlays = allParlays;
+  // Client-side sort by chance-to-land or by return (combined odds), high→low.
+  const parlays = [...allParlays].sort((a, b) =>
+    accaSort === 'return' ? b.combined_price - a.combined_price
+                          : b.combined_fair - a.combined_fair);
 
   const panel = document.getElementById('bets-panel');
 

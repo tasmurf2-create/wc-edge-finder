@@ -715,7 +715,7 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
 # Parlay builder
 # ---------------------------------------------------------------------------
 
-def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12, round_filter=None):
+def _build_parlays(singles, risk="balanced", value_guard=True, top_n=36, round_filter=None):
     """
     Generate high-probability accumulators from the value singles.
 
