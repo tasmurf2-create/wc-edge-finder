@@ -391,6 +391,10 @@ tr:last-child td { border-bottom: none; }
       <option value="totals">Over / Under</option>
       <option value="spreads">Asian Handicap</option>
     </select>
+    <label>Round:</label>
+    <select id="round-filter" onchange="onRoundChange()">
+      <option value="">All rounds</option>
+    </select>
   </div>
   <div class="legend">
     <span><span class="dot" style="background:#3fb950"></span> High confidence — book edge + PM confirms</span>
@@ -476,6 +480,8 @@ let accaRisk      = 'balanced';   // 'banker' | 'balanced' | 'punchy'
 let accaGuard     = true;         // value guard: legs must be priced at/above fair
 let _accaBusy     = false;
 let accaMarkets   = [];           // market keys currently in the odds feed
+let accaRound     = '';           // round filter ('' = all rounds)
+let roundsAvailable = [];         // round labels present in the schedule
 
 // ---- tab switching ----
 function switchTab(tab) {
@@ -517,6 +523,8 @@ async function loadData(force = false) {
     allParlays    = betsData.bets?.parlays || [];
     allBookmakers = betsData.bookmakers   || [];
     accaMarkets   = betsData.markets_available || [];
+    roundsAvailable = betsData.rounds_available || [];
+    populateRoundFilter();
 
     // Populate bookmaker dropdowns once (bets tab + picks tab + futures tab)
     ['book-select', 'picks-book-select', 'futures-book-select'].forEach(selId => {
@@ -823,11 +831,28 @@ function toggleAccaGuard(on) {
   refetchParlays();
 }
 
+function populateRoundFilter() {
+  const sel = document.getElementById('round-filter');
+  if (!sel || sel.options.length > 1 || !roundsAvailable.length) return;
+  roundsAvailable.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r; o.textContent = r;
+    sel.appendChild(o);
+  });
+}
+
+// Round dropdown changes BOTH the singles shown and the accas built
+// (single-round accas need the server to rebuild from that round's legs).
+function onRoundChange() {
+  accaRound = document.getElementById('round-filter').value;
+  refetchParlays();   // re-renders singles too (filtered by round)
+}
+
 async function refetchParlays() {
   _accaBusy = true;
   if (betsSubTab === 'parlays') renderBets();   // reflect busy state immediately
   try {
-    const res  = await fetch(`/api/bets?risk=${encodeURIComponent(accaRisk)}&value_guard=${accaGuard}`);
+    const res  = await fetch(`/api/bets?risk=${encodeURIComponent(accaRisk)}&value_guard=${accaGuard}&round=${encodeURIComponent(accaRound)}`);
     const data = await res.json();
     allParlays = data.bets?.parlays || [];
     accaMarkets = data.markets_available || accaMarkets;
@@ -848,7 +873,8 @@ function renderBets() {
 
   const singles = allSingles.filter(s =>
     allowedConf.includes(s.confidence) &&
-    (marketFilter === 'all' || s.market === marketFilter)
+    (marketFilter === 'all' || s.market === marketFilter) &&
+    (accaRound === '' || (s.round && s.round.label === accaRound))
   );
   // Accas are driven by their own risk/value preset, not the singles confidence filter.
   const parlays = allParlays;
@@ -998,7 +1024,7 @@ function singleHTML(s, book, stake, opts = {}) {
     <div class="single-top">
       <div>
         <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
-        <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mktLabel}</div>
+        <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mktLabel}${s.round ? ' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">' + s.round.label + '</span>' : ''}</div>
         ${weatherFlagHTML(s)}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -1166,6 +1192,7 @@ function parlayHTML(p, book, stake) {
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="parlay-chance help" title="Our model's estimate that ALL legs win together, using the de-vigged (margin-removed) consensus of your bookmakers. It falls fast as you add legs — that's the trade-off for bigger odds.">${p.combined_fair.toFixed(1)}% chance it lands</span>
           <span class="badge badge-neutral help" title="Accumulator (a.k.a. parlay): all ${p.legs.length} selections must win. The odds multiply together for a bigger payout, but a single losing leg loses the whole bet.">${p.legs.length}-leg acca</span>
+          ${p.round_label ? `<span class="badge badge-neutral" style="color:#88c0d0;border-color:#88c0d044" title="${p.round_span === 'multi' ? 'Legs span more than one round' : 'All legs in the same round'}">${p.round_label}</span>` : ''}
           <span class="badge badge-neutral help" style="color:${edgeRaw >= 0 ? '#3fb950' : '#f85149'};border-color:${edgeRaw >= 0 ? '#3fb95044' : '#f8514944'}" title="Expected value — long-run return per €1 staked. Positive = the price is in your favour; negative = the bookmaker's margin is against you (normal for favourite accas).">EV ${edgeRaw >= 0 ? '+' : ''}${combinedEdge}%</span>
         </div>
         <div style="font-size:0.75rem;color:#8b949e;margin-top:5px">

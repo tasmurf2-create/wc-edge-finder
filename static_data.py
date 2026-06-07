@@ -108,6 +108,47 @@ for m in _read("matches.csv"):
         _match_venue[frozenset((h, a))] = m
 
 
+# ---- rounds (sourced from matches.csv stage + derived group matchday) -------
+_match_round = {}   # frozenset({home_code, away_code}) -> (label, order)
+_KO_ORDER = {
+    "Round of 32": 4, "Round of 16": 5, "Quarter-final": 6, "Quarter-finals": 6,
+    "Semi-final": 7, "Semi-finals": 7, "Third Place Playoff": 8, "Final": 9,
+}
+
+
+def _build_rounds():
+    from collections import defaultdict
+    rows = _read("matches.csv")
+    groups = defaultdict(list)
+    for m in rows:
+        if m.get("stage") == "Group Stage" and m.get("group_letter"):
+            groups[m["group_letter"]].append(m)
+        else:
+            h, a = m.get("home_team_code"), m.get("away_team_code")
+            if h and a:
+                st = m.get("stage", "")
+                _match_round[frozenset((h, a))] = (st, _KO_ORDER.get(st, 10))
+    # Group stage: sort each group's 6 matches by kickoff, 2 per matchday.
+    for g, ms in groups.items():
+        ms.sort(key=lambda m: m.get("kickoff_utc", ""))
+        for i, m in enumerate(ms):
+            md = i // 2 + 1
+            h, a = m.get("home_team_code"), m.get("away_team_code")
+            if h and a:
+                _match_round[frozenset((h, a))] = (f"Group Stage R{md}", md)
+
+
+_build_rounds()
+
+
+def match_round(home, away):
+    """(label, order) for a fixture, sourced from the schedule — or None."""
+    hc, ac = team_code(home), team_code(away)
+    if not hc or not ac:
+        return None
+    return _match_round.get(frozenset((hc, ac)))
+
+
 def venue_for_teams(home, away):
     """Real fixture + stadium conditions for a match, or None if unmatched."""
     hc, ac = team_code(home), team_code(away)

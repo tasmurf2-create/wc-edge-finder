@@ -29,6 +29,7 @@ import wc_odds
 import prediction_markets as pmkt
 import football_intel as fintel
 import outrights as outr
+import static_data
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -342,6 +343,7 @@ def _build_raw():
     acca_pool   = []   # ALL outcomes (incl. favourites) — candidate legs for accas
     all_books   = set()
     weather_by_label = {}   # match label -> weather signal (or None)
+    round_by_label   = {}   # match label -> {label, order} round (or None)
 
     # Warm the forecast cache concurrently so per-match weather lookups are instant
     try:
@@ -361,6 +363,8 @@ def _build_raw():
         label = f"{home} vs {away}"
         comm  = h2h_r["commence"]
         weather_by_label[label] = fintel.weather_signal(home, away, comm)
+        _r = static_data.match_round(home, away)
+        round_by_label[label] = {"label": _r[0], "order": _r[1]} if _r else None
 
         kl_probs   = kal.get(mk, {}).get("probs", {})
         pm_probs   = poly.get(mk, {}).get("probs", {})
@@ -570,13 +574,16 @@ def _build_raw():
             "outcomes":   h2h_outcomes,
             "totals":     totals_list,
             "weather":    weather_by_label.get(label),
+            "round":      round_by_label.get(label),
         })
 
-    # Attach the weather signal to every leg/single by match label
+    # Attach the weather signal + round to every leg/single by match label
     for s in singles:
         s["weather"] = weather_by_label.get(s["match"])
+        s["round"]   = round_by_label.get(s["match"])
     for c in acca_pool:
         c["weather"] = weather_by_label.get(c["match"])
+        c["round"]   = round_by_label.get(c["match"])
 
     matches.sort(key=lambda m: (-abs(m["max_gap"]) if m["has_pm_data"] else 999, m["commence"]))
     singles.sort(key=lambda s: -s["edge"])
@@ -686,10 +693,13 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
 # Parlay builder
 # ---------------------------------------------------------------------------
 
-def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12):
+def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12, round_filter=None):
     """
     Generate high-probability accumulators from the value singles.
 
+    round_filter : None -> build across all rounds (slips may be multi-round)
+                   "Group Stage R1"/etc -> only legs from that round, so every
+                   slip is a single-round acca (e.g. a "Round 1 only" acca).
     risk         : "banker" | "balanced" | "punchy"  -> see ACCA_PRESETS
     value_guard  : True  -> drop legs whose best price is worse than ~2.5% under
                             fair, i.e. keep only well-priced (low-margin) legs.
@@ -712,6 +722,7 @@ def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12):
     eligible = [
         s for s in singles
         if s["fair_prob"] >= min_leg_prob and (s["edge"] >= ACCA_GUARD_TOL_PCT if value_guard else True)
+        and (round_filter is None or (s.get("round") or {}).get("label") == round_filter)
     ]
 
     # One leg per match (a standard acca can't combine correlated same-match
@@ -744,6 +755,15 @@ def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12):
             confidence_scores = {"high": 3, "medium": 2, "low": 1}
             min_conf = min(combo, key=lambda c: confidence_scores.get(c["confidence"], 0))["confidence"]
 
+            # Round span: single-round (all legs same round) vs multi-round.
+            rlabels = {c["round"]["label"] for c in combo if c.get("round")}
+            if len(rlabels) == 1:
+                round_label, round_span = next(iter(rlabels)), "single"
+            elif rlabels:
+                round_label, round_span = "Multi-round", "multi"
+            else:
+                round_label, round_span = None, None
+
             parlays.append({
                 "legs":           [_leg_summary(c) for c in combo],
                 "combined_price": round(combined_price, 2),
@@ -751,6 +771,8 @@ def _build_parlays(singles, risk="balanced", value_guard=True, top_n=12):
                 "ev_pct":         round(ev * 100, 1),
                 "confidence":     min_conf,
                 "n_legs":         n_legs,
+                "round_label":    round_label,
+                "round_span":     round_span,
             })
 
     # Show a spread across leg counts. Ranking purely by chance would only ever
@@ -780,6 +802,7 @@ def _leg_summary(s):
         "edge":       s["edge"],
         "confidence": s["confidence"],
         "weather":    s.get("weather"),
+        "round":      s.get("round"),
     }
 
 
@@ -807,18 +830,19 @@ def divergence():
 
 
 @app.get("/api/bets")
-def bets(risk: str = "balanced", value_guard: bool = True):
+def bets(risk: str = "balanced", value_guard: bool = True, round: str = ""):
     d = get_raw()
     # Attach latest intel from background cache before responding
     with _intel_lock:
         cached_intel = dict(_intel_cache)
     bets_data = d["bets"]
-    # Rebuild accumulators per requested risk/value preset. Cheap (itertools over
-    # ~24 cached singles), so the user can flip presets without re-fetching odds.
+    # Rebuild accumulators per requested risk/value/round preset. Cheap (itertools
+    # over ~24 cached singles), so the user can flip presets without re-fetching.
     if risk not in ACCA_PRESETS:
         risk = "balanced"
+    round_filter = round.strip() or None
     pool = bets_data.get("acca_pool", [])
-    parlays = _build_parlays(pool, risk=risk, value_guard=value_guard)
+    parlays = _build_parlays(pool, risk=risk, value_guard=value_guard, round_filter=round_filter)
     for s in bets_data["singles"]:
         s["intel"] = cached_intel.get(s["match"])
     for p in parlays:
@@ -827,12 +851,21 @@ def bets(risk: str = "balanced", value_guard: bool = True):
     # Which markets the current odds feed actually offers, so the UI can be
     # honest about coverage (e.g. Asian handicaps aren't posted this far out).
     markets_available = sorted({p["market"] for p in pool})
+    # Distinct rounds present (for the round dropdown), ordered by stage.
+    _rd = {}
+    for p in pool:
+        r = p.get("round")
+        if r:
+            _rd[r["label"]] = r["order"]
+    rounds_available = [lbl for lbl, _ in sorted(_rd.items(), key=lambda x: x[1])]
     return JSONResponse({
         "fetched_at":   d["fetched_at"],
         "bets":         {"singles": bets_data["singles"], "parlays": parlays},
         "risk":         risk,
         "value_guard":  value_guard,
+        "round":        round_filter or "",
         "markets_available": markets_available,
+        "rounds_available":  rounds_available,
         "bookmakers":   d.get("bookmakers", []),
         "intel_ready":  len(cached_intel),
         "intel_loading": _intel_busy,
