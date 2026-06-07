@@ -44,6 +44,9 @@ BOOKMAKER_WHITELIST = {
     "Paddy Power", "Betfair", "Betfair Exchange",
     "Bet365", "BoyleSports", "Ladbrokes", "William Hill",
 }
+# Exchanges: better prices on singles, but you CANNOT place accumulators on them.
+# So they're used for singles but excluded from accumulator leg pricing.
+EXCHANGE_BOOKS = {"Betfair", "Betfair Exchange", "Matchbook", "Smarkets"}
 EDGE_MIN   = 0.005         # flag singles with >0.5% edge
 PARLAY_MIN = 0.005         # minimum combined EV to include a parlay
 VALUE_THRESHOLD = 0.015    # 1.5% edge = "clear value"
@@ -576,6 +579,24 @@ def _build_raw():
             "weather":    weather_by_label.get(label),
             "round":      round_by_label.get(label),
         })
+
+    # Accumulators can't be placed on exchanges — re-price every acca leg using
+    # SPORTSBOOKS ONLY (drop exchange prices, recompute best + edge). Legs that
+    # only exist at an exchange are dropped from acca eligibility. Singles are a
+    # separate list and keep the exchange.
+    sb_pool = []
+    for c in acca_pool:
+        pb = {k: v for k, v in (c.get("per_book") or {}).items() if k not in EXCHANGE_BOOKS}
+        if pb:
+            c["per_book"]   = pb
+            c["best_book"]  = max(pb, key=pb.get)
+            c["best_price"] = pb[c["best_book"]]
+            c["edge"]       = round((c["fair_prob"] - 1.0 / c["best_price"]) * 100, 2)
+            sb_pool.append(c)
+        elif c.get("best_book") not in EXCHANGE_BOOKS and c.get("best_price"):
+            sb_pool.append(c)   # no per-book detail (totals/spreads) but already a sportsbook
+        # else: only priced at an exchange -> not acca-placeable, drop it
+    acca_pool = sb_pool
 
     # Attach the weather signal + round to every leg/single by match label
     for s in singles:
