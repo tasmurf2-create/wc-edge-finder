@@ -64,8 +64,9 @@ ACCA_PRESETS = {
     "punchy":   {"min_leg_prob": 0.45, "legs": (6, 7, 8),    "min_combined_prob": 0.04},
 }
 # Value guard: with it on, drop any leg whose best price is more than this far
-# (in edge %) below fair. Keeps only well-priced, low-margin legs.
-ACCA_GUARD_TOL_PCT = -2.5
+# (in edge %) below fair. Keeps only well-priced legs. -4% lets strong favourites
+# survive on sportsbook prices (they shade favourites harder than the exchange).
+ACCA_GUARD_TOL_PCT = -4.0
 
 # ---------------------------------------------------------------------------
 # Cache — one shared fetch for all endpoints
