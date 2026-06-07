@@ -424,8 +424,8 @@ tr:last-child td { border-bottom: none; }
     </span>
   </div>
   <div class="legend">
-    <span>Analyst-backed picks (football judgement) — the "both agree" overlap with The Maths</span>
-    <span style="color:#88c0d0">Focus: upcoming group stage games</span>
+    <span>The analyst's professional read + recommended bets per match — a second opinion, not fact</span>
+    <span style="color:#88c0d0">Cross-check with The Maths; agreement = strongest signal</span>
   </div>
   <div id="picks-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
     <div class="loading-inner"><div class="spinner"></div><span>Loading picks...</span></div>
@@ -466,6 +466,7 @@ tr:last-child td { border-bottom: none; }
 let allMatches    = [];
 let allSingles    = [];
 let allParlays    = [];
+let allIntel      = {};   // {match_label: analyst intel} — the Bettor's Analysis source
 let allBookmakers = [];
 let allFutures    = {};
 let threshold     = 0;
@@ -500,10 +501,12 @@ async function loadData(force = false) {
   if (_intelPollTimer) { clearInterval(_intelPollTimer); _intelPollTimer = null; }
 
   try {
-    const [divRes, betsRes] = await Promise.all([
+    const [divRes, betsRes, intelRes] = await Promise.all([
       fetch(force ? '/api/refresh' : '/api/divergence'),
-      fetch('/api/bets')
+      fetch('/api/bets'),
+      fetch('/api/intel')
     ]);
+    try { allIntel = (await intelRes.json()).intel || {}; } catch (e) { allIntel = {}; }
     const divData  = await divRes.json();
     const betsData = await betsRes.json();
 
@@ -573,6 +576,8 @@ async function pollIntel() {
     const res  = await fetch('/api/intel');
     const data = await res.json();
     if (!data.intel || !Object.keys(data.intel).length) return;
+
+    allIntel = { ...allIntel, ...data.intel };
 
     // Merge intel into allSingles and allParlays; compute analyst confirmation
     let changed = false;
@@ -1364,56 +1369,75 @@ function picksChosenStake() {
   return parseFloat(document.getElementById('picks-stake-input')?.value) || 10;
 }
 
+function fmtAnalystOutcome(rb, home, away) {
+  const o = (rb.outcome || '').toLowerCase();
+  if (o === 'home_win') return `${home} to win`;
+  if (o === 'away_win') return `${away} to win`;
+  if (o === 'draw')     return 'Draw';
+  if (o.startsWith('over_'))  return `Over ${o.split('_')[1]} goals`;
+  if (o.startsWith('under_')) return `Under ${o.split('_')[1]} goals`;
+  if (o.startsWith('home_'))  return `${home} (${o.split('home_')[1]}) handicap`;
+  if (o.startsWith('away_'))  return `${away} (${o.split('away_')[1]}) handicap`;
+  return rb.outcome || '';
+}
+
+function analystMatchHTML(label, intel) {
+  const parts = label.includes(' vs ') ? label.split(' vs ') : [label, ''];
+  const home = parts[0], away = parts[1];
+  const cc = c => c === 'high' ? '#3fb950' : c === 'medium' ? '#d29922' : '#8b949e';
+  const recs = intel.recommended_bets || [];
+  const recsHTML = recs.length
+    ? recs.map(rb => `
+        <div style="border-left:3px solid ${cc(rb.confidence)};padding:8px 12px;margin-top:8px;background:#0d1117;border-radius:0 6px 6px 0">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <strong style="color:#f0f6fc">${fmtAnalystOutcome(rb, home, away)}</strong>
+            <span class="badge" style="color:${cc(rb.confidence)};border-color:${cc(rb.confidence)}44">${rb.confidence || ''}${rb.strength ? ' · ' + rb.strength : ''}</span>
+          </div>
+          <div style="font-size:0.82rem;color:#8b949e;margin-top:4px;line-height:1.45">${rb.reasoning || ''}</div>
+        </div>`).join('')
+    : `<div style="color:#8b949e;font-size:0.85rem;margin-top:6px">Analyst sees no clear edge — no bet recommended.</div>`;
+  const cond = intel.conditions;
+  const condNote = cond && cond.stadium
+    ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${cond.stadium}${cond.altitude_m > 800 ? ' · ' + cond.altitude_m + 'm altitude' : ''}</div>`
+    : '';
+  return `<div class="single-card">
+    <div class="single-title">${label}</div>
+    ${condNote}
+    ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${intel.overall_summary}</div>` : ''}
+    ${recsHTML}
+  </div>`;
+}
+
 function renderTopPicks() {
   const panel = document.getElementById('picks-panel');
   if (!panel) return;
 
-  if (!allSingles.length) {
-    panel.innerHTML = '<div class="empty">No picks yet — data loading...</div>';
-    return;
-  }
-
-  const book  = picksChosenBook();
-  const stake = picksChosenStake();
-
-  // Bettor's Analysis = bets the analyst backs (football judgement). Shown
-  // independently of The Maths; every one here also has a price edge, so it's
-  // the "both agree" overlap — the strongest signal.
-  const confirmed = allSingles.filter(s => s.analyst_confirms === true);
-
   const intro = `<div class="ev-banner" style="background:#161b22;border:1px solid #30363d;color:#8b949e">
-      ⚖️ <strong style="color:#f0f6fc">The football view — judgement, not a proven edge.</strong>
-      Picks the analyst backs on form, conditions &amp; injuries. Every bet here also clears <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths</a>, so each is a <span style="color:#3fb950">★ Both agree</span> overlap — the strongest signal in the app.
+      ⚖️ <strong style="color:#f0f6fc">The football view — a professional second opinion, not fact.</strong>
+      The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths</a> — agreement between the two is the strongest signal.
     </div>`;
 
-  if (!confirmed.length) {
+  const labels = Object.keys(allIntel || {});
+  if (!labels.length) {
+    const loading = document.querySelector('.intel-loading') || _intelPollTimer;
     panel.innerHTML = intro + `<div class="empty" style="padding:24px">
-      The analyst hasn't backed any current value bet yet.<br>
-      <small style="color:#6e7681">Analysis is rate-limited (only a few matches per refresh), so coverage is thin and grows as it runs. Meanwhile, see <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths →</a></small>
+      ${loading ? 'Analyst is still researching matches…' : 'No analyst coverage yet.'}<br>
+      <small style="color:#6e7681">Analysis is rate-limited (only a few matches per refresh) — coverage grows as it runs. Meanwhile see <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths →</a></small>
     </div>`;
     return;
   }
 
-  // Group by tournament round
-  const groups = {};
-  confirmed.forEach(s => {
-    const rnd = getTournamentRound(s.commence);
-    if (!groups[rnd]) groups[rnd] = [];
-    groups[rnd].push(s);
-  });
+  // Sort analysed matches by kick-off (looked up from the divergence list)
+  const commenceBy = {};
+  allMatches.forEach(m => { commenceBy[m.label] = m.commence; });
+  const items = labels
+    .map(l => ({ label: l, intel: allIntel[l], commence: commenceBy[l] || '' }))
+    .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
 
-  const html = ROUND_ORDER
-    .filter(r => groups[r])
-    .map(r => `
-      <div>
-        <div class="picks-round-title">${r}</div>
-        <div class="singles-list">
-          ${groups[r].map(s => singleHTML(s, book, stake, {context:'analyst'})).join('')}
-        </div>
-      </div>`)
-    .join('');
-
-  panel.innerHTML = intro + (html || '<div class="empty">No picks available.</div>');
+  panel.innerHTML = intro +
+    `<div style="display:flex;flex-direction:column;gap:14px">
+       ${items.map(it => analystMatchHTML(it.label, it.intel)).join('')}
+     </div>`;
 }
 
 // ---- boot ----

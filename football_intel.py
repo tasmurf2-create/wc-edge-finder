@@ -362,7 +362,7 @@ def prewarm_weather(triples, max_workers=8):
 def _load_cache():
     if CACHE_FILE.exists():
         try:
-            return json.loads(CACHE_FILE.read_text())
+            return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
     return {}
