@@ -1171,7 +1171,7 @@ function parlayHTML(p, book, stake) {
     return `<div class="parlay-leg">
       <div class="parlay-leg-left">
         <div><strong title="Your selection for this match">${l.outcome.toUpperCase()}</strong></div>
-        <div class="parlay-leg-match">${l.match} &middot; ${fmt(l.commence)}</div>
+        <div class="parlay-leg-match">${l.match} &middot; ${fmt(l.commence)}${l.round ? ' &middot; <span style="color:#88c0d0;font-weight:600">' + l.round.label.replace('Group Stage ', '') + '</span>' : ''}</div>
         ${weatherFlagHTML(l)}
       </div>
       <div class="parlay-leg-right">
