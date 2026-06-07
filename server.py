@@ -926,7 +926,8 @@ def refresh():
 
 @app.get("/")
 def index():
-    return FileResponse("static/index.html")
+    # no-store so the browser always loads the latest UI (avoids stale-cache confusion)
+    return FileResponse("static/index.html", headers={"Cache-Control": "no-store"})
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
