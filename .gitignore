@@ -21,3 +21,6 @@ weather_cache.json
 outrights_cache.json
 team_injuries.json
 team_profiles.json
+
+# Local Claude tooling
+.claude/
