@@ -68,144 +68,13 @@ def _get_search_client():
     return _search_client
 
 
-# ---------------------------------------------------------------------------
-# WC 2026 venue registry
-# lat, lon, altitude_m, timezone, city_name, notes
-# ---------------------------------------------------------------------------
-WC_VENUES = {
-    "dallas":       (32.748, -97.093,   169,  "America/Chicago",       "Arlington/Dallas TX",    "AT&T Stadium — extreme summer heat, inland Texas"),
-    "houston":      (29.685, -95.411,    15,  "America/Chicago",       "Houston TX",             "NRG Stadium — tropical humidity, very hot"),
-    "miami":        (25.958, -80.239,     4,  "America/New_York",      "Miami FL",               "Hard Rock Stadium — heat and high humidity"),
-    "kansas_city":  (39.049, -94.484,   270,  "America/Chicago",       "Kansas City MO",         "Arrowhead Stadium — hot, exposed, midwest heat"),
-    "philadelphia": (39.901, -75.168,    9,  "America/New_York",      "Philadelphia PA",         "Lincoln Financial Field — warm, humid summers"),
-    "new_york":     (40.814, -74.074,    7,  "America/New_York",      "New York/NJ",            "MetLife Stadium — moderate, Final venue"),
-    "boston":       (42.091, -71.264,    7,  "America/New_York",      "Boston MA",              "Gillette Stadium — cooler New England climate"),
-    "seattle":      (47.596, -122.332,   4,  "America/Los_Angeles",   "Seattle WA",             "Lumen Field — mild Pacific Northwest, often cloudy"),
-    "los_angeles":  (33.954, -118.339,  27,  "America/Los_Angeles",   "Los Angeles CA",         "SoFi Stadium — mild coastal climate, indoor retractable roof"),
-    "san_francisco":(37.403, -121.970,  17,  "America/Los_Angeles",   "San Francisco/Santa Clara CA","Levi's Stadium — mild bay area, can be warm"),
-    "toronto":      (43.633, -79.419,   76,  "America/Toronto",       "Toronto ON, Canada",     "BMO Field — moderate, Great Lakes climate"),
-    "vancouver":    (49.276, -123.112,   4,  "America/Vancouver",     "Vancouver BC, Canada",   "BC Place — mild, indoor stadium"),
-    "mexico_city":  (19.303, -99.151, 2240,  "America/Mexico_City",   "Mexico City, Mexico",    "Estadio Azteca — HIGH ALTITUDE 2240m, significant factor for stamina"),
-    "guadalajara":  (20.688, -103.467,1560,  "America/Mexico_City",   "Guadalajara, Mexico",    "Estadio Akron — altitude 1560m, warm daytime"),
-    "monterrey":    (25.670, -100.244, 538,  "America/Monterrey",     "Monterrey, Mexico",      "Estadio BBVA — very hot in June, can exceed 38°C"),
-}
 
-# Best-effort group stage venue assignments based on confirmed WC 2026 schedule.
-# frozenset of (home, away) lower-case → venue key
-# Covers the fixtures most likely to have heat/altitude relevance.
-MATCH_VENUES = {
-    # Mexico host city — Azteca
-    frozenset(["mexico", "south africa"]):        "mexico_city",
-    frozenset(["mexico", "south korea"]):         "dallas",
-    frozenset(["mexico", "czech republic"]):      "dallas",
-    # USA host city
-    frozenset(["united states", "paraguay"]):     "kansas_city",
-    frozenset(["united states", "australia"]):    "los_angeles",
-    frozenset(["united states", "turkey"]):       "los_angeles",
-    frozenset(["turkey", "usa"]):                 "los_angeles",
-    frozenset(["usa", "australia"]):              "los_angeles",
-    frozenset(["usa", "paraguay"]):               "kansas_city",
-    # Canada
-    frozenset(["canada", "bosnia & herzegovina"]):  "toronto",
-    frozenset(["canada", "qatar"]):               "toronto",
-    frozenset(["switzerland", "canada"]):         "toronto",
-    # Known hot-venue matches
-    frozenset(["brazil", "morocco"]):             "dallas",
-    frozenset(["brazil", "haiti"]):               "dallas",
-    frozenset(["scotland", "brazil"]):            "houston",
-    frozenset(["scotland", "morocco"]):           "houston",
-    frozenset(["morocco", "haiti"]):              "houston",
-    frozenset(["spain", "cape verde"]):           "miami",
-    frozenset(["spain", "saudi arabia"]):         "miami",
-    frozenset(["uruguay", "spain"]):              "miami",
-    frozenset(["uruguay", "cape verde"]):         "miami",
-    frozenset(["new zealand", "egypt"]):          "miami",
-    frozenset(["new zealand", "belgium"]):        "miami",
-    frozenset(["egypt", "iran"]):                 "miami",
-    frozenset(["france", "senegal"]):             "philadelphia",
-    frozenset(["france", "iraq"]):                "philadelphia",
-    frozenset(["norway", "senegal"]):             "philadelphia",
-    frozenset(["norway", "france"]):              "philadelphia",
-    frozenset(["senegal", "iraq"]):               "philadelphia",
-    frozenset(["argentina", "algeria"]):          "san_francisco",
-    frozenset(["argentina", "austria"]):          "san_francisco",
-    frozenset(["jordan", "algeria"]):             "san_francisco",
-    frozenset(["jordan", "argentina"]):           "san_francisco",
-    frozenset(["algeria", "austria"]):            "san_francisco",
-    frozenset(["germany", "curacao"]):            "boston",
-    frozenset(["germany", "ivory coast"]):        "boston",
-    frozenset(["ecuador", "germany"]):            "boston",
-    frozenset(["ecuador", "curacao"]):            "seattle",
-    frozenset(["ivory coast", "ecuador"]):        "boston",
-    frozenset(["curacao", "ivory coast"]):        "seattle",
-    frozenset(["netherlands", "japan"]):          "new_york",
-    frozenset(["netherlands", "sweden"]):         "new_york",
-    frozenset(["tunisia", "netherlands"]):        "new_york",
-    frozenset(["japan", "sweden"]):               "new_york",
-    frozenset(["tunisia", "japan"]):              "new_york",
-    frozenset(["sweden", "tunisia"]):             "new_york",
-    frozenset(["england", "croatia"]):            "los_angeles",
-    frozenset(["england", "ghana"]):              "los_angeles",
-    frozenset(["panama", "england"]):             "los_angeles",
-    frozenset(["panama", "croatia"]):             "los_angeles",
-    frozenset(["croatia", "ghana"]):              "los_angeles",
-    frozenset(["ghana", "panama"]):               "los_angeles",
-    frozenset(["belgium", "egypt"]):              "kansas_city",
-    frozenset(["belgium", "iran"]):               "kansas_city",
-    frozenset(["new zealand", "belgium"]):        "kansas_city",
-    frozenset(["saudi arabia", "uruguay"]):       "dallas",
-    frozenset(["iran", "new zealand"]):           "kansas_city",
-    frozenset(["portugal", "dr congo"]):          "guadalajara",
-    frozenset(["portugal", "uzbekistan"]):        "guadalajara",
-    frozenset(["colombia", "portugal"]):          "guadalajara",
-    frozenset(["colombia", "dr congo"]):          "guadalajara",
-    frozenset(["dr congo", "uzbekistan"]):        "guadalajara",
-    frozenset(["uzbekistan", "colombia"]):        "guadalajara",
-    frozenset(["qatar", "switzerland"]):          "monterrey",
-    frozenset(["south korea", "czech republic"]): "monterrey",
-    frozenset(["south africa", "south korea"]):   "monterrey",
-    frozenset(["czech republic", "south africa"]):"monterrey",
-    frozenset(["bosnia & herzegovina", "qatar"]): "monterrey",
-    frozenset(["switzerland", "bosnia & herzegovina"]): "monterrey",
-    frozenset(["iraq", "norway"]):                "toronto",
-    frozenset(["haiti", "scotland"]):             "vancouver",
-    frozenset(["australia", "turkey"]):           "vancouver",
-    frozenset(["paraguay", "australia"]):         "vancouver",
-    frozenset(["turkey", "paraguay"]):            "vancouver",
-    frozenset(["austria", "jordan"]):             "seattle",
-    frozenset(["panama", "croatia"]):             "los_angeles",
-}
-
-
-def _venue_for_match(home, away):
-    """Look up venue for a match, return venue_key or None."""
-    key = frozenset([home.lower(), away.lower()])
-    return MATCH_VENUES.get(key)
 
 
 # ---------------------------------------------------------------------------
 # Open-Meteo weather fetch (free, no API key)
 # ---------------------------------------------------------------------------
 
-# June climate normals per venue (avg high °C, avg humidity %, typical conditions)
-# Source: historical climate data for June — more reliable than a forecast for future dates
-JUNE_CLIMATE = {
-    "dallas":        {"avg_high_c": 35, "feels_like_c": 39, "humidity_pct": 58, "notes": "Extreme heat. Afternoon games brutal. Evening games still 30°C+. Thunderstorm risk."},
-    "houston":       {"avg_high_c": 34, "feels_like_c": 41, "humidity_pct": 72, "notes": "Tropical humidity makes 34°C feel like 41°C. One of the most demanding venues."},
-    "miami":         {"avg_high_c": 31, "feels_like_c": 37, "humidity_pct": 76, "notes": "High humidity, afternoon heat, frequent storms. Evening games more manageable."},
-    "kansas_city":   {"avg_high_c": 31, "feels_like_c": 34, "humidity_pct": 63, "notes": "Hot and open. Exposed stadium, no shade. Midday heat significant."},
-    "philadelphia":  {"avg_high_c": 28, "feels_like_c": 30, "humidity_pct": 60, "notes": "Warm but manageable. East coast humidity present. Evening games comfortable."},
-    "new_york":      {"avg_high_c": 27, "feels_like_c": 28, "humidity_pct": 60, "notes": "Warm, moderate humidity. Final venue — good playing conditions."},
-    "boston":        {"avg_high_c": 25, "feels_like_c": 26, "humidity_pct": 60, "notes": "Mild New England summer. Comfortable playing conditions."},
-    "seattle":       {"avg_high_c": 21, "feels_like_c": 21, "humidity_pct": 55, "notes": "Mild Pacific Northwest. Rarely hot. Cool evening temperatures — best conditions in USA."},
-    "los_angeles":   {"avg_high_c": 24, "feels_like_c": 24, "humidity_pct": 60, "notes": "SoFi has a roof — weather-controlled. Mild LA coastal climate regardless."},
-    "san_francisco": {"avg_high_c": 18, "feels_like_c": 17, "humidity_pct": 65, "notes": "Famous June fog. Cool afternoons. Can be cold evenings — very different to rest of tournament."},
-    "toronto":       {"avg_high_c": 25, "feels_like_c": 26, "humidity_pct": 62, "notes": "Warm Canadian summer. Manageable conditions."},
-    "vancouver":     {"avg_high_c": 20, "feels_like_c": 19, "humidity_pct": 65, "notes": "BC Place is indoor dome — controlled conditions. Cool and comfortable."},
-    "mexico_city":   {"avg_high_c": 23, "feels_like_c": 20, "humidity_pct": 45, "notes": "ALTITUDE 2240m — the dominant factor. Stamina severely impacted for sea-level teams. Surprisingly cool temperatures but thin air is the issue."},
-    "guadalajara":   {"avg_high_c": 28, "feels_like_c": 27, "humidity_pct": 40, "notes": "ALTITUDE 1560m — significant but less extreme than Mexico City. Warm and dry. Double impact: altitude + afternoon heat."},
-    "monterrey":     {"avg_high_c": 37, "feels_like_c": 41, "humidity_pct": 50, "notes": "Hottest WC venue. June temperatures regularly exceed 38°C. Brutal for European sides. Evening games still 32°C+."},
-}
 
 
 def _local_kickoff(iso_datetime, tz):
@@ -236,7 +105,7 @@ def _match_local_date(iso_datetime, tz):
 def _fetch_weather(lat, lon, iso_datetime, tz):
     """Real Open-Meteo daily forecast for the match's local date — free, no API key.
     Returns a dict, or None when the match is outside the ~16-day forecast horizon
-    (caller then falls back to JUNE_CLIMATE normals). Cached on disk for WEATHER_TTL.
+    (caller then has no conditions). Cached on disk for WEATHER_TTL.
     """
     local_date = _match_local_date(iso_datetime, tz)
     if local_date is None:
@@ -339,51 +208,13 @@ def get_conditions_for_match(home, away, commence):
             }
         return cond, v["venue_key"]
 
-    # ---- legacy fallback: fixture not in the static schedule ----
-    vk = _venue_for_match(home, away)
-    if not vk:
-        return None, None
-    lat, lon, alt, tz, city, venue_notes = WC_VENUES[vk]
-    climate  = JUNE_CLIMATE.get(vk, {})
-    local_ko = _local_kickoff(commence, tz)
-
-    fc = _fetch_weather(lat, lon, commence, tz)
-    if fc:
-        def pick(val, fallback):
-            return round(val) if isinstance(val, (int, float)) else fallback
-        cond = {
-            "city":            city,
-            "altitude_m":      alt,
-            "local_kickoff":   local_ko,
-            "avg_high_c":      pick(fc.get("temp_max_c"),   climate.get("avg_high_c")),
-            "feels_like_c":    pick(fc.get("feels_like_c"), climate.get("feels_like_c")),
-            "humidity_pct":    pick(fc.get("humidity_pct"), climate.get("humidity_pct")),
-            "precip_prob_pct": fc.get("precip_prob_pct"),
-            "wind_max_kmh":    pick(fc.get("wind_max_kmh"), None),
-            "notes":           climate.get("notes", venue_notes),
-            "source":          "forecast",
-            "days_out":        fc.get("days_out"),
-        }
-    else:
-        cond = {
-            "city":            city,
-            "altitude_m":      alt,
-            "local_kickoff":   local_ko,
-            "avg_high_c":      climate.get("avg_high_c"),
-            "feels_like_c":    climate.get("feels_like_c"),
-            "humidity_pct":    climate.get("humidity_pct"),
-            "precip_prob_pct": None,
-            "wind_max_kmh":    None,
-            "notes":           climate.get("notes", venue_notes),
-            "source":          "climate_normal",
-            "days_out":        None,
-        }
-    return cond, vk
+    # Fixture not in the sourced FIFA schedule — no guessing on venue/conditions.
+    return None, None
 
 
 def _fmt_conditions(cond, vk):
     if not cond:
-        return "Venue not confirmed in schedule — reason from your knowledge about likely host city."
+        return "Venue not in the sourced FIFA schedule — do NOT speculate on venue, conditions, kick-off or weather; exclude conditions from this analysis."
     alt_note = f" *** ALTITUDE {cond['altitude_m']}m ***" if (cond.get("altitude_m") or 0) > 800 else ""
     src = cond.get("source")
     if src == "forecast":
@@ -411,28 +242,6 @@ def _fmt_conditions(cond, vk):
 # ---------------------------------------------------------------------------
 # Climate tolerance — which nations cope with heat / altitude (static, no API)
 # ---------------------------------------------------------------------------
-HEAT_TOLERANCE = {
-    # low — cold-climate sides that wilt in heat/humidity
-    "norway": "low", "denmark": "low", "sweden": "low", "scotland": "low",
-    "england": "low", "netherlands": "low", "germany": "low", "belgium": "low",
-    "switzerland": "low", "austria": "low", "czech republic": "low", "poland": "low",
-    "ukraine": "low", "ireland": "low", "russia": "low", "canada": "low",
-    "bosnia & herzegovina": "low", "bosnia and herzegovina": "low",
-    # high — heat/humidity adapted
-    "costa rica": "high", "mexico": "high", "saudi arabia": "high", "qatar": "high",
-    "iran": "high", "iraq": "high", "egypt": "high", "morocco": "high", "tunisia": "high",
-    "algeria": "high", "senegal": "high", "ivory coast": "high", "ghana": "high",
-    "dr congo": "high", "nigeria": "high", "cape verde": "high", "brazil": "high",
-    "colombia": "high", "ecuador": "high", "paraguay": "high", "uruguay": "high",
-    "haiti": "high", "curacao": "high", "curaçao": "high", "panama": "high",
-    "jordan": "high", "uzbekistan": "high", "south africa": "high", "cameroon": "high",
-    "mali": "high",
-    # medium — temperate / adaptable
-    "united states": "medium", "usa": "medium", "australia": "medium", "japan": "medium",
-    "south korea": "medium", "spain": "medium", "portugal": "medium", "italy": "medium",
-    "france": "medium", "croatia": "medium", "argentina": "medium", "new zealand": "medium",
-    "turkey": "medium",
-}
 # Nations whose footballers are accustomed to high-altitude home venues
 ALTITUDE_ADAPTED = {"mexico", "bolivia", "ecuador", "colombia", "peru"}
 _TOL_RANK = {"low": 0, "medium": 1, "high": 2}
@@ -445,7 +254,7 @@ def _heat_tol(team):
     if c:
         t = c["avg_temp_c"]
         return "high" if t >= 22 else ("medium" if t >= 14 else "low")
-    return HEAT_TOLERANCE.get(team.lower().strip(), "medium")
+    return "medium"
 
 
 def weather_signal(home, away, commence):
