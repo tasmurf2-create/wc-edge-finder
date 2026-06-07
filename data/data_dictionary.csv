@@ -1,0 +1,10 @@
+table_name,column_name,definition
+countries,average_annual_temp_c,Country-level annual average air temperature in °C. Static published/compiled baseline; not a weather forecast and not stadium-specific.
+countries,mean_elevation_m,Country-level mean elevation above sea level in metres. Static published/compiled baseline; not match venue elevation.
+venues,altitude_m,Approximate stadium or host-city elevation above sea level in metres.
+venues,avg_temp_june_c,Host-city June average temperature in °C for pre-tournament fixture condition analysis; not live forecast.
+venues,avg_temp_july_c,Host-city July average temperature in °C for pre-tournament fixture condition analysis; not live forecast.
+matches,kickoff_local,Primary display time. Kickoff time converted into the local timezone at the match venue.
+matches,kickoff_utc,"UTC representation of kickoff for sorting, joins, and user-local conversion."
+players,club,Club as listed in the official FIFA squad list PDF.
+players,dob,"Date of birth as listed in the official FIFA squad list PDF, DD/MM/YYYY."

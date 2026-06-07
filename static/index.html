@@ -282,6 +282,15 @@ tr:last-child td { border-bottom: none; }
 .parlay-chance {
   font-size: 1.05rem; font-weight: 700; color: #3fb950;
 }
+/* demoted (speculative longshot) single + muted badge */
+.single-card.demoted { opacity: 0.55; }
+.single-card.demoted:hover { opacity: 0.85; }
+.badge-muted { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+/* EV framing banners */
+.ev-banner { margin: 12px 24px 0; padding: 10px 14px; border-radius: 8px; font-size: 0.82rem; line-height: 1.45; }
+.ev-banner.good { background: #11271a; border: 1px solid #3fb95055; color: #c9d1d9; }
+.ev-banner.warn { background: #2a1411; border: 1px solid #f8514955; color: #c9d1d9; }
+.ev-banner strong { color: #f0f6fc; }
 /* weather flag on legs / singles */
 .wflag { font-size: 0.72rem; margin-top: 4px; cursor: help; line-height: 1.3; }
 .wflag.good    { color: #3fb950; }
@@ -325,8 +334,8 @@ tr:last-child td { border-bottom: none; }
 
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
-  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">Recommended Bets</button>
-  <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Top Picks</button>
+  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
+  <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
   <button class="tab-btn" data-tab="futures" onclick="switchTab('futures')">Futures &amp; Outrights</button>
 </div>
 
@@ -391,8 +400,8 @@ tr:last-child td { border-bottom: none; }
   </div>
   <!-- Singles / Multi sub-tabs -->
   <div style="background:#161b22;border-bottom:1px solid #21262d;padding:0 24px;display:flex;gap:2px">
-    <button id="btn-singles" class="bet-type-btn active" onclick="switchBetsTab('singles')">Singles</button>
-    <button id="btn-parlays" class="bet-type-btn" onclick="switchBetsTab('parlays')">Multi-Bets</button>
+    <button id="btn-singles" class="bet-type-btn active" onclick="switchBetsTab('singles')">Value Singles <span style="color:#3fb950;font-weight:700">+EV</span></button>
+    <button id="btn-parlays" class="bet-type-btn" onclick="switchBetsTab('parlays')">Accumulators <span style="color:#f85149;font-weight:700">−EV</span></button>
   </div>
   <div id="bets-panel">
     <div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>
@@ -415,7 +424,7 @@ tr:last-child td { border-bottom: none; }
     </span>
   </div>
   <div class="legend">
-    <span>Top 5 value bets ranked by edge, grouped by tournament round</span>
+    <span>Analyst-backed picks (football judgement) — the "both agree" overlap with The Maths</span>
     <span style="color:#88c0d0">Focus: upcoming group stage games</span>
   </div>
   <div id="picks-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
@@ -855,6 +864,11 @@ function renderBets() {
           <small>${parlays.length} slip${parlays.length !== 1 ? 's' : ''}, ranked by chance of landing · ${book === 'best' ? 'best available price' : book}</small>
         </div>
       </div>
+      <div class="ev-banner warn">
+        ⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong>
+        Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small.
+        The genuine edge is in <a onclick="switchBetsTab('singles')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">Value Singles →</a>
+      </div>
       ${controls}
       ${accaMarketsNote()}
       ${accaLegendHTML()}
@@ -864,15 +878,25 @@ function renderBets() {
       panel.innerHTML = '<div class="empty" style="padding:24px">No value singles found under current filters.</div>';
       return;
     }
+    // Reliable edges first; speculative longshots demoted to the bottom.
+    const ranked = [...singles].sort((a, b) => {
+      const da = edgeReliable(a) ? 0 : 1, db = edgeReliable(b) ? 0 : 1;
+      return da !== db ? da - db : b.edge - a.edge;
+    });
+    const solid = ranked.filter(edgeReliable).length;
     panel.innerHTML = `
       <div style="padding:18px 24px 0">
         <div class="bets-section-title">
-          Singles
-          <small>${singles.length} value bet${singles.length !== 1 ? 's' : ''} · ${book === 'best' ? 'best available price' : book}</small>
+          The Maths — positive-edge candidates
+          <small>${ranked.length} where the price beats fair (${solid} solid, ${ranked.length - solid} speculative) · ${book === 'best' ? 'best available price' : book}</small>
         </div>
       </div>
+      <div class="ev-banner good">
+        ✅ <strong>What the numbers say — candidates, not endorsements.</strong>
+        Each one's best price beats the de-vigged fair probability (positive edge). Small edges on long-odds outcomes are greyed out as <em>speculative</em> (within the model's margin of error). For the football view, see <a onclick="switchTab('picks')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">Bettor's Analysis →</a>; bets marked <span style="color:#3fb950">★ Both agree</span> are the strongest.
+      </div>
       <div class="singles-list" style="padding:0 24px 24px">
-        ${singles.map(s => singleHTML(s, book, stake)).join('')}
+        ${ranked.map(s => singleHTML(s, book, stake)).join('')}
       </div>`;
   }
 }
@@ -911,7 +935,14 @@ function analystConfirms(single, intel) {
   return false;
 }
 
-function singleHTML(s, book, stake) {
+// A small edge on a long-priced outcome is within the de-vig's own margin of
+// error — i.e. noise, not value. Require the edge to grow with the price.
+function edgeReliable(s) {
+  return s.edge >= (0.5 + 0.3 * ((s.best_price || 1) - 1));
+}
+
+function singleHTML(s, book, stake, opts = {}) {
+  const context = opts.context || 'maths';   // 'maths' | 'analyst'
   const { price, bookLabel, fallback } = priceForBook(s, book);
   const grossReturn = stake * price;
   const profit      = grossReturn - stake;
@@ -924,11 +955,32 @@ function singleHTML(s, book, stake) {
   if (confirmed === undefined || confirmed === null) {
     confirmed = analystConfirms(s, s.intel);
   }
+  const reliable    = edgeReliable(s);
+  const speculative = !reliable;
+  // In The Maths tab the analyst is a *separate* layer — we only surface the
+  // positive overlap ("both agree"), never the contradiction (that lives in
+  // the Bettor's Analysis tab). In the analyst tab we show the full verdict.
+  const overlapBadge = confirmed === true
+    ? `<span class="badge" style="background:#0d2818;color:#3fb950;border:1px solid #3fb95088" title="The maths and the analyst both like this — the strongest signal.">★ Both agree</span>`
+    : ``;
   const analystBadge = confirmed === true
     ? `<span class="badge" style="background:#1a3626;color:#3fb950;border:1px solid #3fb95066">✓ Analyst backed</span>`
     : confirmed === false
     ? `<span class="badge" style="background:#2a1a1a;color:#d29922;border:1px solid #d2992266">⚠ Analyst prefers other outcome</span>`
     : ``;
+
+  // Confidence badge: maths-only. Demote speculative longshots instead of
+  // dressing them as "medium/high".
+  const confBadge = speculative
+    ? `<span class="badge badge-muted" title="Edge (+${s.edge.toFixed(1)}%) is small relative to the long price (${(s.best_price||0).toFixed(2)}) — within the model's margin of error, so treat as noise, not value.">Speculative · longshot</span>`
+    : `<span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>`;
+
+  const topRight = context === 'analyst'
+    ? `${analystBadge}
+       <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${s.edge.toFixed(1)}%</span>`
+    : `${confBadge}
+       <span class="badge badge-neutral" style="color:${reliable ? '#3fb950' : '#6e7681'};border-color:${reliable ? '#3fb95044' : '#30363d'}">edge +${s.edge.toFixed(1)}%</span>
+       ${overlapBadge}`;
 
   const fallbackNote = fallback
     ? `<span style="color:#d29922;font-size:0.73rem"> ⚠ not at ${book}, using ${bookLabel}</span>`
@@ -937,7 +989,7 @@ function singleHTML(s, book, stake) {
   const kalLine  = s.kalshi != null ? `<span><span class="lbl">Kalshi:</span><span class="val blue">${s.kalshi}%</span></span>` : '';
   const polyLine = s.poly   != null ? `<span><span class="lbl">Poly:</span><span class="val blue">${s.poly}%</span></span>`   : '';
 
-  return `<div class="single-card conf-${s.confidence}">
+  return `<div class="single-card conf-${s.confidence}${speculative && context !== 'analyst' ? ' demoted' : ''}">
     <div class="single-top">
       <div>
         <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
@@ -945,9 +997,7 @@ function singleHTML(s, book, stake) {
         ${weatherFlagHTML(s)}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>
-        <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${s.edge.toFixed(1)}%</span>
-        ${analystBadge}
+        ${topRight}
       </div>
     </div>
     <div class="single-prices">
@@ -1326,27 +1376,31 @@ function renderTopPicks() {
   const book  = picksChosenBook();
   const stake = picksChosenStake();
 
-  // Separate analyst-confirmed bets from price-only bets
+  // Bettor's Analysis = bets the analyst backs (football judgement). Shown
+  // independently of The Maths; every one here also has a price edge, so it's
+  // the "both agree" overlap — the strongest signal.
   const confirmed = allSingles.filter(s => s.analyst_confirms === true);
-  const unconfirmed = allSingles.filter(s => s.analyst_confirms !== true);
 
-  // Top 5: analyst-confirmed first, then fill with best price-edge bets
-  const top5 = [...confirmed, ...unconfirmed].slice(0, 5);
-  const hasAnalyst = confirmed.length > 0;
+  const intro = `<div class="ev-banner" style="background:#161b22;border:1px solid #30363d;color:#8b949e">
+      ⚖️ <strong style="color:#f0f6fc">The football view — judgement, not a proven edge.</strong>
+      Picks the analyst backs on form, conditions &amp; injuries. Every bet here also clears <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths</a>, so each is a <span style="color:#3fb950">★ Both agree</span> overlap — the strongest signal in the app.
+    </div>`;
+
+  if (!confirmed.length) {
+    panel.innerHTML = intro + `<div class="empty" style="padding:24px">
+      The analyst hasn't backed any current value bet yet.<br>
+      <small style="color:#6e7681">Analysis is rate-limited (only a few matches per refresh), so coverage is thin and grows as it runs. Meanwhile, see <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths →</a></small>
+    </div>`;
+    return;
+  }
 
   // Group by tournament round
   const groups = {};
-  top5.forEach(s => {
+  confirmed.forEach(s => {
     const rnd = getTournamentRound(s.commence);
     if (!groups[rnd]) groups[rnd] = [];
     groups[rnd].push(s);
   });
-
-  const note = !hasAnalyst
-    ? `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:0.82rem;color:#8b949e">
-        Analyst research is pending — showing top price-edge bets. Picks will update once analysis completes.
-       </div>`
-    : '';
 
   const html = ROUND_ORDER
     .filter(r => groups[r])
@@ -1354,12 +1408,12 @@ function renderTopPicks() {
       <div>
         <div class="picks-round-title">${r}</div>
         <div class="singles-list">
-          ${groups[r].map(s => singleHTML(s, book, stake)).join('')}
+          ${groups[r].map(s => singleHTML(s, book, stake, {context:'analyst'})).join('')}
         </div>
       </div>`)
     .join('');
 
-  panel.innerHTML = note + (html || '<div class="empty">No picks available.</div>');
+  panel.innerHTML = intro + (html || '<div class="empty">No picks available.</div>');
 }
 
 // ---- boot ----

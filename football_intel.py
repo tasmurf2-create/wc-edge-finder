@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import anthropic
+import static_data
 
 CACHE_FILE      = Path("intel_cache.json")
 PROFILES_FILE   = Path("team_profiles.json")   # squad announcements — never expires
@@ -289,9 +290,56 @@ def _fetch_weather(lat, lon, iso_datetime, tz):
         return None
 
 
+def _venue_month_temp(venue, commence):
+    """Venue June or July average, picked by the match month."""
+    try:
+        mo = datetime.fromisoformat(commence.replace("Z", "+00:00")).month
+    except Exception:
+        mo = 6
+    if mo >= 7 and venue.get("avg_temp_july_c") is not None:
+        return venue["avg_temp_july_c"]
+    return venue.get("avg_temp_june_c")
+
+
 def get_conditions_for_match(home, away, commence):
-    """Return conditions dict for a match. Uses a live Open-Meteo forecast when the
-    match is within the forecast horizon, otherwise June climate normals."""
+    """Conditions for a match from the sourced static venue DB + a live Open-Meteo
+    forecast (within 16 days), else the venue's June/July climate normal. Roofed
+    stadiums are treated as climate-controlled. Falls back to the legacy hand
+    tables only if the fixture isn't in the static schedule."""
+    info = static_data.venue_for_teams(home, away)
+    if info:
+        v = info["venue"]
+        tz = v.get("timezone") or "UTC"
+        local_ko = _local_kickoff(commence, tz)
+        base = _venue_month_temp(v, commence)
+        base_r = round(base) if isinstance(base, (int, float)) else None
+        roofed = bool(v.get("has_roof"))
+        notes = f"{v['stadium']}, {v['city']}" + (" — roofed / climate-controlled" if roofed else "")
+        fc = None if roofed else _fetch_weather(v.get("latitude"), v.get("longitude"), commence, tz)
+        if fc:
+            def pick(val, fb):
+                return round(val) if isinstance(val, (int, float)) else fb
+            cond = {
+                "city": v["city"], "stadium": v["stadium"], "has_roof": roofed,
+                "altitude_m": v.get("altitude_m") or 0, "local_kickoff": local_ko,
+                "avg_high_c": pick(fc.get("temp_max_c"), base_r),
+                "feels_like_c": pick(fc.get("feels_like_c"), base_r),
+                "humidity_pct": pick(fc.get("humidity_pct"), None),
+                "precip_prob_pct": fc.get("precip_prob_pct"),
+                "wind_max_kmh": pick(fc.get("wind_max_kmh"), None),
+                "notes": notes, "source": "forecast", "days_out": fc.get("days_out"),
+            }
+        else:
+            cond = {
+                "city": v["city"], "stadium": v["stadium"], "has_roof": roofed,
+                "altitude_m": v.get("altitude_m") or 0, "local_kickoff": local_ko,
+                "avg_high_c": base_r, "feels_like_c": base_r, "humidity_pct": None,
+                "precip_prob_pct": None, "wind_max_kmh": None, "notes": notes,
+                "source": "controlled" if roofed else "climate_normal", "days_out": None,
+            }
+        return cond, v["venue_key"]
+
+    # ---- legacy fallback: fixture not in the static schedule ----
     vk = _venue_for_match(home, away)
     if not vk:
         return None, None
@@ -336,20 +384,24 @@ def get_conditions_for_match(home, away, commence):
 def _fmt_conditions(cond, vk):
     if not cond:
         return "Venue not confirmed in schedule — reason from your knowledge about likely host city."
-    alt_note = f" *** ALTITUDE {cond['altitude_m']}m ***" if cond["altitude_m"] > 800 else ""
-    if cond.get("source") == "forecast":
+    alt_note = f" *** ALTITUDE {cond['altitude_m']}m ***" if (cond.get("altitude_m") or 0) > 800 else ""
+    src = cond.get("source")
+    if src == "forecast":
         extra = ""
         if cond.get("precip_prob_pct") is not None:
             extra += f"  |  Rain chance: {cond['precip_prob_pct']}%"
         if cond.get("wind_max_kmh") is not None:
             extra += f"  |  Wind: {cond['wind_max_kmh']} km/h"
+        hum = f"  |  Humidity: {cond['humidity_pct']}%" if cond.get("humidity_pct") is not None else ""
         weather_line = (f"LIVE FORECAST ({cond['days_out']}d out) — high: {cond['avg_high_c']}°C  |  "
-                        f"Feels like: {cond['feels_like_c']}°C  |  Humidity: {cond['humidity_pct']}%{extra}")
+                        f"Feels like: {cond['feels_like_c']}°C{hum}{extra}")
+    elif src == "controlled":
+        weather_line = "Roofed / climate-controlled stadium — weather not a factor."
     else:
-        weather_line = (f"June climate normal — high: {cond['avg_high_c']}°C  |  "
-                        f"Feels like: {cond['feels_like_c']}°C  |  Humidity: {cond['humidity_pct']}%")
+        weather_line = f"Climate normal — venue avg temp: {cond.get('avg_high_c')}°C"
+    venue_label = cond.get("stadium") or cond.get("city") or "venue"
     return (
-        f"Venue: {cond['city']}{alt_note}\n"
+        f"Venue: {venue_label}{alt_note}\n"
         f"Local kick-off: {cond['local_kickoff']}\n"
         f"{weather_line}\n"
         f"Assessment: {cond['notes']}"
@@ -387,6 +439,12 @@ _TOL_RANK = {"low": 0, "medium": 1, "high": 2}
 
 
 def _heat_tol(team):
+    # Data-driven from teams.csv (sourced country avg annual temperature);
+    # falls back to the hand-curated table only if the team isn't in the DB.
+    c = static_data.team_climate(team)
+    if c:
+        t = c["avg_temp_c"]
+        return "high" if t >= 22 else ("medium" if t >= 14 else "low")
     return HEAT_TOLERANCE.get(team.lower().strip(), "medium")
 
 
@@ -398,6 +456,8 @@ def weather_signal(home, away, commence):
     cond, vk = get_conditions_for_match(home, away, commence)
     if not cond:
         return None
+    if cond.get("has_roof"):
+        return None   # roofed / climate-controlled stadium — conditions neutralised
     feels    = cond.get("feels_like_c") or cond.get("avg_high_c") or 0
     humidity = cond.get("humidity_pct") or 0
     alt      = cond.get("altitude_m") or 0
@@ -406,10 +466,16 @@ def weather_signal(home, away, commence):
     types = []
 
     # --- heat / humidity ---
+    # A live forecast gives a feels-like *max*; a climate normal is a monthly
+    # *mean* (a few degrees lower for the same heat) — so use lower thresholds.
+    if cond.get("source") == "forecast":
+        hot_t, extreme_t = 33, 38
+    else:
+        hot_t, extreme_t = 26, 29
     heat_sev = None
-    if feels >= 38 or (feels >= 34 and humidity >= 65):
+    if feels >= extreme_t or (feels >= extreme_t - 4 and humidity >= 65):
         heat_sev = "extreme"
-    elif feels >= 33:
+    elif feels >= hot_t:
         heat_sev = "hot"
     if heat_sev:
         types.append("heat")
