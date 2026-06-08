@@ -31,7 +31,7 @@ Irish-accessible books only: **Paddy Power · Betfair · Bet365 · BoyleSports �
 
 Each match gets a Claude analysis covering:
 - Squad profile (from official WC 2026 announcements — cached permanently)
-- Injury & suspension news (refreshed every 12 hours)
+- Injury & suspension news (one tournament-wide BBC digest, refreshed every 12 hours)
 - Venue conditions: altitude (Mexico City 2240m, Guadalajara 1560m), heat (Monterrey 37°C+, Houston, Dallas), humidity
 - Tactical matchup and form
 - Specific `recommended_bets[]` — up to 3 bets with clear football reasoning, not just price signal
@@ -68,7 +68,7 @@ python server.py
 | Match odds | 5 min | in-memory |
 | Match intel (analyst) | 12 hours | `intel_cache.json` |
 | Team squad profiles | Permanent | `team_profiles.json` |
-| Injury/suspension news | 12 hours | `team_injuries.json` |
+| Injury/suspension digest (BBC, tournament-wide) | 12 hours | `injury_digest.json` |
 
 ## Edge logic
 

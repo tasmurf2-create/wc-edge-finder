@@ -23,10 +23,13 @@ import anthropic
 import static_data
 
 CACHE_FILE      = Path("intel_cache.json")
-INJURIES_FILE   = Path("team_injuries.json")   # injuries/suspensions — refreshed daily (runtime cache)
+INJURY_DIGEST_FILE = Path("injury_digest.json")  # ONE tournament-wide injury digest (BBC)
 WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+date
 CACHE_TTL       = 43200    # 12 hours — match analysis
 INJURIES_TTL    = 43200    # 12 hours — injury data
+# Restrict injury searches to one trusted source. One broad BBC search per refresh
+# covers the newsworthy injuries tournament-wide, instead of one search per team.
+INJURY_DOMAINS  = ["bbc.com"]
 WEATHER_TTL     = 21600    # 6 hours — weather forecast (refreshes a few times daily)
 WEATHER_HORIZON_DAYS = 15  # Open-Meteo forecasts ~16 days ahead; use live data inside this
 MODEL           = "claude-sonnet-4-6"          # match analysis (reasoning)
@@ -417,13 +420,17 @@ def _team_key(team):
     return team.lower().strip()
 
 
-def _web_search_text(prompt, max_uses=2, max_tokens=500):
-    """Run a single web-search call on the search model and return the text."""
+def _web_search_text(prompt, max_uses=2, max_tokens=500, allowed_domains=None):
+    """Run a single web-search call on the search model and return the text.
+    allowed_domains (e.g. ["bbc.com"]) restricts results to trusted sources."""
     client = _get_search_client()
+    tool = {"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}
+    if allowed_domains:
+        tool["allowed_domains"] = allowed_domains
     resp = client.messages.create(
         model      = SEARCH_MODEL,
         max_tokens = max_tokens,
-        tools      = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
+        tools      = [tool],
         messages   = [{"role": "user", "content": prompt}],
     )
     return "".join(
@@ -436,91 +443,65 @@ def _web_search_text(prompt, max_uses=2, max_tokens=500):
 # Squad data is now SOURCED from the official FIFA list (players.csv via
 # static_data.squad_text) — no web search, no fabrication. See _team_context().
 
-# --- Injuries (daily refresh) ---
+# --- Injuries: ONE tournament-wide digest (BBC), refreshed 12h ---
 
-def fetch_team_injuries(team, force=False):
+def _injury_digest_query():
+    today = datetime.now().strftime("%-d %B %Y") if os.name != "nt" else datetime.now().strftime("%d %B %Y")
+    return (
+        f"As of {today}, summarise the latest confirmed injury and suspension news "
+        f"for the 2026 FIFA World Cup. For each affected national team, list the player "
+        f"name, their team, and the injury/suspension and expected availability. "
+        f"Group by national team. Focus on the most recent news. If a major team has no "
+        f"reported absences, you may note that."
+    )
+
+
+def fetch_wc_injury_digest(force=False):
     """
-    Fetch current injury/suspension news for a team via web search. Cached 12h.
-    This is the one genuinely *dynamic* team input — it cannot be static.
-    Returns a plain-text summary. Concurrency-safe.
+    ONE web search (restricted to BBC) for tournament-wide injury/suspension news,
+    cached 12h. Replaces the old per-team search (which cost ~1 call per team).
+    Returns a plain-text digest grouped by national team. Concurrency-safe.
     """
-    key = _team_key(team)
     with _io_lock:
-        entry = _load_json(INJURIES_FILE).get(key, {})
-    if (not force and entry.get("injuries")
+        entry = _load_json(INJURY_DIGEST_FILE)
+    if (not force and entry.get("digest")
             and (time.time() - entry.get("fetched_at", 0)) < INJURIES_TTL):
-        return entry["injuries"]
+        return entry["digest"]
 
     try:
         text = _web_search_text(
-            f"What are the latest injury and suspension news for the {team} national "
-            f"team ahead of the 2026 FIFA World Cup? List confirmed absences, doubtful "
-            f"players, and fitness concerns with player names and injury type. "
-            f"If none reported, say 'No significant injuries reported'.",
-            max_uses=1, max_tokens=250,
+            _injury_digest_query(),
+            max_uses=3, max_tokens=900, allowed_domains=INJURY_DOMAINS,
         )
         if text:
             with _io_lock:
-                store = _load_json(INJURIES_FILE)
-                store[key] = {"injuries": text, "fetched_at": int(time.time()), "team": team}
-                _save_json(INJURIES_FILE, store)
-            print(f"[injuries] {team} ({len(text)} chars)")
+                _save_json(INJURY_DIGEST_FILE,
+                           {"digest": text, "fetched_at": int(time.time())})
+            print(f"[injuries] WC digest refreshed ({len(text)} chars)")
             return text
     except Exception as e:
-        print(f"[injuries] failed for {team}: {e}")
+        print(f"[injuries] digest fetch failed: {e}")
 
-    return entry.get("injuries", "No injury data available.")
+    return entry.get("digest", "No injury data available.")
 
 
-def _team_context(team, injuries):
-    """Combine the SOURCED squad (official FIFA list) with web-searched injuries,
-    each clearly labelled by reliability for the analyst."""
+def peek_injury_digest():
+    """Return the currently cached digest text without triggering a search."""
+    return (_load_json(INJURY_DIGEST_FILE) or {}).get("digest")
+
+
+def _team_context(team):
+    """The SOURCED squad (official FIFA list) for a team. Injuries are now a
+    single tournament-wide digest injected separately into the prompt."""
     squad = static_data.squad_text(team)
-    parts = []
     if squad:
-        parts.append("SQUAD (official FIFA 2026 squad list — authoritative):\n" + squad)
-    else:
-        parts.append("SQUAD: not found in official list.")
-    parts.append("INJURY / AVAILABILITY (web search — may be incomplete, treat as indicative):\n"
-                 + (injuries or "No injury data available."))
-    return "\n\n".join(parts)
+        return "SQUAD (official FIFA 2026 squad list — authoritative):\n" + squad
+    return "SQUAD: not found in official list."
 
 
 def get_team_snapshots(home, away):
-    """Build each team's context: SOURCED squad from players.csv + injuries from a
-    focused web search (fetched concurrently). Squad is factual; only injuries hit
-    the network."""
-    inj = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-        futs = {ex.submit(fetch_team_injuries, t): t for t in (home, away)}
-        for f in concurrent.futures.as_completed(futs):
-            try:
-                inj[futs[f]] = f.result()
-            except Exception as e:
-                print(f"[injuries] {futs[f]} failed: {e}")
-                inj[futs[f]] = ""
-    return _team_context(home, inj.get(home, "")), _team_context(away, inj.get(away, ""))
-
-
-def refresh_injuries_for_teams(teams, force=True):
-    """Force-refresh injury data for a list of teams, concurrently."""
-    teams = list(teams)
-    if not teams:
-        return
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(teams))) as ex:
-        futs = {ex.submit(fetch_team_injuries, t, True): t for t in teams}
-        for f in concurrent.futures.as_completed(futs):
-            try:
-                f.result()
-            except Exception as e:
-                print(f"[injuries] refresh failed for {futs[f]}: {e}")
-
-
-def injuries_snapshot(teams):
-    """Return {team_key: injuries_text} for the given teams from the injuries
-    cache — call before and after a refresh to detect which teams changed."""
-    store = _load_json(INJURIES_FILE)
-    return {_team_key(t): (store.get(_team_key(t)) or {}).get("injuries") for t in teams}
+    """Both teams' SOURCED squad context (static — no network)."""
+    return _team_context(home), _team_context(away)
 
 
 # ---------------------------------------------------------------------------
@@ -541,19 +522,27 @@ Always output valid JSON matching the exact schema requested — no markdown fen
 
 
 def _build_prompt(home, away, commence, price_notes, weather_str,
-                  home_ctx="", away_ctx=""):
+                  home_ctx="", away_ctx="", injury_digest=""):
     context_section = ""
     if home_ctx or away_ctx:
         context_section = f"""
-TEAM INTEL — official squad (authoritative) + injury/availability (web, indicative):
+TEAM SQUADS — official FIFA 2026 lists (authoritative):
 {home.upper()}: {home_ctx or 'Not available.'}
 
 {away.upper()}: {away_ctx or 'Not available.'}
 """
+    injury_section = ""
+    if injury_digest:
+        injury_section = f"""
+INJURY / SUSPENSION NEWS — tournament-wide digest (source: BBC, indicative; covers
+newsworthy absences, may not mention every team). Apply only the parts relevant to
+{home} or {away}:
+{injury_digest}
+"""
     return f"""WC 2026 match: {home} vs {away} (kick-off UTC: {commence})
 
 VENUE & CONDITIONS: {weather_str}
-{context_section}
+{context_section}{injury_section}
 BOOKMAKER PRICE SIGNAL (for context — your recommendation must be driven by football logic first):
 {price_notes}
 
@@ -631,8 +620,10 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
     if sig:
         cond_str += f"\nClimate edge: {sig['detail']}"
 
-    # Fetch both teams' snapshots (squad + injuries) concurrently before analysis
+    # Squad context (static) + the shared tournament-wide injury digest (one cached
+    # BBC search, not one per team).
     home_ctx, away_ctx = get_team_snapshots(home, away)
+    injury_digest = fetch_wc_injury_digest()
 
     try:
         client = _get_client()
@@ -643,7 +634,7 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
             messages   = [{"role": "user",
                            "content": _build_prompt(
                                home, away, commence, price_notes, cond_str,
-                               home_ctx, away_ctx,
+                               home_ctx, away_ctx, injury_digest,
                            )}],
         )
         raw = resp.content[0].text.strip()

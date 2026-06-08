@@ -556,15 +556,15 @@ async function loadData(force = false) {
 
 async function refreshInjuries() {
   const btn = document.getElementById('team-btn');
-  btn.disabled = true; btn.textContent = 'Fetching injuries...';
+  btn.disabled = true; btn.textContent = 'Refreshing injuries...';
   try {
-    const res = await fetch('/api/refresh-injuries');
-    const d = await res.json();
-    btn.textContent = `Updating ${d.teams} teams...`;
+    await fetch('/api/refresh-injuries');
+    // One BBC injury-digest search (~15-30s); affected analyst cards then
+    // re-analyse in the background. Reload shortly to pick up the changes.
     setTimeout(async () => {
       await loadData(false);
       btn.disabled = false; btn.textContent = 'Refresh Injuries';
-    }, d.teams * 5000); // ~5s per team for injury-only search
+    }, 25000);
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Refresh Injuries';
   }
