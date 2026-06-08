@@ -1469,15 +1469,27 @@ function analystMatchHTML(label, intel) {
   const home = parts[0], away = parts[1];
   const cc = c => c === 'high' ? '#3fb950' : c === 'medium' ? '#d29922' : '#8b949e';
   const recs = intel.recommended_bets || [];
+  const book = picksChosenBook();
   const recsHTML = recs.length
-    ? recs.map(rb => `
+    ? recs.map(rb => {
+        // Live odds for this exact selection (joined server-side in /api/intel).
+        const { price, bookLabel, fallback } = rb.best_price ? priceForBook(rb, book) : { price: null };
+        const oddsHTML = price
+          ? `<span class="badge help" style="color:#f0f6fc;border-color:#30363d" title="Best available decimal odds for this selection${fallback ? ' — not posted at ' + book + ', best price shown' : ''}.">${price.toFixed(2)} @ ${bookLabel}${fallback ? ' ⚠' : ''}</span>`
+            + (rb.edge != null && rb.edge > 0
+                ? `<span class="badge help" style="color:#3fb950;border-color:#3fb95044" title="The price beats the de-vigged fair value by this much — the analyst pick is also +EV on the maths.">+${rb.edge.toFixed(1)}% edge</span>`
+                : '')
+          : `<span style="font-size:0.72rem;color:#6e7681">no price posted yet</span>`;
+        return `
         <div style="border-left:3px solid ${cc(rb.confidence)};padding:8px 12px;margin-top:8px;background:#0d1117;border-radius:0 6px 6px 0">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <strong style="color:#f0f6fc">${fmtAnalystOutcome(rb, home, away)}</strong>
             <span class="badge" style="color:${cc(rb.confidence)};border-color:${cc(rb.confidence)}44">${rb.confidence || ''}${rb.strength ? ' · ' + rb.strength : ''}</span>
+            ${oddsHTML}
           </div>
           <div style="font-size:0.82rem;color:#8b949e;margin-top:4px;line-height:1.45">${rb.reasoning || ''}</div>
-        </div>`).join('')
+        </div>`;
+      }).join('')
     : `<div style="color:#8b949e;font-size:0.85rem;margin-top:6px">Analyst sees no clear edge — no bet recommended.</div>`;
   const cond = intel.conditions;
   const condNote = cond && cond.stadium

@@ -334,6 +334,43 @@ def _trigger_intel_bg(singles):
 # Core build
 # ---------------------------------------------------------------------------
 
+def _analyst_token(c):
+    """
+    Map a priced acca_pool outcome to the analyst's outcome vocabulary
+    (home_win|away_win|draw|over_2.5|under_1.5|home_-1.5|away_+1 ...), so the
+    Bettor's Analysis tab can look up real odds for each recommended bet.
+    Returns the token string, or None if it can't be mapped.
+    """
+    m = c.get("market")
+    if m == "totals":
+        # "Over 2.5" -> "over_2.5"
+        return c["outcome"].lower().replace(" ", "_")
+
+    parts = c["match"].split(" vs ", 1)
+    if len(parts) != 2:
+        return None
+    home, away = parts
+
+    if m == "h2h":
+        o = c["outcome"]
+        if o == "draw":                       return "draw"
+        if o == pmkt.normalize_team(home):    return "home_win"
+        if o == pmkt.normalize_team(away):    return "away_win"
+        return None
+
+    if m == "spreads":
+        team, pt = c.get("spread_team"), c.get("spread_point")
+        if team is None or pt is None:
+            return None
+        side = "home" if team == home else "away" if team == away else None
+        if side is None:
+            return None
+        # home_-1.5  /  away_+1  (negative carries its own sign)
+        return f"{side}_{pt:g}" if pt < 0 else f"{side}_+{pt:g}"
+
+    return None
+
+
 def _build_raw():
     try:
         events = _fetch_events()
@@ -542,17 +579,19 @@ def _build_raw():
 
             # Every priced handicap is an acca candidate (e.g. a nailed-on +2).
             acca_pool.append({
-                "match":      label,
-                "commence":   comm,
-                "market":     "spreads",
-                "outcome":    outcome_label,
-                "fair_prob":  sd["fair_prob"],
-                "best_price": bp_price,
-                "best_book":  bp_book,
-                "per_book":   per_book,
-                "paddy":      paddy,
-                "edge":       edge,
-                "confidence": "low",
+                "match":        label,
+                "commence":     comm,
+                "market":       "spreads",
+                "outcome":      outcome_label,
+                "fair_prob":    sd["fair_prob"],
+                "best_price":   bp_price,
+                "best_book":    bp_book,
+                "per_book":     per_book,
+                "paddy":        paddy,
+                "edge":         edge,
+                "confidence":   "low",
+                "spread_team":  team_name,   # for analyst-recommendation odds lookup
+                "spread_point": point,
             })
 
             if edge > EDGE_MIN * 100:
@@ -617,6 +656,20 @@ def _build_raw():
     matches.sort(key=lambda m: (-abs(m["max_gap"]) if m["has_pm_data"] else 999, m["commence"]))
     singles.sort(key=lambda s: -s["edge"])
 
+    # Price index for analyst recommendations: {label: {analyst_token: {...}}}.
+    # Lets the Bettor's Analysis tab show real odds next to each recommended bet.
+    price_index = {}
+    for c in acca_pool:
+        tok = _analyst_token(c)
+        if not tok:
+            continue
+        price_index.setdefault(c["match"], {})[tok] = {
+            "best_price": c["best_price"],
+            "best_book":  c["best_book"],
+            "per_book":   c.get("per_book", {}),
+            "edge":       c.get("edge"),
+        }
+
     parlays = _build_parlays(acca_pool)
 
     # Attach any already-cached intel (from disk or previous background run)
@@ -648,6 +701,7 @@ def _build_raw():
             "parlays": parlays,
             "acca_pool": acca_pool,
         },
+        "price_index": price_index,
     }
 
 
@@ -940,12 +994,37 @@ def bets(risk: str = "balanced", value_guard: bool = True, round: str = ""):
 
 @app.get("/api/intel")
 def intel():
-    """Returns current intel map — call this to refresh analyst cards without re-fetching odds."""
+    """Returns current intel map — call this to refresh analyst cards without re-fetching odds.
+    Each recommended bet is enriched with the live best odds (price/book/edge)
+    for that outcome so the Bettor's Analysis tab can show real prices."""
     with _intel_lock:
         cached_intel = dict(_intel_cache)
+
+    price_index = get_raw().get("price_index", {})
+    enriched = {}
+    for label, intel_obj in cached_intel.items():
+        recs = intel_obj.get("recommended_bets")
+        if not recs:
+            enriched[label] = intel_obj
+            continue
+        # Shallow-copy the intel + its bets so we never mutate the cache.
+        obj = dict(intel_obj)
+        match_prices = price_index.get(label, {})
+        new_recs = []
+        for rb in recs:
+            rb2 = dict(rb)
+            odds = match_prices.get(str(rb.get("outcome", "")).lower())
+            rb2["best_price"] = odds["best_price"] if odds else None
+            rb2["best_book"]  = odds["best_book"]  if odds else None
+            rb2["per_book"]   = odds["per_book"]   if odds else {}
+            rb2["edge"]       = odds["edge"]       if odds else None
+            new_recs.append(rb2)
+        obj["recommended_bets"] = new_recs
+        enriched[label] = obj
+
     return JSONResponse({
-        "intel":         cached_intel,
-        "intel_ready":   len(cached_intel),
+        "intel":         enriched,
+        "intel_ready":   len(enriched),
         "intel_loading": _intel_busy,
     })
 
