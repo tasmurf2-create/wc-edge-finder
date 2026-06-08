@@ -49,7 +49,7 @@ _ALIASES = {
     "capeverde": "CPV", "caboverde": "CPV", "capeverdeislands": "CPV",
     "drcongo": "COD", "congodr": "COD", "democraticrepublicofthecongo": "COD",
     "bosniaherzegovina": "BIH", "bosniaandherzegovina": "BIH",
-    "curacao": "CUW",
+    "curacao": "CUW", "curaaao": "CUW",  # 2nd covers a cedilla-mangling encoding path
 }
 for k, v in _ALIASES.items():
     _name2code.setdefault(k, v)
@@ -57,6 +57,22 @@ for k, v in _ALIASES.items():
 
 def team_code(name):
     return _name2code.get(_norm(name))
+
+
+# ---- FIFA world ranking (team_facts.csv) ----------------------------------
+_facts = {r["fifa_code"]: r for r in _read("team_facts.csv")}
+
+
+def team_rank(name):
+    """Current FIFA world ranking position for a team, or None if unknown."""
+    code = team_code(name)
+    row = _facts.get(code) if code else None
+    if not row:
+        return None
+    try:
+        return int(row["fifa_rank"])
+    except (ValueError, KeyError, TypeError):
+        return None
 
 
 def team_climate(name):

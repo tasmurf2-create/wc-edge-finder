@@ -527,12 +527,14 @@ def peek_injury_digest():
 
 
 def _team_context(team):
-    """The SOURCED squad (official FIFA list) for a team. Injuries are now a
-    single tournament-wide digest injected separately into the prompt."""
+    """The SOURCED squad (official FIFA list) + current FIFA world ranking for a
+    team. Injuries are a single tournament-wide digest injected separately."""
+    rank = static_data.team_rank(team)
+    head = f"FIFA world ranking: #{rank} (objective strength anchor).\n" if rank else ""
     squad = static_data.squad_text(team)
     if squad:
-        return "SQUAD (official FIFA 2026 squad list — authoritative):\n" + squad
-    return "SQUAD: not found in official list."
+        return head + "SQUAD (official FIFA 2026 squad list — authoritative):\n" + squad
+    return head + "SQUAD: not found in official list."
 
 
 def get_team_snapshots(home, away):
@@ -679,7 +681,7 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
         client = _get_client()
         resp   = client.messages.create(
             model      = MODEL,
-            max_tokens = 1500,
+            max_tokens = 2800,   # 1500 truncated the JSON on verbose matches -> parse failures
             system     = SYSTEM_PROMPT,
             messages   = [{"role": "user",
                            "content": _build_prompt(
