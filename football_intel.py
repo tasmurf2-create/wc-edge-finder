@@ -29,9 +29,10 @@ INJURY_DIGEST_FILE = Path("injury_digest.json")  # ONE tournament-wide injury di
 WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+date
 CACHE_TTL       = 43200    # 12 hours — match analysis
 INJURIES_TTL    = 43200    # 12 hours — injury data
-# Restrict injury searches to one trusted source. One broad BBC search per refresh
-# covers the newsworthy injuries tournament-wide, instead of one search per team.
-INJURY_DOMAINS  = ["bbc.com"]
+# One broad web search per refresh covers newsworthy injuries tournament-wide,
+# instead of one search per team. NB: BBC (and many news sites) block Anthropic's
+# web crawler, so we do NOT domain-restrict — a locked whitelist returns nothing.
+INJURY_DOMAINS  = None
 WEATHER_TTL     = 21600    # 6 hours — weather forecast (refreshes a few times daily)
 WEATHER_HORIZON_DAYS = 15  # Open-Meteo forecasts ~16 days ahead; use live data inside this
 MODEL           = "claude-sonnet-4-6"          # match analysis (reasoning)
@@ -579,7 +580,7 @@ TEAM SQUADS — official FIFA 2026 lists (authoritative):
     injury_section = ""
     if injury_digest:
         injury_section = f"""
-INJURY / SUSPENSION NEWS — tournament-wide digest (source: BBC, indicative; covers
+INJURY / SUSPENSION NEWS — tournament-wide digest (web search, indicative; covers
 newsworthy absences, may not mention every team). Apply only the parts relevant to
 {home} or {away}:
 {injury_digest}
