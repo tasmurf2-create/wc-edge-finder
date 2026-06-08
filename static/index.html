@@ -1140,8 +1140,16 @@ function weatherFlagHTML(item) {
   else if (w.goals_lean === 'under' && o.includes('over'))  { cls = 'wflag warn'; prefix = '⚠ heat works against Over — '; }
   else if (w.goals_lean === 'over'  && o.includes('over'))  { cls = 'wflag good'; prefix = '✓ altitude suits Over — '; }
   else if (w.goals_lean === 'over'  && o.includes('under')) { cls = 'wflag warn'; prefix = '⚠ altitude works against Under — '; }
-  const tip = (w.detail || '').replace(/"/g, '&quot;');
-  return `<div class="${cls}" title="${tip}">${w.emoji} ${prefix}${w.headline}</div>`;
+  // Be explicit about whether this is a real forecast or a historical average,
+  // so an extreme live forecast is never confused with a climate normal.
+  const srcTag = w.source === 'forecast'
+    ? `<span style="color:#3fb950;font-weight:600"> · live forecast${w.days_out != null ? ' ' + w.days_out + 'd out' : ''}</span>`
+    : `<span style="color:#8b949e"> · historical avg (no live forecast)</span>`;
+  const tip = ((w.detail || '') + (w.source === 'forecast'
+                ? '  [Live Open-Meteo forecast.]'
+                : '  [Historical climate normal — live forecast unavailable, so an abnormal forecast would NOT be reflected here.]'
+              )).replace(/"/g, '&quot;');
+  return `<div class="${cls}" title="${tip}">${w.emoji} ${prefix}${w.headline}${srcTag}</div>`;
 }
 
 function parlayHTML(p, book, stake) {

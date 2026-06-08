@@ -371,8 +371,13 @@ def weather_signal(home, away, commence):
 
 def prewarm_weather(triples, max_workers=3):
     """Concurrently warm the on-disk forecast cache for a list of (home, away,
-    commence) tuples, so per-match weather_signal() calls are then instant."""
-    triples = list(triples)
+    commence) tuples, so per-match weather_signal() calls are then instant.
+
+    Soonest kick-offs are fetched FIRST: those forecasts are both the most
+    decision-relevant and the most reliable, so they get their real live data
+    before any far-out match (whose 14-day forecast is unreliable anyway) can
+    trip Open-Meteo's rate limit and force a climate-normal fallback."""
+    triples = sorted(triples, key=lambda t: t[2] or "")   # ascending by commence (ISO)
     if not triples:
         return
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(triples))) as ex:
