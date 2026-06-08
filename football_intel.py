@@ -16,6 +16,7 @@ import threading
 import concurrent.futures
 import urllib.request
 import urllib.parse
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -105,11 +106,17 @@ def _match_local_date(iso_datetime, tz):
             return None
 
 
+_weather_cd_lock       = threading.Lock()
+_weather_blocked_until = 0.0          # circuit breaker: skip live weather until this ts
+WEATHER_COOLDOWN       = 600          # after a 429, pause live weather this many seconds
+
+
 def _fetch_weather(lat, lon, iso_datetime, tz):
     """Real Open-Meteo daily forecast for the match's local date — free, no API key.
     Returns a dict, or None when the match is outside the ~16-day forecast horizon
     (caller then has no conditions). Cached on disk for WEATHER_TTL.
     """
+    global _weather_blocked_until
     local_date = _match_local_date(iso_datetime, tz)
     if local_date is None:
         return None
@@ -123,6 +130,11 @@ def _fetch_weather(lat, lon, iso_datetime, tz):
         entry = _load_json(WEATHER_FILE).get(ck)
     if entry and (time.time() - entry.get("fetched_at", 0)) < WEATHER_TTL:
         return entry["weather"]
+
+    # Circuit breaker: if Open-Meteo rate-limited us recently, don't keep hammering
+    # it — skip live weather (caller uses climate normals) until the cooldown ends.
+    if time.time() < _weather_blocked_until:
+        return None
 
     url = "https://api.open-meteo.com/v1/forecast?" + urllib.parse.urlencode({
         "latitude":  f"{lat:.4f}",
@@ -157,6 +169,19 @@ def _fetch_weather(lat, lon, iso_datetime, tz):
             _save_json(WEATHER_FILE, store)
         print(f"[weather] {ck}: {weather['temp_max_c']}°C (feels {weather['feels_like_c']}°C), {days_out}d out")
         return weather
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            # Trip the circuit breaker and log ONCE per cooldown window, instead of
+            # spamming a line per venue/date.
+            with _weather_cd_lock:
+                first = time.time() >= _weather_blocked_until
+                _weather_blocked_until = time.time() + WEATHER_COOLDOWN
+            if first:
+                print(f"[weather] Open-Meteo rate-limited (429) — pausing live weather "
+                      f"for {WEATHER_COOLDOWN // 60} min; using climate normals meanwhile")
+        else:
+            print(f"[weather] fetch failed for {ck}: {e}")
+        return None
     except Exception as e:
         print(f"[weather] fetch failed for {ck}: {e}")
         return None
@@ -344,7 +369,7 @@ def weather_signal(home, away, commence):
     }
 
 
-def prewarm_weather(triples, max_workers=8):
+def prewarm_weather(triples, max_workers=3):
     """Concurrently warm the on-disk forecast cache for a list of (home, away,
     commence) tuples, so per-match weather_signal() calls are then instant."""
     triples = list(triples)
