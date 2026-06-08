@@ -533,10 +533,13 @@ def injury_digest_info():
 
 
 def _team_context(team):
-    """The SOURCED squad (official FIFA list) + current FIFA world ranking for a
-    team. Injuries are a single tournament-wide digest injected separately."""
+    """The SOURCED squad (official FIFA list) + FIFA world ranking + recent form
+    for a team. Injuries are a single tournament-wide digest injected separately."""
     rank = static_data.team_rank(team)
     head = f"FIFA world ranking: #{rank} (objective strength anchor).\n" if rank else ""
+    form = static_data.team_form_text(team)
+    if form:
+        head += form + "\n"
     squad = static_data.squad_text(team)
     if squad:
         return head + "SQUAD (official FIFA 2026 squad list — authoritative):\n" + squad
@@ -569,14 +572,17 @@ calculated separately by another layer, so:
   so and put it in knowledge_caveat — do not invent facts to inflate a gap.
 
 GROUND EVERYTHING IN THE DATA PROVIDED. You are given: squads (players, clubs, ages), the FIFA
-world ranking, an injury digest, venue/conditions, and bookmaker prices — and nothing else. You do
-NOT have recent results, form tables, goal statistics, qualifying records, managers, or formations.
-So:
-- Do NOT state specific numbers (goal tallies, scorelines, win/loss records, league positions,
-  "X wins from Y") or name managers/formations — you weren't given them and would be guessing.
-- Judge team strength primarily from the FIFA RANKING and the SQUAD (named players/clubs/ages).
-- You may reason about likely style from squad profile, but keep it general and flag uncertainty in
-  knowledge_caveat. Saying "I don't have form/tactical data" is better than inventing it.
+world ranking, each team's RECENT FORM (last ~8 results with scores, opponents and competition),
+an injury digest, venue/conditions, and bookmaker prices. You do NOT have managers, formations, or
+detailed per-player statistics. So:
+- Use the RECENT FORM provided — you may cite those exact results/scores. But do NOT invent any
+  result, scoreline, win/loss record or goal tally beyond what's listed, and do NOT name managers
+  or formations (you weren't given them).
+- Weigh form in context of the COMPETITION shown (a 7-0 in a friendly or vs a minnow means less
+  than a competitive result vs a peer).
+- Judge strength from the FIFA RANKING + SQUAD + the provided RECENT FORM.
+- Reason about likely style from squad profile, but keep it general and flag uncertainty in
+  knowledge_caveat rather than inventing detail.
 
 Your job: analyse World Cup 2026 matches and produce up to 3 specific recommended bets across any
 combination of markets. Each must have a clear football reason grounded in the provided data
@@ -642,8 +648,8 @@ Examples of good thinking:
 
 Using the squad and injury data above, output ONLY this JSON:
 {{
-  "home_form": "{home}'s strength read grounded in their FIFA ranking and squad (name real players/clubs from the list). Do NOT invent results, win/loss records or goal tallies. 2 sentences.",
-  "away_form": "Same for {away}, grounded in ranking + squad only. 2 sentences.",
+  "home_form": "{home}'s form read using the RECENT FORM provided (cite the real results/scores and their competition) plus FIFA ranking and squad. Do NOT invent results beyond those listed. 2 sentences.",
+  "away_form": "Same for {away}, using its provided recent form + ranking + squad. 2 sentences.",
   "key_absences": "From the injury digest only — relevant injuries/suspensions, or 'none reported'. Do not invent.",
   "conditions_impact": "How heat/altitude/kickoff time affects each team specifically. Which team benefits?",
   "tactical_matchup": "Likely stylistic matchup inferred from squad profile + ranking. Do NOT assert specific formations or manager names. Who does it favour? 2 sentences.",

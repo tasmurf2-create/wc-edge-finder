@@ -75,6 +75,23 @@ def team_rank(name):
         return None
 
 
+# ---- recent form (team_form.csv, built by build_form.py) -------------------
+_form = {r["fifa_code"]: r for r in _read("team_form.csv")}
+
+
+def team_form_text(name):
+    """Sourced recent-form summary for the analyst prompt, or '' if unknown.
+    Built offline from the international-results dataset (no live query)."""
+    code = team_code(name)
+    r = _form.get(code) if code else None
+    if not r:
+        return ""
+    n = len(r.get("form", ""))
+    return (f"RECENT FORM (last {n}, to {r['as_of']}, SOURCED): {r['form']} "
+            f"({r['record']}; GF {r['gf']} / GA {r['ga']}). "
+            f"Latest: {r['recent']}")
+
+
 def team_climate(name):
     code = team_code(name)
     if not code:
