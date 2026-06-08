@@ -11,6 +11,7 @@ class Event(db.Model):
     __tablename__ = "events"
 
     id = db.Column(db.Integer, primary_key=True)
+    fixture_id = db.Column(db.Integer, db.ForeignKey("fixtures.id"), index=True)
     provider_event_id = db.Column(db.String(128), unique=True, nullable=False, index=True)
     sport = db.Column(db.String(80))
     league_name = db.Column(db.String(160))
@@ -25,11 +26,16 @@ class Event(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+    fixture = db.relationship("Fixture")
+
 
 class OddsSnapshot(db.Model):
     __tablename__ = "odds_snapshots"
 
     id = db.Column(db.Integer, primary_key=True)
+    fixture_id = db.Column(db.Integer, db.ForeignKey("fixtures.id"), index=True)
+    bookmaker_id = db.Column(db.Integer, db.ForeignKey("bookmakers.id"), index=True)
+    market_id = db.Column(db.Integer, db.ForeignKey("markets.id"), index=True)
     provider_event_id = db.Column(db.String(128), nullable=False, index=True)
     snapshot_time = db.Column(db.DateTime(timezone=True), default=utcnow, index=True)
     bookmaker = db.Column(db.String(120), index=True)
@@ -42,6 +48,10 @@ class OddsSnapshot(db.Model):
     raw_outcome_name = db.Column(db.String(160))
     raw_json = db.Column(db.JSON)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
+
+    fixture = db.relationship("Fixture")
+    bookmaker_ref = db.relationship("Bookmaker")
+    market_ref = db.relationship("Market")
 
 
 class UserProbability(db.Model):
@@ -101,64 +111,6 @@ class AppSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(120), unique=True, nullable=False)
     value = db.Column(db.Text)
-    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-
-class WorldCupTeam(db.Model):
-    __tablename__ = "worldcup_teams"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
-    fifa_code = db.Column(db.String(8))
-    group_name = db.Column(db.String(20))
-    country_average_temp_c = db.Column(db.Float)
-    country_average_altitude_m = db.Column(db.Float)
-    notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
-    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-
-class WorldCupVenue(db.Model):
-    __tablename__ = "worldcup_venues"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(160), unique=True, nullable=False)
-    city = db.Column(db.String(120))
-    country = db.Column(db.String(80))
-    timezone = db.Column(db.String(80))
-    altitude_m = db.Column(db.Float)
-    notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
-    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-
-class WorldCupFixture(db.Model):
-    __tablename__ = "worldcup_fixtures"
-
-    id = db.Column(db.Integer, primary_key=True)
-    match_number = db.Column(db.Integer, unique=True, nullable=False)
-    stage = db.Column(db.String(80))
-    group_name = db.Column(db.String(20))
-    home_team = db.Column(db.String(120))
-    away_team = db.Column(db.String(120))
-    venue_name = db.Column(db.String(160))
-    kickoff_utc = db.Column(db.DateTime(timezone=True))
-    source_note = db.Column(db.Text)
-    created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
-    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-
-class SquadPlayer(db.Model):
-    __tablename__ = "squad_players"
-
-    id = db.Column(db.Integer, primary_key=True)
-    team_name = db.Column(db.String(120), index=True, nullable=False)
-    shirt_number = db.Column(db.Integer)
-    position = db.Column(db.String(20))
-    name_on_shirt = db.Column(db.String(120), nullable=False)
-    club = db.Column(db.String(160))
-    source_note = db.Column(db.Text)
-    created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

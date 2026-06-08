@@ -10,12 +10,8 @@ from app.models import (
     Market,
     Player,
     SquadMembership,
-    SquadPlayer,
     Team,
     Venue,
-    WorldCupFixture,
-    WorldCupTeam,
-    WorldCupVenue,
 )
 
 
@@ -26,7 +22,7 @@ TEAMS = [
     ("Brazil", "BRA", "C", 24.9, 320), ("Cape Verde", "CPV", "H", 24.0, 400),
     ("Canada", "CAN", "B", -5.4, 487), ("Colombia", "COL", "K", 24.8, 593),
     ("DR Congo", "COD", "K", 24.0, 726), ("Ivory Coast", "CIV", "E", 26.4, 250),
-    ("Croatia", "CRO", "L", 11.9, 331), ("Curaçao", "CUW", "E", 27.5, 10),
+    ("Croatia", "CRO", "L", 11.9, 331), ("Curacao", "CUW", "E", 27.5, 10),
     ("Czech Republic", "CZE", "A", 8.9, 430), ("Ecuador", "ECU", "E", 21.8, 1117),
     ("Egypt", "EGY", "G", 22.1, 321), ("England", "ENG", "L", 10.4, 162),
     ("France", "FRA", "I", 11.7, 375), ("Germany", "GER", "E", 9.6, 263),
@@ -74,7 +70,7 @@ FIXTURES = [
     (6, "Group stage", "C", "Brazil", "Morocco", "MetLife Stadium", "2026-06-13T22:00:00+00:00"),
     (7, "Group stage", "C", "Haiti", "Scotland", "Gillette Stadium", "2026-06-14T01:00:00+00:00"),
     (8, "Group stage", "D", "Australia", "Turkey", "BC Place", "2026-06-14T04:00:00+00:00"),
-    (9, "Group stage", "E", "Germany", "Curaçao", "NRG Stadium", "2026-06-14T17:00:00+00:00"),
+    (9, "Group stage", "E", "Germany", "Curacao", "NRG Stadium", "2026-06-14T17:00:00+00:00"),
     (10, "Group stage", "F", "Netherlands", "Japan", "AT&T Stadium", "2026-06-14T20:00:00+00:00"),
     (11, "Group stage", "E", "Ivory Coast", "Ecuador", "Lincoln Financial Field", "2026-06-14T23:00:00+00:00"),
     (12, "Group stage", "F", "Sweden", "Tunisia", "Estadio BBVA", "2026-06-15T02:00:00+00:00"),
@@ -104,7 +100,7 @@ MORE_FIXTURES_TEXT = """
 32|Group stage|D|Turkey|Paraguay|Levi's Stadium|2026-06-20T03:00:00+00:00
 33|Group stage|F|Netherlands|Sweden|NRG Stadium|2026-06-20T17:00:00+00:00
 34|Group stage|E|Germany|Ivory Coast|BMO Field|2026-06-20T20:00:00+00:00
-35|Group stage|E|Ecuador|Curaçao|GEHA Field at Arrowhead Stadium|2026-06-21T00:00:00+00:00
+35|Group stage|E|Ecuador|Curacao|GEHA Field at Arrowhead Stadium|2026-06-21T00:00:00+00:00
 36|Group stage|F|Tunisia|Japan|Estadio BBVA|2026-06-21T04:00:00+00:00
 37|Group stage|H|Spain|Saudi Arabia|Mercedes-Benz Stadium|2026-06-21T16:00:00+00:00
 38|Group stage|G|Belgium|Iran|SoFi Stadium|2026-06-21T19:00:00+00:00
@@ -124,7 +120,7 @@ MORE_FIXTURES_TEXT = """
 52|Group stage|C|Morocco|Haiti|Mercedes-Benz Stadium|2026-06-24T22:00:00+00:00
 53|Group stage|A|Czech Republic|Mexico|Estadio Azteca|2026-06-25T01:00:00+00:00
 54|Group stage|A|South Africa|South Korea|Estadio BBVA|2026-06-25T01:00:00+00:00
-55|Group stage|E|Curaçao|Ivory Coast|Lincoln Financial Field|2026-06-25T20:00:00+00:00
+55|Group stage|E|Curacao|Ivory Coast|Lincoln Financial Field|2026-06-25T20:00:00+00:00
 56|Group stage|E|Ecuador|Germany|MetLife Stadium|2026-06-25T20:00:00+00:00
 57|Group stage|F|Japan|Sweden|AT&T Stadium|2026-06-25T23:00:00+00:00
 58|Group stage|F|Tunisia|Netherlands|GEHA Field at Arrowhead Stadium|2026-06-25T23:00:00+00:00
@@ -178,27 +174,7 @@ MORE_FIXTURES_TEXT = """
 
 
 def seed_static_worldcup_data():
-    normalized_summary = seed_normalized_worldcup_data()
-    for name, code, group, temp, altitude in TEAMS:
-        upsert(WorldCupTeam, "name", name, fifa_code=code, group_name=group, country_average_temp_c=temp, country_average_altitude_m=altitude, notes="Starter climate/altitude estimate; verify before analytical use.")
-    for name, city, country, tz, altitude in VENUES:
-        upsert(WorldCupVenue, "name", name, city=city, country=country, timezone=tz, altitude_m=altitude)
-    for row in FIXTURES + parse_more_fixtures():
-        match_number, stage, group, home, away, venue, kickoff = row
-        upsert(
-            WorldCupFixture,
-            "match_number",
-            match_number,
-            stage=stage,
-            group_name=group or None,
-            home_team=home,
-            away_team=away,
-            venue_name=venue,
-            kickoff_utc=datetime.fromisoformat(kickoff),
-            source_note="Schedule seeded from public fixture listing checked 2026-06-06; verify against FIFA for final analytical use.",
-        )
-    db.session.commit()
-    return normalized_summary
+    return seed_normalized_worldcup_data()
 
 
 def seed_normalized_worldcup_data():
@@ -307,7 +283,7 @@ def team_id_or_none(teams, name):
 
 
 def clean_name(value):
-    return str(value).replace("CuraÃ§ao", "Curacao").strip()
+    return str(value).replace("Curaçao", "Curacao").replace("CuraÃ§ao", "Curacao").strip()
 
 
 def import_squad_rows(rows):
@@ -317,14 +293,6 @@ def import_squad_rows(rows):
         player_name = row.get("name_on_shirt") or row.get("player") or row.get("name")
         if not team_name or not player_name:
             continue
-        existing = SquadPlayer.query.filter_by(team_name=team_name, name_on_shirt=player_name).first()
-        if existing is None:
-            existing = SquadPlayer(team_name=team_name, name_on_shirt=player_name)
-            db.session.add(existing)
-        existing.shirt_number = int(row["shirt_number"]) if str(row.get("shirt_number", "")).isdigit() else None
-        existing.position = row.get("position")
-        existing.club = row.get("club")
-        existing.source_note = row.get("source_note") or "Imported CSV"
         import_squad_membership(row, team_name, player_name)
         count += 1
     db.session.commit()

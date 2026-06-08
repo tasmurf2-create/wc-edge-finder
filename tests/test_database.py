@@ -2,7 +2,7 @@ from pathlib import Path
 
 from app import create_app
 from app.extensions import db
-from app.models import Event, OddsSnapshot
+from app.models import Bookmaker, Event, Market, OddsSnapshot
 
 
 class TestConfig:
@@ -41,3 +41,27 @@ def test_database_can_store_event_and_snapshot():
         db.session.commit()
         assert Event.query.count() == 1
         assert OddsSnapshot.query.count() == 1
+
+
+def test_database_can_store_normalized_odds_links():
+    app = create_app(TestConfig)
+    with app.app_context():
+        bookmaker = Bookmaker(name="Bet365", display_name="Bet365")
+        market = Market(name="Match Winner / 1X2", category="match_result")
+        db.session.add_all([bookmaker, market])
+        db.session.commit()
+        db.session.add(
+            OddsSnapshot(
+                provider_event_id="abc",
+                bookmaker="Bet365",
+                bookmaker_id=bookmaker.id,
+                market_name="Match Winner / 1X2",
+                market_id=market.id,
+                outcome_name="A",
+                decimal_odds=2.0,
+            )
+        )
+        db.session.commit()
+        snapshot = OddsSnapshot.query.one()
+        assert snapshot.bookmaker_ref.display_name == "Bet365"
+        assert snapshot.market_ref.category == "match_result"

@@ -21,7 +21,11 @@ bp = Blueprint("value", __name__, url_prefix="/value")
 def calculator():
     result = None
     if request.method == "POST":
-        result = calculate_from_form(request.form)
+        try:
+            result = calculate_from_form(request.form)
+        except ValueError as exc:
+            flash(str(exc), "warning")
+            result = None
         if request.form.get("action") == "save" and result:
             item = WatchlistItem(**result["watchlist_payload"])
             db.session.add(item)
@@ -42,11 +46,19 @@ def calculate_from_form(form):
     provider_event_id = form["event"]
     market_name = form["market"]
     outcome_name = form["outcome"]
-    model_probability = float(form["model_probability"])
-    bankroll = float(form.get("bankroll") or current_app.config["DEFAULT_BANKROLL"])
-    max_stake = float(form.get("max_stake") or current_app.config["DEFAULT_MAX_STAKE"])
-    threshold = float(form.get("ev_threshold") or current_app.config["DEFAULT_EV_THRESHOLD"])
-    kelly_fraction = float(form.get("kelly_fraction") or current_app.config["DEFAULT_KELLY_FRACTION"])
+    model_probability = parse_float(form.get("model_probability"), "Model probability")
+    bankroll = parse_float(form.get("bankroll") or current_app.config["DEFAULT_BANKROLL"], "Bankroll")
+    max_stake = parse_float(form.get("max_stake") or current_app.config["DEFAULT_MAX_STAKE"], "Max stake")
+    threshold = parse_float(form.get("ev_threshold") or current_app.config["DEFAULT_EV_THRESHOLD"], "EV threshold")
+    kelly_fraction = parse_float(form.get("kelly_fraction") or current_app.config["DEFAULT_KELLY_FRACTION"], "Kelly fraction")
+    if not 0 < model_probability <= 1:
+        raise ValueError("Model probability must be greater than 0 and no more than 1.")
+    if bankroll < 0:
+        raise ValueError("Bankroll cannot be negative.")
+    if max_stake < 0:
+        raise ValueError("Max stake cannot be negative.")
+    if not 0 <= kelly_fraction <= 1:
+        raise ValueError("Kelly fraction must be between 0 and 1.")
     best = best_price(provider_event_id, market_name, outcome_name)
     if best is None:
         flash("No stored odds matched that event, market, and outcome.", "warning")
@@ -84,6 +96,13 @@ def calculate_from_form(form):
         "no_vig": no_vig,
         "watchlist_payload": payload,
     }
+
+
+def parse_float(value, label):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{label} must be a valid number.") from None
 
 
 def best_price(event_id, market, outcome):

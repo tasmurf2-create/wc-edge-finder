@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from flask import current_app
 
 from app.extensions import db
-from app.models import Event, OddsSnapshot, RefreshLog
+from app.models import Bookmaker, Event, Fixture, Market, OddsSnapshot, RefreshLog
 from app.services.odds_api_client import OddsAPIClient, OddsAPIError, normalise_event, normalise_odds_records
 
 
@@ -95,6 +95,7 @@ def upsert_event(event_data):
         db.session.add(event)
     for key, value in event_data.items():
         setattr(event, key, value)
+    event.fixture_id = find_matching_fixture_id(event_data)
     db.session.commit()
     return event
 
@@ -102,6 +103,7 @@ def upsert_event(event_data):
 def save_odds_records(records):
     saved = 0
     for record in records:
+        enrich_odds_record(record)
         if is_duplicate_latest(record):
             continue
         db.session.add(OddsSnapshot(**record))
@@ -128,3 +130,41 @@ def is_duplicate_latest(record):
         and latest.handicap_or_line == record.get("handicap_or_line")
         and latest.point_total == record.get("point_total")
     )
+
+
+def enrich_odds_record(record):
+    event = Event.query.filter_by(provider_event_id=record["provider_event_id"]).first()
+    bookmaker = upsert_lookup(Bookmaker, "name", record["bookmaker"], display_name=record["bookmaker"])
+    market = upsert_lookup(Market, "name", record["market_name"])
+    db.session.flush()
+    record["fixture_id"] = event.fixture_id if event else None
+    record["bookmaker_id"] = bookmaker.id
+    record["market_id"] = market.id
+
+
+def upsert_lookup(model, field, value, **defaults):
+    item = model.query.filter(getattr(model, field) == value).first()
+    if item is None:
+        item = model(**{field: value}, **defaults)
+        db.session.add(item)
+    return item
+
+
+def find_matching_fixture_id(event_data):
+    home = clean_team_name(event_data.get("home_team"))
+    away = clean_team_name(event_data.get("away_team"))
+    if not home or not away:
+        return None
+    candidates = Fixture.query.all()
+    for fixture in candidates:
+        fixture_home = clean_team_name(fixture.home_team.display_name) if fixture.home_team else None
+        fixture_away = clean_team_name(fixture.away_team.display_name) if fixture.away_team else None
+        if {home, away} == {fixture_home, fixture_away}:
+            return fixture.id
+    return None
+
+
+def clean_team_name(value):
+    if not value:
+        return None
+    return str(value).lower().replace("curaçao", "curacao").replace("curaÃ§ao", "curacao").strip()
