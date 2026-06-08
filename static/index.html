@@ -334,6 +334,7 @@ tr:last-child td { border-bottom: none; }
 
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
+  <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
   <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
   <button class="tab-btn" data-tab="futures" onclick="switchTab('futures')">Futures &amp; Outrights</button>
@@ -433,6 +434,28 @@ tr:last-child td { border-bottom: none; }
   </div>
   <div id="picks-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
     <div class="loading-inner"><div class="spinner"></div><span>Loading picks...</span></div>
+  </div>
+</div>
+
+<!-- ===================== SENSIBLE BETS TAB ===================== -->
+<div id="tab-sensible" class="tab-panel">
+  <div class="filter-bar">
+    <label>Stake:</label>
+    <span style="display:flex;align-items:center;gap:4px">
+      <span style="color:#8b949e">€</span>
+      <input type="number" id="sensible-stake-input" value="10" min="1" step="1"
+        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
+        oninput="renderSensible()">
+    </span>
+    <label>Show:</label>
+    <select id="sensible-tier-filter" onchange="renderSensible()">
+      <option value="all">All tiers</option>
+      <option value="strong">★ Strong only</option>
+      <option value="solid">Solid + Strong</option>
+    </select>
+  </div>
+  <div id="sensible-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:12px">
+    <div class="loading-inner"><div class="spinner"></div><span>Scoring bets...</span></div>
   </div>
 </div>
 
@@ -1482,6 +1505,99 @@ function renderTopPicks() {
     `<div style="display:flex;flex-direction:column;gap:14px">
        ${items.map(it => analystMatchHTML(it.label, it.intel)).join('')}
      </div>`;
+}
+
+// ====================================================================
+// SENSIBLE BETS (Option C) — composite, all-match guidance.
+// Purely additive: reads the existing singles + their attached signals,
+// scores each, and ranks. Changes no existing logic.
+// ====================================================================
+function sensibleScore(s) {
+  let score = 0; const reasons = [];
+
+  // 1. Reliability-weighted value edge (the backbone)
+  if (edgeReliable(s)) {
+    score += 2;
+    reasons.push({t:'good', x:`✅ reliable edge +${s.edge.toFixed(1)}% (best ${s.best_book})`});
+  } else {
+    reasons.push({t:'warn', x:`⚠ small +${s.edge.toFixed(1)}% edge on a long price — speculative`});
+  }
+
+  // 2. Prediction-market confirmation (Kalshi / Polymarket)
+  if (s.pm_gap != null) {
+    if (s.pm_gap > 1)       { score += 2; reasons.push({t:'good', x:`✅ prediction markets agree (+${s.pm_gap}%)`}); }
+    else if (s.pm_gap < -2) { score -= 2; reasons.push({t:'warn', x:`⚠ prediction markets disagree (${s.pm_gap}%)`}); }
+  }
+
+  // 3. Weather / conditions
+  const w = s.weather;
+  if (w) {
+    const o = (s.outcome||'').toLowerCase();
+    const fav = (w.favours||'').toLowerCase(), dis = (w.disfavours||'').toLowerCase();
+    const hits = (n)=> n && (n.includes(o) || o.includes(n));
+    if (hits(fav))                                            { score += 1; reasons.push({t:'good', x:`🌡️ conditions favour this — ${w.headline}`}); }
+    else if (hits(dis))                                       { score -= 2; reasons.push({t:'warn', x:`🌡️ conditions against this — ${w.headline}`}); }
+    else if (w.goals_lean==='under' && o.includes('under'))   { score += 1; reasons.push({t:'good', x:`🌡️ heat suits Under`}); }
+    else if (w.goals_lean==='under' && o.includes('over'))    { score -= 1; reasons.push({t:'warn', x:`🌡️ heat works against Over`}); }
+    else if (w.goals_lean==='over'  && o.includes('over'))    { score += 1; reasons.push({t:'good', x:`⛰️ altitude suits Over`}); }
+  }
+
+  // 4. Analyst overlap (bonus where the analyst has run)
+  let conf = s.analyst_confirms;
+  if (conf === undefined || conf === null) conf = analystConfirms(s, s.intel);
+  if (conf === true)        { score += 3; reasons.push({t:'good', x:`★ analyst backs it (both agree)`}); }
+  else if (conf === false)  { score -= 3; reasons.push({t:'warn', x:`⚠ analyst prefers another outcome`}); }
+
+  const tier = score >= 5 ? 'strong' : score >= 2 ? 'solid' : 'speculative';
+  return { score, reasons, tier };
+}
+
+function sensibleStake() { return parseFloat(document.getElementById('sensible-stake-input')?.value) || 10; }
+
+function sensibleCardHTML(s, sc, stake) {
+  const price = s.best_price, ret = stake*price, profit = ret-stake;
+  const mkt = s.market==='totals'?'Over/Under':s.market==='spreads'?'Handicap':'1X2';
+  const tierBadge = sc.tier==='strong'
+    ? `<span class="badge" style="background:#0d2818;color:#3fb950;border:1px solid #3fb95088">★ Strong</span>`
+    : sc.tier==='solid'
+    ? `<span class="badge" style="background:#1c2128;color:#c9d1d9;border:1px solid #30363d">Solid</span>`
+    : `<span class="badge badge-muted">Speculative</span>`;
+  const tags = sc.reasons.map(r =>
+    `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':'#d29922'}">${r.x}</span>`).join('');
+  return `<div class="single-card${sc.tier==='speculative'?' demoted':''}">
+    <div class="single-top">
+      <div>
+        <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
+        <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        ${tierBadge}
+        <span style="font-size:0.78rem;color:#8b949e">@ <strong style="color:#f0f6fc">${price.toFixed(2)}</strong> ${s.best_book}</span>
+      </div>
+    </div>
+    <div style="margin-top:6px;line-height:1.7">${tags}</div>
+    <div style="margin-top:8px;font-size:0.8rem;color:#8b949e">€${stake.toFixed(2)} → <strong style="color:#3fb950">€${ret.toFixed(2)}</strong> (profit +€${profit.toFixed(2)})</div>
+  </div>`;
+}
+
+function renderSensible() {
+  const panel = document.getElementById('sensible-panel');
+  if (!panel) return;
+  if (!allSingles.length) { panel.innerHTML = '<div class="empty">No bets yet — data loading…</div>'; return; }
+  const stake = sensibleStake();
+  const tierFilter = document.getElementById('sensible-tier-filter')?.value || 'all';
+  const scored = allSingles.map(s => ({ s, sc: sensibleScore(s) }))
+    .sort((a,b) => b.sc.score - a.sc.score || b.s.edge - a.s.edge);
+  let list = scored;
+  if (tierFilter === 'strong')     list = scored.filter(x => x.sc.tier === 'strong');
+  else if (tierFilter === 'solid') list = scored.filter(x => x.sc.tier !== 'speculative');
+  const nStrong = scored.filter(x => x.sc.tier === 'strong').length;
+  const intro = `<div class="ev-banner good">
+      🎯 <strong>Sensible Bets — what the data backs, across every game.</strong>
+      Every value bet scored on: reliability-weighted edge + prediction-market agreement + conditions + analyst overlap${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''}. Tags show exactly why. These are singles — placeable at the named book.
+    </div>`;
+  if (!list.length) { panel.innerHTML = intro + '<div class="empty" style="padding:24px">No bets at this tier yet.</div>'; return; }
+  panel.innerHTML = intro + list.map(x => sensibleCardHTML(x.s, x.sc, stake)).join('');
 }
 
 // ---- boot ----
