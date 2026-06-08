@@ -1182,8 +1182,12 @@ function parlayHTML(p, book, stake) {
   let combinedPrice = 1;
   let anyFallback   = false;
 
+  // An acca is placed on ONE book. In "best" mode use the single best book for
+  // the whole slip (computed server-side as acca_book), not a different book per
+  // leg. When a specific book is chosen, honour that.
+  const slipBook = (book === 'best') ? (p.acca_book || 'best') : book;
   const legData = p.legs.map(l => {
-    const { price, bookLabel, fallback } = priceForBook(l, book);
+    const { price, bookLabel, fallback } = priceForBook(l, slipBook);
     combinedPrice *= price;
     if (fallback) anyFallback = true;
     return { ...l, usedPrice: price, usedBook: bookLabel, fallback };
@@ -1226,12 +1230,23 @@ function parlayHTML(p, book, stake) {
     ? `<div style="font-size:0.73rem;color:#d29922;padding:6px 16px;border-top:1px solid #21262d">⚠ One or more legs not available at ${book === 'best' ? 'chosen book' : book} — best price used instead.</div>`
     : '';
 
+  // No single bookmaker prices every leg → this can't go on one acca slip.
+  const mixedWarning = (book === 'best' && p.mixed_books)
+    ? `<div style="font-size:0.73rem;color:#f85149;padding:6px 16px;border-top:1px solid #21262d">⚠ No single bookmaker prices all ${p.legs.length} legs — this can't be placed as one acca. Prices shown are best-available per leg.</div>`
+    : '';
+
+  // Which book this slip is actually placeable at (best mode, single book found).
+  const slipBookBadge = (book === 'best' && p.acca_book)
+    ? `<span class="badge badge-neutral help" title="The single bookmaker that prices every leg at the best combined odds — place the whole acca here.">@ ${p.acca_book}</span>`
+    : '';
+
   return `<div class="parlay-card conf-${p.confidence}">
     <div class="parlay-header">
       <div style="flex:1">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="parlay-chance help" title="Our model's estimate that ALL legs win together, using the de-vigged (margin-removed) consensus of your bookmakers. It falls fast as you add legs — that's the trade-off for bigger odds.">${p.combined_fair.toFixed(1)}% chance it lands</span>
           <span class="badge badge-neutral help" title="Accumulator (a.k.a. parlay): all ${p.legs.length} selections must win. The odds multiply together for a bigger payout, but a single losing leg loses the whole bet.">${p.legs.length}-leg acca</span>
+          ${slipBookBadge}
           ${p.round_label ? `<span class="badge badge-neutral" style="color:#88c0d0;border-color:#88c0d044" title="${p.round_span === 'multi' ? 'Legs span more than one round' : 'All legs in the same round'}">${p.round_label}</span>` : ''}
           <span class="badge badge-neutral help" style="color:${edgeRaw >= 0 ? '#3fb950' : '#f85149'};border-color:${edgeRaw >= 0 ? '#3fb95044' : '#f8514944'}" title="Expected value — long-run return per €1 staked. Positive = the price is in your favour; negative = the bookmaker's margin is against you (normal for favourite accas).">EV ${edgeRaw >= 0 ? '+' : ''}${combinedEdge}%</span>
         </div>
@@ -1262,6 +1277,7 @@ function parlayHTML(p, book, stake) {
       </div>
     </div>
     <div class="parlay-legs">${legs}</div>
+    ${mixedWarning}
     ${fallbackWarning}
   </div>`;
 }

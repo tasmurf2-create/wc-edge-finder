@@ -150,10 +150,17 @@ def _analyse_totals(event):
         outcomes = {}
         for name, fp in fair.items():
             best_price, best_book = line_best[line][name]
+            # Per-bookmaker prices for this outcome (best price per book), so an
+            # acca can be priced at a single book rather than line-shopped.
+            pb = {}
+            for price, bk in book_prices.get(name, []):
+                if bk not in pb or price > pb[bk]:
+                    pb[bk] = price
             outcomes[name] = {
                 "fair":       round(fp * 100, 1),
                 "best_price": best_price,
                 "best_book":  best_book,
+                "per_book":   pb,
                 "edge":       round((fp - 1.0/best_price) * 100, 2) if best_price else None,
             }
         result[float(line)] = {"outcomes": outcomes, "margin": round(margin * 100, 1)}
@@ -488,7 +495,7 @@ def _build_raw():
                         "fair_prob":  od["fair"] / 100,
                         "best_price": od["best_price"],
                         "best_book":  od["best_book"],
-                        "per_book":   {},
+                        "per_book":   od.get("per_book", {}),
                         "paddy":      None,
                         "edge":       edge if edge is not None else 0.0,
                         "confidence": "low",
@@ -502,7 +509,7 @@ def _build_raw():
                         "fair_prob":  od["fair"] / 100,
                         "best_price": od["best_price"],
                         "best_book":  od["best_book"],
-                        "per_book":   {},
+                        "per_book":   od.get("per_book", {}),
                         "paddy":      None,
                         "edge":       edge,
                         "pm_gap":     None,
@@ -715,6 +722,38 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
 # Parlay builder
 # ---------------------------------------------------------------------------
 
+def _best_single_book(combo):
+    """
+    Best combined price obtainable on a SINGLE bookmaker for this slip.
+
+    An acca has to be placed on one book — you can't take leg 1 at Paddy Power
+    and leg 2 at Bet365 on the same slip. So we price the whole combo at each
+    book that quotes EVERY leg and keep the book with the highest combined price.
+
+    Returns (book_name, combined_price, mixed_books):
+      - book_name / price from the best single book when one covers all legs.
+      - if no single book covers all legs the slip isn't placeable as one acca:
+        mixed_books=True, book_name=None, and price falls back to the per-leg
+        best (line-shopped) purely so the slip can still be shown, clearly flagged.
+    """
+    books_per_leg = [set((leg.get("per_book") or {}).keys()) for leg in combo]
+    common = set.intersection(*books_per_leg) if all(books_per_leg) else set()
+    if common:
+        best_book, best_price = None, 0.0
+        for bk in common:
+            prod = 1.0
+            for leg in combo:
+                prod *= leg["per_book"][bk]
+            if prod > best_price:
+                best_book, best_price = bk, prod
+        return best_book, round(best_price, 2), False
+    # No single book prices all legs — not a one-slip acca.
+    prod = 1.0
+    for leg in combo:
+        prod *= leg["best_price"]
+    return None, round(prod, 2), True
+
+
 def _build_parlays(singles, risk="balanced", value_guard=True, top_n=36, round_filter=None):
     """
     Generate high-probability accumulators from the value singles.
@@ -762,15 +801,18 @@ def _build_parlays(singles, risk="balanced", value_guard=True, top_n=36, round_f
         if n_legs > len(candidates):
             continue
         for combo in itertools.combinations(candidates, n_legs):
-            combined_fair  = 1.0
-            combined_price = 1.0
+            combined_fair = 1.0
             for leg in combo:
-                combined_fair  *= leg["fair_prob"]
-                combined_price *= leg["best_price"]
+                combined_fair *= leg["fair_prob"]
 
             # The whole slip must clear the combined-probability floor.
             if combined_fair < min_combined_prob:
                 continue
+
+            # Price the slip at a SINGLE book (see _best_single_book) — never
+            # line-shop different books across legs, which yields a price no
+            # bookmaker will actually lay.
+            acca_book, combined_price, mixed_books = _best_single_book(combo)
 
             ev = combined_fair * combined_price - 1.0
 
@@ -795,6 +837,8 @@ def _build_parlays(singles, risk="balanced", value_guard=True, top_n=36, round_f
                 "n_legs":         n_legs,
                 "round_label":    round_label,
                 "round_span":     round_span,
+                "acca_book":      acca_book,
+                "mixed_books":    mixed_books,
             })
 
     # Show a spread across leg counts. Ranking purely by chance would only ever
