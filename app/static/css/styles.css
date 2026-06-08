@@ -1,0 +1,25 @@
+body {
+  background: #f6f7f9;
+}
+
+.card {
+  border-radius: 8px;
+  border-color: #d8dee6;
+}
+
+.metric-card .display-6 {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+table {
+  background: white;
+}
+
+#movement-chart {
+  min-height: 420px;
+  background: white;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  padding: 8px;
+}

@@ -1,0 +1,49 @@
+fifa_code,team_name,country_name,group_letter,group_seed,confederation,average_annual_temp_c,mean_elevation_m
+MEX,Mexico,Mexico,A,1,,21.0,1111
+RSA,South Africa,South Africa,A,2,,17.5,1034
+KOR,Korea Republic,Korea Republic,A,3,,11.5,282
+CZE,Czechia,Czechia,A,4,,8.1,430
+CAN,Canada,Canada,B,1,,-5.1,487
+BIH,Bosnia And Herzegovina,Bosnia And Herzegovina,B,2,,10.1,500
+QAT,Qatar,Qatar,B,3,,28.0,28
+SUI,Switzerland,Switzerland,B,4,,5.5,1350
+BRA,Brazil,Brazil,C,1,,25.0,320
+MAR,Morocco,Morocco,C,2,,18.0,909
+HAI,Haiti,Haiti,C,3,,24.9,470
+SCO,Scotland,Scotland,C,4,,8.0,239
+USA,USA,USA,D,1,,8.9,760
+PAR,Paraguay,Paraguay,D,2,,23.5,178
+AUS,Australia,Australia,D,3,,21.7,330
+TUR,Türkiye,Türkiye,D,4,,11.7,1132
+GER,Germany,Germany,E,1,,9.0,263
+CUW,Curaçao,Curaçao,E,2,,28.0,50
+CIV,Côte D'Ivoire,Côte D'Ivoire,E,3,,26.4,250
+ECU,Ecuador,Ecuador,E,4,,21.9,1117
+NED,Netherlands,Netherlands,F,1,,10.4,30
+JPN,Japan,Japan,F,2,,12.0,438
+SWE,Sweden,Sweden,F,3,,3.0,320
+TUN,Tunisia,Tunisia,F,4,,20.0,246
+BEL,Belgium,Belgium,G,1,,10.5,181
+EGY,Egypt,Egypt,G,2,,22.1,321
+IRN,IR Iran,IR Iran,G,3,,17.0,1305
+NZL,New Zealand,New Zealand,G,4,,10.6,388
+ESP,Spain,Spain,H,1,,13.3,660
+CPV,Cabo Verde,Cabo Verde,H,2,,24.7,403
+KSA,Saudi Arabia,Saudi Arabia,H,3,,26.5,665
+URU,Uruguay,Uruguay,H,4,,17.5,109
+FRA,France,France,I,1,,11.6,375
+SEN,Senegal,Senegal,I,2,,28.0,69
+IRQ,Iraq,Iraq,I,3,,21.4,312
+NOR,Norway,Norway,I,4,,1.5,460
+ARG,Argentina,Argentina,J,1,,15.0,595
+ALG,Algeria,Algeria,J,2,,22.5,800
+AUT,Austria,Austria,J,3,,7.4,910
+JOR,Jordan,Jordan,J,4,,18.3,812
+POR,Portugal,Portugal,K,1,,15.2,372
+COD,Congo DR,Congo DR,K,2,,24.0,726
+UZB,Uzbekistan,Uzbekistan,K,3,,13.5,450
+COL,Colombia,Colombia,K,4,,24.5,593
+ENG,England,England,L,1,,10.0,162
+CRO,Croatia,Croatia,L,2,,11.9,331
+GHA,Ghana,Ghana,L,3,,27.2,190
+PAN,Panama,Panama,L,4,,27.0,360

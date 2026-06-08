@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">World Cup static data</h1>
+  <form method="post" action="{{ url_for('static_data.seed') }}"><button class="btn btn-primary btn-sm">Seed / refresh static data</button></form>
+</div>
+<div class="alert alert-info">Climate and country altitude values are starter reference estimates. Verify before using them as part of any betting model.</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#teams" type="button">Teams</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#countries" type="button">Countries</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fixtures" type="button">Fixtures</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#venues" type="button">Venues</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#squads" type="button">Squads</button></li>
+</ul>
+
+<div class="tab-content">
+  <section class="tab-pane fade show active" id="teams">
+    {% if not teams %}<div class="alert alert-secondary">No static team data yet. Click seed above.</div>{% endif %}
+    <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Group</th><th>Team</th><th>Code</th><th>Country</th><th>Avg temp C</th><th>Country altitude m</th></tr></thead><tbody>
+      {% for team in teams %}<tr><td>{{ team.group_name }}</td><td>{{ team.display_name }}</td><td>{{ team.country.fifa_code }}</td><td>{{ team.country.name }}</td><td>{{ team.country.average_temp_c }}</td><td>{{ team.country.average_altitude_m }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="tab-pane fade" id="countries">
+    <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Country</th><th>Code</th><th>Avg temp C</th><th>Avg altitude m</th><th>Notes</th></tr></thead><tbody>
+      {% for country in countries %}<tr><td>{{ country.name }}</td><td>{{ country.fifa_code or "" }}</td><td>{{ country.average_temp_c or "" }}</td><td>{{ country.average_altitude_m or "" }}</td><td>{{ country.climate_notes or "" }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="tab-pane fade" id="fixtures">
+    <div class="table-responsive"><table class="table table-sm"><thead><tr><th>#</th><th>Stage</th><th>Group</th><th>Match</th><th>Venue</th><th>UTC</th><th>Local venue time</th></tr></thead><tbody>
+      {% for fixture in fixtures %}<tr><td>{{ fixture.match_number }}</td><td>{{ fixture.stage }}</td><td>{{ fixture.group_name or "" }}</td><td>{{ fixture.home_team.display_name if fixture.home_team else fixture.source_note and "TBD" or "" }} v {{ fixture.away_team.display_name if fixture.away_team else "TBD" }}</td><td>{{ fixture.venue.name if fixture.venue else "" }}</td><td>{{ fixture.kickoff_utc }}</td><td>{{ local_time(fixture) }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="tab-pane fade" id="venues">
+    <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Venue</th><th>City</th><th>Country</th><th>Timezone</th><th>Altitude m</th></tr></thead><tbody>
+      {% for venue in venues %}<tr><td>{{ venue.name }}</td><td>{{ venue.city }}</td><td>{{ venue.country.name if venue.country else "" }}</td><td>{{ venue.timezone }}</td><td>{{ venue.altitude_m }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="tab-pane fade" id="squads">
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('static_data.import_squads') }}" class="row g-2 mb-3">
+      <div class="col-md-6"><input class="form-control" type="file" name="squad_csv" accept=".csv"></div>
+      <div class="col-md-3"><button class="btn btn-primary">Import squad CSV</button></div>
+      <div class="col-12 small text-muted">CSV columns accepted: team_name, shirt_number, position, name_on_shirt, club, source_note.</div>
+    </form>
+    {% if not squad_memberships %}<div class="alert alert-secondary">No squad players imported yet.</div>{% endif %}
+    <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Team</th><th>#</th><th>Pos</th><th>Name</th><th>Club</th><th>Source</th></tr></thead><tbody>
+      {% for membership in squad_memberships %}<tr><td>{{ membership.team.display_name }}</td><td>{{ membership.shirt_number }}</td><td>{{ membership.position }}</td><td>{{ membership.player.full_name }}</td><td>{{ membership.player.club }}</td><td>{{ membership.source_note }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

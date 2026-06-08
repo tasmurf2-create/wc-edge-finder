@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Dashboard</h1>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('settings.settings') }}">Settings</a>
+</div>
+<div class="alert alert-info">
+  This app is for personal analysis only. Betting involves risk and can result in losses. Positive expected value depends entirely on the probability assumptions used.
+</div>
+{% if not metrics.has_api_key %}
+  <div class="alert alert-warning">No API key is configured. The app will still run and display stored data. Add <code>ODDS_API_KEY</code> to <code>.env</code> before refreshing live odds.</div>
+{% endif %}
+<div class="row g-3 mb-4">
+  {% for label, value in [("Events tracked", metrics.events), ("Odds snapshots", metrics.snapshots), ("Bookmakers", metrics.bookmakers), ("Markets", metrics.markets), ("Possible value candidates", metrics.candidates)] %}
+    <div class="col-12 col-sm-6 col-xl">
+      <div class="card metric-card"><div class="card-body"><div class="text-muted small">{{ label }}</div><div class="display-6">{{ value }}</div></div></div>
+    </div>
+  {% endfor %}
+</div>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Latest refresh</h2>
+      {% if metrics.latest_refresh %}
+        <p>Status: <span class="badge bg-{{ 'success' if metrics.latest_refresh.status == 'success' else 'warning' }}">{{ metrics.latest_refresh.status }}</span></p>
+        <p class="mb-1">Started: {{ metrics.latest_refresh.started_at }}</p>
+        <p class="mb-1">Finished: {{ metrics.latest_refresh.finished_at or "Still running" }}</p>
+        <p class="mb-0">Requests: {{ metrics.latest_refresh.request_count }}</p>
+      {% else %}
+        <p>No refresh has been run yet.</p>
+      {% endif %}
+      <form method="post" action="{{ url_for('dashboard.refresh') }}"><button class="btn btn-primary">Refresh odds now</button></form>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Stored odds</h2>
+      {% if metrics.snapshots == 0 %}
+        <p>No odds snapshots are stored yet. Configure an API key and run a refresh to populate this dashboard.</p>
+      {% else %}
+        <p>Stored odds are available for comparison, movement charts, exports, and watchlist calculations.</p>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

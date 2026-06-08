@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3">Events</h1>
+<form class="row g-2 mb-3">
+  <div class="col-md-2"><input class="form-control" type="date" name="date" value="{{ request.args.get('date','') }}"></div>
+  <div class="col-md-3"><input class="form-control" name="team" placeholder="Team" value="{{ request.args.get('team','') }}"></div>
+  <div class="col-md-3"><input class="form-control" name="competition" placeholder="Competition" value="{{ request.args.get('competition','') }}"></div>
+  <div class="col-md-2"><input class="form-control" name="status" placeholder="Status" value="{{ request.args.get('status','') }}"></div>
+  <div class="col-md-2"><button class="btn btn-primary w-100">Filter</button></div>
+</form>
+{% if not events %}
+  <div class="alert alert-secondary">No World Cup events are stored yet. Run a refresh after configuring your API key.</div>
+{% else %}
+<div class="table-responsive"><table class="table table-sm align-middle">
+  <thead><tr><th>Event</th><th>Competition</th><th>Start time</th><th>Bookmakers</th><th>Markets</th><th>Latest odds</th></tr></thead>
+  <tbody>
+  {% for event in events %}
+    {% set stat = stats.get(event.provider_event_id, {}) %}
+    <tr>
+      <td>{{ event.event_name }}</td><td>{{ event.competition_name or event.league_name }}</td><td>{{ event.event_start_time or "" }}</td>
+      <td>{{ stat.get("bookmakers", 0) }}</td><td>{{ stat.get("markets", 0) }}</td><td>{{ stat.get("latest", "") }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

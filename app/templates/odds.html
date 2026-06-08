@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3">Odds comparison</h1>
+<form class="row g-2 mb-3">
+  <div class="col-md-3"><select class="form-select" name="event"><option value="">All events</option>{% for event in options.events %}<option value="{{ event.provider_event_id }}" {% if filters.event == event.provider_event_id %}selected{% endif %}>{{ event.event_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><select class="form-select" name="market"><option value="">All markets</option>{% for market in options.markets %}<option {% if filters.market == market %}selected{% endif %}>{{ market }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select" name="bookmaker"><option value="">All bookmakers</option>{% for bookmaker in options.bookmakers %}<option {% if filters.bookmaker == bookmaker %}selected{% endif %}>{{ bookmaker }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><input class="form-control" name="outcome" placeholder="Outcome" value="{{ filters.outcome }}"></div>
+  <div class="col-md-2"><button class="btn btn-primary w-100">Filter</button></div>
+</form>
+{% if not rows %}
+  <div class="alert alert-secondary">No latest odds are available yet.</div>
+{% else %}
+<div class="table-responsive"><table class="table table-sm align-middle">
+  <thead><tr><th>Event</th><th>Market</th><th>Outcome</th><th>Bookmaker</th><th>Odds</th><th>Implied probability</th><th>Overround</th><th>Timestamp</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    {% set s = row.snapshot %}
+    {% set is_best = ((s.provider_event_id, s.market_name, s.outcome_name), s.bookmaker) in best_keys %}
+    <tr>
+      <td>{{ row.event.event_name if row.event else s.provider_event_id }}</td><td>{{ s.market_name }}</td><td>{{ s.outcome_name }}</td><td>{{ s.bookmaker }}</td>
+      <td>{{ "%.2f"|format(s.decimal_odds) }} {% if is_best %}<span class="badge bg-success">best price</span>{% endif %}</td>
+      <td>{{ "%.1f"|format(row.implied * 100) }}%</td>
+      <td>{% set ov = overrounds.get((s.provider_event_id, s.market_name, s.bookmaker)) %}{% if ov is not none %}{{ "%.1f"|format(ov * 100) }}%{% endif %}</td>
+      <td>{{ s.snapshot_time }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

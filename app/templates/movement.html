@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3">Odds movement</h1>
+<form class="row g-2 mb-3">
+  <div class="col-md-3"><select class="form-select" name="event"><option value="">Any event</option>{% for event in options.events %}<option value="{{ event.provider_event_id }}" {% if filters.event == event.provider_event_id %}selected{% endif %}>{{ event.event_name }}</option>{% endfor %}</select></div>
+  {% for name, values in [("market", options.markets), ("outcome", options.outcomes), ("bookmaker", options.bookmakers)] %}
+    <div class="col-md-2"><select class="form-select" name="{{ name }}"><option value="">Any {{ name }}</option>{% for value in values %}<option {% if filters[name] == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></div>
+  {% endfor %}
+  <div class="col-md-1"><button class="btn btn-primary w-100">Show</button></div>
+</form>
+{% if current %}
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Current odds</div><div class="h3">{{ "%.2f"|format(current.decimal_odds) }}</div></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Previous odds</div><div class="h3">{{ "%.2f"|format(previous.decimal_odds) if previous else "n/a" }}</div></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Movement</div><div class="h3">{% if previous %}{{ "%+.2f"|format(current.decimal_odds - previous.decimal_odds) }}{% else %}n/a{% endif %}</div></div></div></div>
+  </div>
+  <div id="movement-chart" data-chart='{{ chart_json|safe }}'></div>
+{% else %}
+  <div class="alert alert-secondary">No matching odds history is available yet.</div>
+{% endif %}
+{% endblock %}

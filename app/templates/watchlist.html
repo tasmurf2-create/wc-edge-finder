@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3"><h1 class="h3 mb-0">Watchlist</h1><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('watchlist.export') }}">Export CSV</a></div>
+<form class="mb-3"><select class="form-select w-auto d-inline" name="status"><option value="">All statuses</option>{% for item_status in statuses %}<option {% if status == item_status %}selected{% endif %}>{{ item_status }}</option>{% endfor %}</select> <button class="btn btn-primary">Filter</button></form>
+{% if not items %}
+  <div class="alert alert-secondary">No watchlist items yet.</div>
+{% else %}
+<div class="table-responsive"><table class="table table-sm align-middle">
+  <thead><tr><th>Event</th><th>Market</th><th>Outcome</th><th>Bookmaker</th><th>Odds</th><th>EV</th><th>Stake</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+  <tbody>
+  {% for item in items %}
+  <tr>
+    <td>{{ item.event_name }}</td><td>{{ item.market_name }}</td><td>{{ item.outcome_name }}</td><td>{{ item.bookmaker }}</td><td>{{ item.decimal_odds }}</td>
+    <td><span class="badge bg-{{ 'success' if item.expected_value and item.expected_value > 0 else 'secondary' }}">{{ "%.3f"|format(item.expected_value or 0) }}</span></td><td>{{ item.suggested_stake }}</td>
+    <td colspan="3">
+      <form method="post" action="{{ url_for('watchlist.update_item', item_id=item.id) }}" class="row g-1">
+        <div class="col-md-2"><select class="form-select form-select-sm" name="status">{% for s in statuses %}<option {% if item.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+        <div class="col-md-7"><input class="form-control form-control-sm" name="notes" value="{{ item.notes or '' }}"></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Save</button></div>
+      </form>
+      <form method="post" action="{{ url_for('watchlist.delete_item', item_id=item.id) }}" class="mt-1"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

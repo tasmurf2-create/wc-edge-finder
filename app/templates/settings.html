@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3">Settings</h1>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <form method="post" class="card"><div class="card-body">
+      <p>API key status: {% if api_key_present %}<span class="badge bg-success">configured</span>{% else %}<span class="badge bg-warning text-dark">not configured</span>{% endif %}</p>
+      <label class="form-label">Competition filter</label><input class="form-control mb-2" name="competition_filter" value="{{ settings.get('competition_filter', config.DEFAULT_COMPETITION_FILTER) }}">
+      <label class="form-label">Default bookmakers, comma separated</label><input class="form-control mb-2" name="default_bookmakers" value="{{ settings.get('default_bookmakers', ', '.join(config.DEFAULT_BOOKMAKERS)) }}">
+      <label class="form-label">Default markets, comma separated</label><input class="form-control mb-2" name="default_markets" value="{{ settings.get('default_markets', ', '.join(config.DEFAULT_MARKETS)) }}">
+      <div class="row g-2">
+        <div class="col-md-4"><label class="form-label">Bankroll</label><input class="form-control" name="default_bankroll" value="{{ settings.get('default_bankroll', config.DEFAULT_BANKROLL) }}"></div>
+        <div class="col-md-4"><label class="form-label">Max stake</label><input class="form-control" name="default_max_stake" value="{{ settings.get('default_max_stake', config.DEFAULT_MAX_STAKE) }}"></div>
+        <div class="col-md-4"><label class="form-label">EV threshold</label><input class="form-control" name="default_ev_threshold" value="{{ settings.get('default_ev_threshold', config.DEFAULT_EV_THRESHOLD) }}"></div>
+      </div>
+      <button class="btn btn-primary mt-3">Save settings</button>
+    </div></form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-body">
+      <h2 class="h5">Actions</h2>
+      <form method="post" action="{{ url_for('settings.refresh') }}" class="mb-2"><button class="btn btn-primary">Refresh odds</button></form>
+      <form method="post" action="{{ url_for('settings.test_connection') }}"><button class="btn btn-outline-secondary">Test API connection</button></form>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Exports</h2>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('settings.latest_odds_csv') }}">Latest odds CSV</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('settings.movement_csv') }}">Movement CSV</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('settings.value_candidates_csv') }}">Value candidates CSV</a>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
