@@ -12,8 +12,10 @@ Then open http://localhost:8000
 """
 import os
 import time
+import secrets
 import itertools
 import threading
+from datetime import datetime, timezone
 from collections import defaultdict
 
 def _load_env(path=".env"):
@@ -35,6 +37,44 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+
+# ---------------------------------------------------------------------------
+# Lightweight visitor tracking (real client IP via X-Forwarded-For, since the
+# app sits behind Render's proxy). In-memory only — resets on restart/redeploy.
+# View at /admin/stats?key=<ADMIN_KEY>. The key is read from the ADMIN_KEY env
+# var, or a random one is generated and printed to the logs at startup.
+# ---------------------------------------------------------------------------
+_ADMIN_KEY    = os.environ.get("ADMIN_KEY") or secrets.token_urlsafe(8)
+_access_lock  = threading.Lock()
+_visitors     = {}   # ip -> {hits, first, last, last_path}
+print(f"[admin] visitor stats at /admin/stats?key={_ADMIN_KEY}")
+
+
+def _client_ip(request):
+    """Real visitor IP: first hop in X-Forwarded-For, else the socket peer."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "?"
+
+
+@app.middleware("http")
+async def _track_visitors(request, call_next):
+    path = request.url.path
+    if not path.startswith(("/admin", "/static")):
+        ip  = _client_ip(request)
+        now = int(time.time())
+        with _access_lock:
+            v = _visitors.get(ip)
+            if v is None:
+                _visitors[ip] = {"hits": 1, "first": now, "last": now, "last_path": path}
+                print(f"[access] NEW visitor {ip} (unique so far: {len(_visitors)})")
+            else:
+                v["hits"] += 1; v["last"] = now; v["last_path"] = path
+        if path == "/":
+            print(f"[access] {ip} opened the app")
+    return await call_next(request)
+
 
 REGIONS = "uk"             # UK region covers all Irish-accessible bookmakers
 
@@ -1025,6 +1065,32 @@ def intel():
         "intel":         enriched,
         "intel_ready":   len(enriched),
         "intel_loading": _intel_busy,
+    })
+
+
+@app.get("/admin/stats")
+def admin_stats(key: str = ""):
+    """Visitor stats — unique IPs + per-IP hit counts. Requires ?key=<ADMIN_KEY>."""
+    if not secrets.compare_digest(key, _ADMIN_KEY):
+        return JSONResponse({"error": "forbidden — append ?key=<ADMIN_KEY>"}, status_code=403)
+
+    def _iso(ts):
+        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
+
+    with _access_lock:
+        rows = sorted(_visitors.items(), key=lambda kv: -kv[1]["last"])
+        visitors = [{
+            "ip":         ip,
+            "hits":       v["hits"],
+            "first_seen": _iso(v["first"]),
+            "last_seen":  _iso(v["last"]),
+            "last_path":  v["last_path"],
+        } for ip, v in rows]
+        total = sum(v["hits"] for v in _visitors.values())
+    return JSONResponse({
+        "unique_visitors": len(visitors),
+        "total_requests":  total,
+        "visitors":        visitors,
     })
 
 
