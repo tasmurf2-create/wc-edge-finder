@@ -28,7 +28,6 @@ _load_env()
 import wc_odds
 import prediction_markets as pmkt
 import football_intel as fintel
-import outrights as outr
 import static_data
 
 from fastapi import FastAPI
@@ -1050,17 +1049,6 @@ def refresh_injuries():
 
     threading.Thread(target=_do_refresh, daemon=True).start()
     return JSONResponse({"status": "refreshing", "teams": len(teams)})
-
-
-@app.get("/api/outrights")
-def api_outrights(force: bool = False):
-    """Tournament/futures markets: Winner, Semis, Group Winner, Golden Boot."""
-    try:
-        data = outr.get_outright_analysis(force=force)
-    except Exception as e:
-        print(f"[outrights] analysis failed: {e}")
-        data = {}
-    return JSONResponse({"data": data, "fetched_at": int(time.time())})
 
 
 @app.get("/api/refresh")

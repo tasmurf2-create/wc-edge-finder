@@ -337,7 +337,6 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
   <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
-  <button class="tab-btn" data-tab="futures" onclick="switchTab('futures')">Futures &amp; Outrights</button>
 </div>
 
 <!-- ===================== DIVERGENCE TAB ===================== -->
@@ -459,35 +458,6 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
-<!-- ===================== FUTURES TAB ===================== -->
-<div id="tab-futures" class="tab-panel">
-  <div class="filter-bar">
-    <label>Bookmaker:</label>
-    <select id="futures-book-select" onchange="renderFutures()">
-      <option value="best">Best available (any book)</option>
-    </select>
-    <label>Stake:</label>
-    <span style="display:flex;align-items:center;gap:4px">
-      <span style="color:#8b949e">€</span>
-      <input type="number" id="futures-stake-input" value="10" min="1" step="1"
-        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
-        oninput="renderFutures()">
-    </span>
-    <button id="futures-refresh-btn" onclick="loadFutures(true)"
-      style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">
-      Refresh Outrights
-    </button>
-  </div>
-  <div class="legend">
-    <span><span class="dot dot-short"></span> PM higher than books — possible undervalued outright</span>
-    <span><span class="dot dot-long"></span> PM lower than books — books may have overpriced</span>
-    <span style="color:#88c0d0">Markets: Tournament Winner · Semis/Final · Group Winner · Golden Boot</span>
-  </div>
-  <div id="futures-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
-    <div class="loading-inner"><div class="spinner"></div><span>Loading futures markets...</span></div>
-  </div>
-</div>
-
 <script>
 // ---- state ----
 let allMatches    = [];
@@ -495,10 +465,8 @@ let allSingles    = [];
 let allParlays    = [];
 let allIntel      = {};   // {match_label: analyst intel} — the Bettor's Analysis source
 let allBookmakers = [];
-let allFutures    = {};
 let threshold     = 0;
 let betsSubTab    = 'singles';
-let _futuresLoaded = false;
 let accaRisk      = 'balanced';   // 'banker' | 'balanced' | 'punchy'
 let accaGuard     = true;         // value guard: legs must be priced at/above fair
 let _accaBusy     = false;
@@ -515,7 +483,6 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'picks') renderTopPicks();
-  if (tab === 'futures' && !_futuresLoaded) loadFutures();
 }
 
 // ---- data loading ----
@@ -550,8 +517,8 @@ async function loadData(force = false) {
     roundsAvailable = betsData.rounds_available || [];
     populateRoundFilter();
 
-    // Populate bookmaker dropdowns once (bets tab + picks tab + futures tab)
-    ['book-select', 'picks-book-select', 'futures-book-select'].forEach(selId => {
+    // Populate bookmaker dropdowns once (bets tab + picks tab)
+    ['book-select', 'picks-book-select'].forEach(selId => {
       const sel = document.getElementById(selId);
       if (sel.options.length <= 1 && allBookmakers.length) {
         allBookmakers.forEach(bk => {
@@ -1279,148 +1246,6 @@ function parlayHTML(p, book, stake) {
     <div class="parlay-legs">${legs}</div>
     ${mixedWarning}
     ${fallbackWarning}
-  </div>`;
-}
-
-// ---- futures / outrights ----
-
-const FUTURES_ORDER = [
-  'tournament_winner', 'reach_final', 'reach_semis', 'reach_quarters',
-  'reach_r16', 'group_winner', 'qualify_group', 'top_goalscorer'
-];
-
-async function loadFutures(force = false) {
-  const panel = document.getElementById('futures-panel');
-  const btn   = document.getElementById('futures-refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
-  panel.innerHTML = '<div class="loading-inner"><div class="spinner"></div><span>Fetching futures markets...</span></div>';
-
-  try {
-    const url = force ? '/api/outrights?force=true' : '/api/outrights';
-    const res  = await fetch(url);
-    const json = await res.json();
-    allFutures    = json.data || {};
-    _futuresLoaded = true;
-
-    // Sync bookmaker dropdowns
-    const sel = document.getElementById('futures-book-select');
-    if (sel && sel.options.length <= 1 && allBookmakers.length) {
-      allBookmakers.forEach(bk => {
-        const opt = document.createElement('option');
-        opt.value = bk; opt.textContent = bk;
-        if (bk === 'Paddy Power') opt.selected = true;
-        sel.appendChild(opt);
-      });
-    }
-    renderFutures();
-  } catch(e) {
-    panel.innerHTML = `<div class="empty">Failed to load futures: ${e.message}</div>`;
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Refresh Outrights'; }
-  }
-}
-
-function futuresChosenBook() {
-  return document.getElementById('futures-book-select')?.value || 'best';
-}
-function futuresChosenStake() {
-  return parseFloat(document.getElementById('futures-stake-input')?.value) || 10;
-}
-
-function renderFutures() {
-  const panel = document.getElementById('futures-panel');
-  if (!panel) return;
-  if (!_futuresLoaded) return;
-
-  if (!Object.keys(allFutures).length) {
-    panel.innerHTML = `<div class="empty">
-      No outright/futures market data available yet.<br>
-      <small style="color:#6e7681">This is normal early in the tournament — check back as more books price up outrights.</small>
-    </div>`;
-    return;
-  }
-
-  const book  = futuresChosenBook();
-  const stake = futuresChosenStake();
-
-  const sections = FUTURES_ORDER
-    .filter(mtype => allFutures[mtype] && allFutures[mtype].rows.length)
-    .map(mtype => {
-      const mkt = allFutures[mtype];
-      return `
-        <div>
-          <div class="picks-round-title" style="display:flex;justify-content:space-between;align-items:baseline">
-            <span>${mkt.label}</span>
-            ${mkt.margin != null ? `<span style="font-size:0.72rem;color:#6e7681;font-weight:400">Book margin: ${mkt.margin}%</span>` : ''}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            ${mkt.rows.map(r => futuresRowHTML(r, book, stake)).join('')}
-          </div>
-        </div>`;
-    }).join('');
-
-  panel.innerHTML = sections || '<div class="empty">No futures data found from any source.</div>';
-}
-
-function futuresRowHTML(r, book, stake) {
-  // Pick price for chosen book
-  let price = null, bookLabel = 'N/A', fallback = false;
-  if (book === 'best') {
-    price = r.best_price; bookLabel = r.best_book || 'best';
-  } else {
-    price = (r.per_book || {})[book];
-    if (price) { bookLabel = book; }
-    else if (r.paddy) { price = r.paddy; bookLabel = 'Paddy Power'; fallback = true; }
-    else { price = r.best_price; bookLabel = r.best_book || 'best'; fallback = true; }
-  }
-
-  const grossReturn = stake * (price || 0);
-  const profit      = grossReturn - stake;
-
-  // Divergence badge
-  const gap = r.gap;
-  let gapBadge = '';
-  if (gap !== null && gap !== undefined) {
-    if (gap > 3)
-      gapBadge = `<span class="badge" style="background:#1a3626;color:#3fb950;border:1px solid #3fb95066">PM +${gap.toFixed(1)}% vs books</span>`;
-    else if (gap < -3)
-      gapBadge = `<span class="badge" style="background:#2a1a1a;color:#f85149;border:1px solid #f8514966">PM ${gap.toFixed(1)}% vs books</span>`;
-  }
-
-  const fairStr   = r.fair_prob  != null ? `${r.fair_prob.toFixed(1)}%`  : '—';
-  const pmStr     = r.pm_prob    != null ? `${r.pm_prob}%` : '—';
-  const edgeStr   = r.edge       != null ? `+${r.edge.toFixed(1)}%` : '—';
-  const priceStr  = price        != null ? price.toFixed(2) : '—';
-
-  const fallNote  = fallback && price
-    ? `<span style="color:#d29922;font-size:0.73rem"> ⚠ ${bookLabel}</span>` : '';
-
-  return `<div class="single-card" style="border-left:3px solid ${gap > 3 ? '#3fb950' : gap < -3 ? '#f85149' : '#30363d'}">
-    <div class="single-top">
-      <div>
-        <div class="single-title">${r.team.toUpperCase()}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        ${gapBadge}
-        ${r.edge != null && r.edge > 0 ? `<span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">book edge ${edgeStr}</span>` : ''}
-      </div>
-    </div>
-    <div class="single-prices">
-      <span><span class="lbl">Book fair:</span><span class="val">${fairStr}</span></span>
-      ${r.pm_prob != null ? `<span><span class="lbl">PM:</span><span class="val blue">${pmStr}</span></span>` : ''}
-      ${gap != null ? `<span><span class="lbl">Gap:</span><span class="val" style="color:${gap > 0 ? '#3fb950' : '#f85149'}">${gap > 0 ? '+' : ''}${gap.toFixed(1)}%</span></span>` : ''}
-      ${price ? `<span><span class="lbl">Best price:</span><span class="val green">${priceStr}</span>
-        <span style="color:#6e7681;font-size:0.75rem">(${bookLabel})</span>${fallNote}</span>` : ''}
-    </div>
-    ${price ? `<div style="background:#1c2128;border-radius:6px;padding:10px 14px;margin-top:6px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
-      <div><div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Stake</div>
-           <div style="font-size:1rem;font-weight:700;color:#f0f6fc">${eur(stake)}</div></div>
-      <div style="color:#484f58;font-size:1.2rem">→</div>
-      <div><div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Gross return</div>
-           <div style="font-size:1rem;font-weight:700;color:#f0f6fc">${eur(grossReturn)}</div></div>
-      <div><div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Profit</div>
-           <div style="font-size:1rem;font-weight:700;color:#3fb950">+${eur(profit)}</div></div>
-    </div>` : ''}
   </div>`;
 }
 
