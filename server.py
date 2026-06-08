@@ -1030,7 +1030,9 @@ def intel():
 
 @app.get("/api/refresh-injuries")
 def refresh_injuries():
-    """Force re-fetch of injury/suspension data for all teams with value bets."""
+    """Force re-fetch of injury/suspension data for all teams with value bets,
+    then invalidate ONLY the analyst cards for matches whose injury picture
+    actually changed — instead of nuking the whole intel cache."""
     d = get_raw()
     teams = set()
     for s in d["bets"]["singles"]:
@@ -1039,13 +1041,40 @@ def refresh_injuries():
             teams.add(parts[0]); teams.add(parts[1])
 
     def _do_refresh():
+        # Snapshot injuries, refresh, then diff to see which teams actually changed.
+        before = fintel.injuries_snapshot(teams)
         fintel.refresh_injuries_for_teams(sorted(teams), force=True)
-        # Clear intel cache so next load re-analyses with fresh injury data
+        after = fintel.injuries_snapshot(teams)
+        changed = {k for k in after if before.get(k) != after.get(k)}
+
+        if not changed:
+            print(f"[injuries] refresh done for {len(teams)} teams — "
+                  f"no changes, analyst cache kept intact")
+            return
+
+        # Invalidate only analyst cards for matches involving a changed team.
         with _intel_lock:
-            _intel_cache.clear()
-        import pathlib
-        pathlib.Path("intel_cache.json").unlink(missing_ok=True)
-        print(f"[injuries] refresh done for {len(teams)} teams")
+            labels = list(_intel_cache.keys())
+        affected_pairs, affected_labels = [], []
+        for label in labels:
+            p = label.split(" vs ", 1)
+            if len(p) != 2:
+                continue
+            home, away = p
+            if fintel._team_key(home) in changed or fintel._team_key(away) in changed:
+                affected_pairs.append((home, away))
+                affected_labels.append(label)
+
+        fintel.invalidate_match_cache(affected_pairs)
+        with _intel_lock:
+            for label in affected_labels:
+                _intel_cache.pop(label, None)
+        print(f"[injuries] refresh done for {len(teams)} teams — "
+              f"{len(changed)} changed, {len(affected_labels)} analyst card(s) "
+              f"invalidated (rest kept)")
+
+        # Kick the background fetch so invalidated cards re-analyse promptly.
+        _trigger_intel_bg(d["bets"]["singles"])
 
     threading.Thread(target=_do_refresh, daemon=True).start()
     return JSONResponse({"status": "refreshing", "teams": len(teams)})

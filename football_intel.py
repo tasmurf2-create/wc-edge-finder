@@ -376,6 +376,24 @@ def _cache_key(home, away):
     return hashlib.md5(f"{home.lower()}|{away.lower()}".encode()).hexdigest()
 
 
+def invalidate_match_cache(pairs):
+    """
+    Drop the disk-cached analyst entry for each (home, away) pair so it gets
+    re-analysed on the next fetch. Used by the injuries refresh to invalidate
+    only the matches whose injury picture changed — instead of nuking the whole
+    cache. Returns the number of entries removed.
+    """
+    with _io_lock:
+        cache = _load_cache()
+        removed = 0
+        for home, away in pairs:
+            if cache.pop(_cache_key(home, away), None) is not None:
+                removed += 1
+        if removed:
+            _save_cache(cache)
+    return removed
+
+
 # ---------------------------------------------------------------------------
 # Team data — two-tier cache
 #   Profiles  : WC 2026 squad announcement — fetched once, never expires
@@ -496,6 +514,13 @@ def refresh_injuries_for_teams(teams, force=True):
                 f.result()
             except Exception as e:
                 print(f"[injuries] refresh failed for {futs[f]}: {e}")
+
+
+def injuries_snapshot(teams):
+    """Return {team_key: injuries_text} for the given teams from the injuries
+    cache — call before and after a refresh to detect which teams changed."""
+    store = _load_json(INJURIES_FILE)
+    return {_team_key(t): (store.get(_team_key(t)) or {}).get("injuries") for t in teams}
 
 
 # ---------------------------------------------------------------------------
