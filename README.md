@@ -1,51 +1,61 @@
 # WC 2026 Edge Finder
 
-A betting edge finder for the 2026 FIFA World Cup. Combines bookmaker odds, prediction markets (Kalshi/Polymarket), and AI-powered football analysis to surface genuine value bets across match and tournament markets.
+A betting edge finder for the 2026 FIFA World Cup. It combines bookmaker odds, prediction markets (Kalshi/Polymarket), and a **fact-grounded** AI football analyst to surface genuine value across match markets.
 
 ## What it does
 
 - **De-vigs** bookmaker prices to expose the true consensus fair probability
 - **Compares** that fair prob against Kalshi and Polymarket implied prices — divergence is the edge signal
-- **AI analyst** (Claude Sonnet) analyses form, injuries, altitude, heat and tactics for each match, then recommends specific bets across all markets
-- **Confirms or contradicts** each price-edge bet with analyst logic — so a +1.5% edge on a 10/1 shot the analyst disagrees with is flagged, not promoted
+- **AI analyst** (Claude Sonnet) gives a football read grounded **only in sourced data** — squad, FIFA ranking, recent form, injuries, venue/conditions, prices — and is explicitly forbidden from inventing stats, records, managers or formations
+- **Confirms or contradicts** each price-edge bet with the analyst — agreement between the maths and the football view (★ Both agree) is the strongest signal
 
 ## Tabs
 
 | Tab | What it shows |
 |---|---|
-| **Market Divergence** | Every match ranked by bookmaker vs prediction-market gap. Red = books overpricing that side. Green = potential value. |
-| **Recommended Bets** | Value singles (1X2, Over/Under, Asian Handicap) + Multi-Bets, with analyst confirmation badge on each card. |
-| **Top Picks** | Top 5 analyst-confirmed bets, grouped by tournament round (Group Stage R1/R2/R3, then knockouts). |
+| **Market Divergence** | Every match ranked by bookmaker vs prediction-market gap. Green = PM rates it higher than books (possible value); Red = books shorter (possible trap). |
+| **★ Sensible Bets** | One shortlist scoring each bet on edge + PM agreement + conditions + analyst, graded **Strong / Solid / Speculative**. |
+| **The Maths** | Value singles (1X2, Over/Under, Asian Handicap) + accumulators, with the analyst-confirmation badge on each card. |
+| **Bettor's Analysis** | The analyst's football read + recommended bets (with live odds) per match. A second opinion, not fact. |
+| **🩹 Injuries** | Tournament-wide injury/suspension digest in one place. Manual refresh only (no auto-poll). |
 
 ## Bet types covered
 
 - **1X2** — Home win / Draw / Away win
-- **Over/Under** — Goals totals (1.5, 2.5, 3.5)
-- **Asian Handicap** — Win by 2+, cover a handicap, etc.
+- **Over/Under** — Goals totals (1.5, 2.5)
+- **Asian Handicap** — symmetric (either team, either line)
+- **Accumulators** — priced at a **single bookmaker** (you can't split legs across books); each slip names the book to place it at
 
 ## Bookmakers covered
 
-Irish-accessible books only: **Paddy Power · Betfair · Bet365 · BoyleSports · Ladbrokes · William Hill**
+Irish-accessible books only: **Paddy Power · Betfair · Bet365 · BoyleSports · Ladbrokes · William Hill**. Exchanges are used for singles but excluded from accumulator pricing.
 
-## AI Analyst
+## The AI analyst — grounded, not guessing
 
-Each match gets a Claude analysis covering:
-- Squad profile (from official WC 2026 announcements — cached permanently)
-- Injury & suspension news (one tournament-wide BBC digest, refreshed every 12 hours)
-- Venue conditions: altitude (Mexico City 2240m, Guadalajara 1560m), heat (Monterrey 37°C+, Houston, Dallas), humidity
-- Tactical matchup and form
-- Specific `recommended_bets[]` — up to 3 bets with clear football reasoning, not just price signal
+The analyst is given **only sourced inputs** and is instructed not to invent anything beyond them (no fabricated stats, scorelines, records, managers or formations):
 
-Analyst cards show **✓ Analyst backed** (green) or **⚠ Analyst prefers other outcome** (amber) on every bet card.
+| Input | Source |
+|---|---|
+| Squad — players, clubs, ages | official FIFA 2026 squad PDF → `data/players.csv` |
+| FIFA world ranking | `data/team_facts.csv` |
+| Recent form — last 8, W/D/L, GF/GA, with competition labels | `data/team_form.csv` (built by `build_form.py`) |
+| Injuries / suspensions | one tournament-wide web digest → `injury_digest.json` (12 h) |
+| Venue, altitude, weather | `data/venues.csv` + Open-Meteo (live forecast inside 16 days, else climate normal — labelled which) |
+| Bookmaker prices | live odds, de-vigged |
+
+It outputs up to 3 `recommended_bets[]` with football reasoning. Cards show **✓ Analyst backed** / **⚠ Analyst prefers other outcome** / **★ Both agree**.
 
 ## Architecture
 
 ```
-wc_odds.py          — Odds API fetch + de-vig + line-shopping
+wc_odds.py            — Odds API fetch + de-vig + line-shopping
 prediction_markets.py — Kalshi + Polymarket implied probs
-football_intel.py   — Claude analyst: team profiles, injuries, conditions, recommended bets
-server.py           — FastAPI backend, caching, background intel fetch
-static/index.html   — Single-page dashboard (3 tabs)
+static_data.py        — sourced reference data (squads, venues, FIFA ranking, recent form)
+football_intel.py     — Claude analyst (grounded) + injury digest + weather
+build_form.py         — (manual) rebuild data/team_form.csv from the open results dataset
+server.py             — FastAPI backend, caching, background intel, visitor stats
+static/index.html     — single-page dashboard (5 tabs)
+data/                 — players.csv, teams.csv, venues.csv, matches.csv, team_facts.csv, team_form.csv
 ```
 
 ## Setup
@@ -53,22 +63,33 @@ static/index.html   — Single-page dashboard (3 tabs)
 ```bash
 cp .env.example .env
 # Add your keys:
-#   ODDS_API_KEY    — free tier at https://the-odds-api.com (500 req/month)
+#   ODDS_API_KEY      — free tier at https://the-odds-api.com (500 req/month)
 #   ANTHROPIC_API_KEY — at https://console.anthropic.com
 
-pip install fastapi uvicorn python-dotenv
+pip install -r requirements.txt
 python server.py
 # Open http://localhost:8000
 ```
+
+Refresh the recent-form data whenever you like (one download, no per-analysis web calls):
+
+```bash
+python build_form.py    # rebuilds data/team_form.csv from the public results dataset
+```
+
+## Deploy (Render)
+
+`render.yaml` defines a free web service. Deploy via **New → Blueprint**, then set `ODDS_API_KEY` and `ANTHROPIC_API_KEY` (and optionally `ADMIN_KEY` for `/admin/stats`) as dashboard secrets. `intel_seed.json` ships pre-built analyst cards so the deployed app isn't empty on a cold start. Visitor stats: `/admin/stats?key=<ADMIN_KEY>`.
 
 ## Caching
 
 | Cache | TTL | File |
 |---|---|---|
 | Match odds | 5 min | in-memory |
-| Match intel (analyst) | 12 hours | `intel_cache.json` |
-| Team squad profiles | Permanent | `team_profiles.json` |
-| Injury/suspension digest (BBC, tournament-wide) | 12 hours | `injury_digest.json` |
+| Match intel (analyst) | 12 hours | `intel_cache.json` (falls back to committed `intel_seed.json`) |
+| Injury/suspension digest (tournament-wide) | 12 hours | `injury_digest.json` |
+| Weather forecasts | 6 hours | `weather_cache.json` |
+| Squad / FIFA ranking / recent form | static (manual refresh) | `data/*.csv` |
 
 ## Edge logic
 
@@ -86,6 +107,8 @@ confidence:
   medium = edge > 0.5% OR strong PM signal
   low    = small edge, no PM confirmation
 ```
+
+Accumulators are priced at the **single best book that covers all legs** (never line-shopped across books), and EV is computed off that realistic price — so favourite-heavy slips correctly show negative EV.
 
 ## Reality check
 
