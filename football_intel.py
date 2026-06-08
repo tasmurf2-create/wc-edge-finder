@@ -23,6 +23,7 @@ import anthropic
 import static_data
 
 CACHE_FILE      = Path("intel_cache.json")
+SEED_FILE       = Path("intel_seed.json")        # committed seed: analyst cards for a fresh deploy
 INJURY_DIGEST_FILE = Path("injury_digest.json")  # ONE tournament-wide injury digest (BBC)
 WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+date
 CACHE_TTL       = 43200    # 12 hours — match analysis
@@ -363,11 +364,15 @@ def prewarm_weather(triples, max_workers=8):
 # ---------------------------------------------------------------------------
 
 def _load_cache():
-    if CACHE_FILE.exists():
-        try:
-            return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    # Live cache first; fall back to a committed seed (SEED_FILE) so a fresh
+    # deploy with no local cache still shows analyst cards. The first _save_cache
+    # writes CACHE_FILE, which then takes over.
+    for p in (CACHE_FILE, SEED_FILE):
+        if p.exists():
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                pass
     return {}
 
 

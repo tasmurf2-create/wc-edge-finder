@@ -1,0 +1,785 @@
+{
+  "0b686abbab33f14b6fc382033f6142c0": {
+    "intel": {
+      "home_form": "Iraq qualified for their first-ever World Cup as a genuine footballing achievement, built on a compact defensive structure and counter-attacking threat spearheaded by Al-Hamadi (Luton) and Marko (Venezia). Their squad blends European-based players like Z.Iqbal (Utrecht), Doski (Plzeň), and Hussein (Pogoń Szczecin) with a domestic core, giving them more technical quality than many expect from a debut nation.",
+      "away_form": "Norway arrive as one of Europe's most feared attacking units, anchored by Erling Haaland (Manchester City) who finished among the Premier League's top scorers again in 2025-26, supported by Ødegaard (Arsenal), Sørloth, and Strand Larsen in a deep and clinical forward line. Solbakken's side qualified comfortably and have the firepower across all positions to dismantle most Asian or lower-ranked opposition.",
+      "key_absences": "None known for either side. Both squads appear fully fit entering the tournament.",
+      "conditions_impact": "18:00 EDT in Boston in mid-June means 24°C with 70% humidity — warm and sticky but entirely manageable for European players accustomed to demanding league schedules. Iraq's squad includes players based in Thailand, Indonesia, and the UAE who are conditioned to genuine heat, so conditions do not significantly disadvantage them either. Overall the conditions are neutral to slightly favourable for Norway given their physical, high-intensity pressing style will not be significantly hampered at this temperature.",
+      "tactical_matchup": "Norway's 4-3-3 high-press with Haaland as a focal point and wide runners like Nusa and Schjelderup will create a severe mismatch against Iraq's defensively compact but limited block, which relies on set pieces and transitional moments. Iraq will look to sit deep, frustrate, and hit on the break through Al-Hamadi and Marko, but Norway's squad depth and individual quality at every position makes this a very difficult evening for the Iraqi backline — this matchup strongly favours Norway.",
+      "goals_assessment": "This is a match where 3+ goals is the most likely outcome: Norway have the finishing quality to score multiple goals against a team making its World Cup debut, and Iraq — while capable of a disciplined defensive showing for a period — are unlikely to maintain a clean sheet for 90 minutes against Haaland, Ødegaard, Sørloth, and Strand Larsen. BTTS is genuinely possible if Iraq catch Norway on a transition, but the primary expectation is Norway 3-0 or 3-1 rather than a tight contest — over 2.5 is the clean call, and there is a strong case for over 3.5 at longer odds.",
+      "market_read": "The bookmaker fair value for Iraq win at 7.2% and draw at 14.2% look broadly correct — Iraq winning is a 14/1 shot on genuine football logic and the draw requires Norway to be very poor. The market is correctly pricing Norway as strong favourites. The most mispriced area is likely the handicap line: Norway (-1.5) and Norway (-2) are where the real value sits because the scoreline probability distribution here is skewed heavily towards a comfortable Norway victory rather than a narrow one. Over 2.5 goals is also correctly priced but represents a high-probability outcome worth including as a foundation bet.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "away_+0.5",
+          "confidence": "high",
+          "reasoning": "This framing is redundant at -0.5 level — the stronger spread play is Norway -1.5: Norway have the attacking quality across Haaland, Ødegaard, Sørloth, Nusa, and Strand Larsen to win by 2+ goals against a debut World Cup nation with limited defensive quality at this level. Iraq have no previous World Cup experience and face a team that regularly scores 3+ against weaker opposition in qualifying.",
+          "strength": "strong"
+        },
+        {
+          "market": "spreads",
+          "outcome": "away_+1.5",
+          "confidence": "high",
+          "reasoning": "Norway (-1.5) — Norway must win by 2 or more — is the most logical handicap line here: Haaland alone scored 27 Premier League goals in 2025-26 and Iraq have no comparable defensive personnel to stop a combined attack of his quality plus Ødegaard's creativity and Sørloth/Strand Larsen as backup. A 2+ goal Norway win is more probable than a 1-goal margin or any Iraq result.",
+          "strength": "strong"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "medium",
+          "reasoning": "Norway's attacking depth across all positions makes it very likely they score 2 or more on their own, and Iraq have shown they can contribute goals in transition with Al-Hamadi and Marko both capable of punishing high defensive lines. Over 2.5 is a safer foundation bet that accounts for any scenario where Iraq defend heroically for an hour before Norway ultimately open the game up.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Norway (-1.5) on the Asian handicap: the quality gap between a Manchester City striker supported by Arsenal's captain and a debut World Cup nation is enormous, and a 2+ goal Norway win is the most probable single scoreline range in this fixture. Over 2.5 goals provides a complementary foundation bet that covers most realistic scoreline scenarios. Avoid Iraq win or draw — the football logic simply does not support either outcome at any price given Norway's firepower and Iraq's inexperience at this level.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "No injury data is confirmed for either squad — a Haaland fitness concern or late withdrawal would significantly alter the Norway (-1.5) case, and we also lack specific H2H tactical footage or Iraq's defensive set-piece vulnerability data which could affect the total goals market in either direction.",
+      "conditions": {
+        "city": "Boston / Foxborough",
+        "stadium": "Gillette Stadium",
+        "has_roof": false,
+        "altitude_m": 88.0,
+        "local_kickoff": "18:00 EDT (Tuesday)",
+        "avg_high_c": 24,
+        "feels_like_c": 22,
+        "humidity_pct": 70,
+        "precip_prob_pct": 24,
+        "wind_max_kmh": 18,
+        "notes": "Gillette Stadium, Boston / Foxborough",
+        "source": "forecast",
+        "days_out": 8
+      },
+      "cached_at": 1780948054
+    },
+    "cached_at": 1780948054,
+    "label": "Iraq vs Norway"
+  },
+  "04e09901e74a662dde2b14ecb4841e46": {
+    "intel": {
+      "home_form": "Brazil arrive at this World Cup with a star-studded attacking unit headlined by Vinicius Jr, Raphinha, and Martinelli, capable of dismantling any CONCACAF opposition at will. Their qualifying campaign and recent results confirm they are among the tournament favourites, with a deep squad across all positions and elite-level pressing and transition football.",
+      "away_form": "Haiti are a minnow making a historic first World Cup appearance, with a squad drawn predominantly from lower-tier European leagues and North American second divisions. Their attacking options — Nazon, Pierrot, Etienne Jr — lack the quality to threaten a Brazilian backline, and defensively they will be severely overmatched.",
+      "key_absences": "Brazil miss Estevao (hamstring), Rodrygo, Eder Militao (hamstring surgery), and Rodrigo Goes (knee) — all ruled out for the tournament. Neymar carries a right calf issue from May 17 and is a doubt. Haiti report no known injuries or suspensions.",
+      "conditions_impact": "A 21:00 EDT kick-off in Philadelphia at 26°C with 50% humidity is comfortable for both sides — no meaningful heat or altitude stress. The conditions mildly favour Haiti in the sense that extreme heat would have disadvantaged them more, but in these benign evening conditions Brazil's superior fitness and quality remains the dominant factor. Wind at 27 km/h is negligible.",
+      "tactical_matchup": "Brazil will press high, play through the thirds with pace and creativity, and exploit Haiti's limited defensive organisation with combinations through Vinicius Jr and Raphinha on the flanks. Haiti will almost certainly set up in a deep low block, looking to frustrate and absorb pressure, but their defensive personnel — anchored by lower-league European defenders — simply lack the tools to contain a full Brazil attack for 90 minutes.",
+      "goals_assessment": "Expect Brazil to score 3-4 goals with ease. Haiti's backline will be overwhelmed by Brazil's pace and movement off the ball, and Haiti's own attacking threat against a disciplined Brazilian defence is minimal — BTTS is very unlikely. Over 2.5 goals is highly probable driven almost entirely by Brazil's output. The question is not IF Brazil score heavily, but how many.",
+      "market_read": "The Brazil win market is correctly priced at near-certainty and offers little standalone value. Over 2.5 goals is the cleaner value play given Brazil's attacking firepower against a porous Haiti defence — the under here is clearly wrong. Brazil (-1.5) Asian handicap is where the genuine footballing case is strongest: the gap in quality between a top-5 world nation and a first-time qualifier is enormous, and Brazil should win by 3+ goals with a full attacking lineup. The draw market at 15.5 (Betfair) is a statistical curiosity only — there is no footballing basis for a draw, and the book fair of 8.2% is already generous to that outcome.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-2",
+          "confidence": "high",
+          "reasoning": "Brazil possess a world-class attacking unit — Vinicius Jr, Raphinha, Martinelli, Cunha — against a Haiti squad drawn from USL, lower French, and second-tier European football. The class gap is so extreme that a 3+ goal Brazil victory is the most logical footballing outcome, not a marginal win.",
+          "strength": "strong"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "high",
+          "reasoning": "Brazil have both the quality and motivation to rack up goals against the weakest defensive unit in the tournament, with Haiti entirely unable to threaten at the other end — this makes a 3-0 or 4-0 scoreline more likely than a tight game finishing 1-0 or 2-0.",
+          "strength": "strong"
+        },
+        {
+          "market": "h2h",
+          "outcome": "home_win",
+          "confidence": "high",
+          "reasoning": "While the Brazil win offers little price value, it is included as a core anchor: there is simply no footballing scenario in which Haiti — a first-time World Cup qualifier with a squad of Championship-level and lower players — defeats or draws with a Brazil side featuring Real Madrid, Barcelona, Arsenal, and Newcastle starters.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Brazil (-2) Asian handicap: the quality chasm between a top-three global football nation and a first-time World Cup qualifier is as wide as it gets, and Brazil's attack — led by Vinicius Jr, Raphinha, and Martinelli even without Rodrygo and Estevao — should comfortably deliver a 3+ goal winning margin. Pair this with Over 2.5 goals as a lower-risk expression of the same footballing truth, since goals will come through Brazil almost entirely. Ignore the draw price signal entirely — the 15.5 Betfair price is statistically interesting but has zero footballing basis.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Neymar's fitness status is the most important unknown — if he is fit and starts, Brazil's creativity and set-piece threat increases further; if absent, Brazil remain strong but lose a creative focal point. Brazil's exact match-day lineup and tactical approach under their current manager (rotation vs full-strength given this is Group Stage Game 1) is also uncertain and could influence the handicap margin.",
+      "conditions": {
+        "city": "Philadelphia",
+        "stadium": "Lincoln Financial Field",
+        "has_roof": false,
+        "altitude_m": 12.0,
+        "local_kickoff": "21:00 EDT (Friday)",
+        "avg_high_c": 26,
+        "feels_like_c": 24,
+        "humidity_pct": 50,
+        "precip_prob_pct": 30,
+        "wind_max_kmh": 27,
+        "notes": "Lincoln Financial Field, Philadelphia",
+        "source": "forecast",
+        "days_out": 11
+      },
+      "cached_at": 1780948193
+    },
+    "cached_at": 1780948193,
+    "label": "Brazil vs Haiti"
+  },
+  "3e1e6e1c4338f916b43cdd06915c595c": {
+    "intel": {
+      "home_form": "Spain arrive as one of the world's elite sides, reigning European champions with a fluid, possession-dominant system built around Barcelona and Atlético talent. Their squad depth across midfield and attack is exceptional, with Lamine Yamal, Pedri, Fabián Ruiz, and Dani Olmo offering world-class quality across the front third.",
+      "away_form": "Cape Verde are a competitive AFCON-level side who qualified impressively through African qualifying but represent a vast step up in quality at a World Cup. Their squad is largely drawn from lower European leagues (Portugal, Cyprus, Bulgaria, Romania) with no truly elite-level players, and their best asset is defensive organisation and set-piece threat.",
+      "key_absences": "Spain: Fermín López (metatarsal fracture, confirmed out of tournament). Mikel Merino (stress fracture, included in squad but fitness doubtful — indicative). Lamine Yamal (expected fit for this opener but missed warm-up vs Iraq — monitor). Cape Verde: No significant absences reported.",
+      "conditions_impact": "Mercedes-Benz Stadium is roofed and climate-controlled, so heat and humidity are eliminated entirely — this removes any acclimatisation advantage Cape Verde might have theoretically gained as an African side. A midday EDT kick-off has no meaningful bearing inside a closed dome. Neutral conditions favour the higher-quality side, which is Spain unambiguously.",
+      "tactical_matchup": "Spain will dominate possession with their high press and short-passing triangles; Cape Verde will sit in a deep defensive block in a low-mid 4-4-2 or 5-4-1 shape, looking to frustrate and hit on the counter. This matchup heavily favours Spain — the quality gap is enormous and Cape Verde will be under sustained pressure for 90 minutes — but compact defending against possession sides can suppress margin of victory.",
+      "goals_assessment": "Spain should create a high volume of chances against a Cape Verde side unlikely to threaten consistently at the other end. Expect Spain to score 2-3 goals; Cape Verde scoring is unlikely given Spain's defensive solidity with Cubarsí, Laporte, and Grimaldo. Over 1.5 goals looks near-certain, over 2.5 is strongly supported by the quality gap, and BTTS is unlikely — Spain keep sheets regularly and Cape Verde's attacking pool (Benchimol, Livramento, Ryan) is modest.",
+      "market_read": "Spain to win is a near-certainty and correctly priced short. The draw is genuinely mispriced — bookmaker fair value at 8.8% vs Kalshi at 6.5% suggests books are slightly inflating draw probability, but 14.0 on Betfair is a dramatic overstatement; the football logic does not support a draw. Cape Verde win at 30/1 has no meaningful football case. Over 2.5 goals is the strongest value play in the goals market given Spain's attacking firepower and Cape Verde's defensive limitations at this level. Spain (-1.5) Asian handicap offers the best risk/reward in the spreads market — Spain should win by 2+ given the class gap, but going to (-2) introduces unnecessary risk against a potentially stubborn defensive block.",
+      "recommended_bets": [
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "high",
+          "reasoning": "Spain possess one of the world's most potent attacking units — Yamal, Olmo, Williams Jr, Ferran Torres, Oyarzabal — against a Cape Verde side drawn from mid-to-lower European leagues who will concede space on transitions. Spain scored freely in Euro 2024 qualifying and the final stages, and this is a significant quality mismatch that should produce 3+ Spain goals.",
+          "strength": "strong"
+        },
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "medium",
+          "reasoning": "Spain (-1.5) requires only a two-goal winning margin, which is entirely plausible given the enormous talent differential — Spain's front line alone outclasses Cape Verde's entire squad. While Cape Verde may defend deeply for spells, the sustained pressure from Spain's possession game over 90 minutes should produce the necessary cushion.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "under_1.5",
+          "confidence": "low",
+          "reasoning": "This is deliberately included as a counter-check bet to reject — there is no football logic supporting under 1.5 goals given Spain's attacking depth. Included only to flag that the under markets hold no value here.",
+          "strength": "lean"
+        }
+      ],
+      "overall_summary": "The single best bet is Over 2.5 Goals: Spain's world-class attacking unit faces a Cape Verde defence drawn almost entirely from mid-tier European football, and the quality gap demands Spain score 3+ on the day — this is a structured, logic-led selection rather than a price chase. Spain (-1.5) Asian handicap is a sound secondary play for those wanting directional exposure with a margin requirement that reflects the realistic winning margin. Avoid the draw and Cape Verde win entirely — the Betfair price on the draw at 14.0 is eye-catching but there is no credible footballing route to that outcome.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Lamine Yamal's match fitness for this specific game is unconfirmed — he missed the Iraq warm-up and if he is absent or restricted to limited minutes, Spain's right-side creative threat is meaningfully reduced. Additionally, we have no visibility on Cape Verde's tactical preparation or pre-tournament form results, and Mikel Merino's true fitness status (despite squad inclusion) could affect Spain's midfield balance.",
+      "conditions": {
+        "city": "Atlanta",
+        "stadium": "Mercedes-Benz Stadium",
+        "has_roof": true,
+        "altitude_m": 320.0,
+        "local_kickoff": "12:00 EDT (Monday)",
+        "avg_high_c": 26,
+        "feels_like_c": 26,
+        "humidity_pct": null,
+        "precip_prob_pct": null,
+        "wind_max_kmh": null,
+        "notes": "Mercedes-Benz Stadium, Atlanta — roofed / climate-controlled",
+        "source": "controlled",
+        "days_out": null
+      },
+      "cached_at": 1780948262
+    },
+    "cached_at": 1780948262,
+    "label": "Spain vs Cape Verde"
+  },
+  "f59d197e66fe7713c129709740e726c9": {
+    "intel": {
+      "home_form": "Ecuador qualified for WC2026 from CONMEBOL with a squad featuring genuine European pedigree — Moises Caicedo (Chelsea), Piero Hincapie (Arsenal), Pervis Estupiñán (AC Milan), and Enner Valencia as experienced striker cover. They are a cohesive, well-drilled CONMEBOL side accustomed to high-pressure knockout football and physically demanding conditions.",
+      "away_form": "Curaçao are making their historic first World Cup appearance under Dick Advocaat, a squad predominantly drawn from lower Dutch and Turkish leagues with a few Championship-level players (Tahith Chong at Sheffield United, Juninho Bacuna). This is a significant step up in class from their CONCACAF qualifying campaign and they have never faced a team of Ecuador's calibre at this stage.",
+      "key_absences": "None known for either side. Moises Caicedo was rested as a precaution in a recent friendly but no confirmed absence reported.",
+      "conditions_impact": "A 19:00 CDT kick-off in Kansas City at 26°C with 90% humidity is genuinely demanding — but Ecuador's CONMEBOL players are accustomed to altitude and heat (Quito, Guayaquil conditions), while several Curaçao players are based in the Netherlands and may struggle more with the humidity. The heat marginally favours Ecuador's fitness base and their ability to maintain intensity across 90 minutes. Neither side benefits enormously but the edge goes to Ecuador.",
+      "tactical_matchup": "Ecuador will likely press high with Caicedo and Paez controlling midfield and Hincapie/Pacho forming a commanding centre-back pairing — their European club experience means they are well-organised and disciplined in structure. Curaçao will almost certainly sit deep in a low block to be compact, which limits Ecuador's space but does not neutralise their quality differential — Curaçao's attack lacks the pace and creativity to exploit Ecuador on the counter at this level.",
+      "goals_assessment": "Expect Ecuador to dominate possession and territory but face a disciplined low block. A scoreline of 2-0 or 3-0 is most probable — Ecuador have the quality to break down a limited defence over 90 minutes, especially with Caicedo driving from deep and Valencia/Plata providing width. Over 2.5 is the correct call: Ecuador should score 2-3, Curaçao scoring is unlikely (BTTS no is the lean). Under 1.5 is a poor bet; over 1.5 is near-certain.",
+      "market_read": "Ecuador win is correctly priced as a near-certainty — there is no value in the straight h2h win alone unless bundled with handicap. The draw price of 7.6 (Betfair) looks tempting by number but there is minimal footballing logic supporting a draw — the gap in quality is too large. Curaçao win at 17.0 is a novelty price with almost no genuine footballing basis. The real value market is the Asian handicap: Ecuador (-1.5) is the correct footballing outcome (2+ goal win expected) and offers better return than a flat Ecuador win. Over 2.5 goals is the cleanest standalone bet given Ecuador's attacking depth and Curaçao's defensive limitations at this level.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "high",
+          "reasoning": "Ecuador possess a squad of CONMEBOL-tested European club players facing a first-time World Cup side from lower Dutch and Turkish leagues — the quality gap strongly supports a 2+ goal winning margin. A structured Ecuador side with Caicedo, Hincapie, Pacho and multiple attacking options should comfortably exceed a one-goal win against a Curaçao side that will sit deep but lacks the quality to hold out for 90 minutes.",
+          "strength": "strong"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "medium",
+          "reasoning": "Ecuador's attacking options — including Plata, Angulo, Yeboah Zamora and Enner Valencia — provide enough variety and quality to breach a Curaçao low block multiple times over the course of a full match. Even if Curaçao are unlikely to score, Ecuador reaching 3 goals is a realistic expectation given the class differential, making over 2.5 a logical companion to the handicap bet.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Ecuador (-1.5) Asian handicap: the squad quality differential between a CONMEBOL side full of European club players and a historic first-time World Cup debutant from lower leagues makes a 2+ goal winning margin the most footballing-logical outcome, not just a plausible one. Over 2.5 goals provides a cleaner, lower-risk complement — Ecuador's attacking depth should deliver goals, and Curaçao will not keep this clean. Avoid the draw at 7.6 despite the price signal: there is no credible footballing scenario where Curaçao hold Ecuador in a World Cup group stage match.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "No confirmed team news beyond Caicedo being rested in a recent friendly — starting XI selections, tactical setup under Ecuador's coach, and whether Dick Advocaat deploys an ultra-defensive shape or attempts to play are unknown. Curaçao's actual defensive solidity at this level is untested against CONMEBOL opposition, which is the main uncertainty around the handicap line.",
+      "conditions": {
+        "city": "Kansas City",
+        "stadium": "GEHA Field at Arrowhead Stadium",
+        "has_roof": false,
+        "altitude_m": 274.0,
+        "local_kickoff": "19:00 CDT (Saturday)",
+        "avg_high_c": 26,
+        "feels_like_c": 29,
+        "humidity_pct": 90,
+        "precip_prob_pct": 23,
+        "wind_max_kmh": 22,
+        "notes": "GEHA Field at Arrowhead Stadium, Kansas City",
+        "source": "forecast",
+        "days_out": 12
+      },
+      "cached_at": 1780948367
+    },
+    "cached_at": 1780948367,
+    "label": "Ecuador vs Curaçao"
+  },
+  "87d970ffc0ece79a2a0a944c579b1cde": {
+    "intel": {
+      "home_form": "Uzbekistan qualified for their first-ever World Cup through Asian qualifying, showing resilience and defensive organisation particularly against lower-ranked Asian sides. Their squad is predominantly domestically-based with a few players in Iran and the UAE, limiting their exposure to top-level international football, and their attacking output against elite opposition remains untested.",
+      "away_form": "Colombia arrive with one of CONMEBOL's most talented squads, featuring elite European club players in Luis Diaz (Bayern Munich), Luis Diaz, and a deep midfield including James Rodriguez and Richard Rios. They finished strongly in CONMEBOL qualifying and carry genuine attacking pedigree across all positions.",
+      "key_absences": "None known for either side. Uzbekistan have one unnamed player with sharpness concerns due to injury-curtailed minutes but no confirmed absences. Colombia squad is fully available.",
+      "conditions_impact": "The 2240m altitude at Azteca is a genuine leveller — but Colombia, as a CONMEBOL nation that regularly plays qualifying matches at altitude (including in Bolivia at 3600m), are demonstrably better adapted to thin air than Uzbekistan, whose players are based predominantly at sea level in Central Asia and Iran. The 77% rain probability and 26°C feels-like temperature compound Uzbekistan's disadvantage. Colombia benefit clearly on both counts. The 20:00 local kick-off avoids peak daytime heat, slightly reducing the physical burden, but altitude fatigue across 90 minutes will still hurt Uzbekistan more.",
+      "tactical_matchup": "Uzbekistan are likely to set up compactly and defend deep, relying on transitions through Shomurodov and Fayzullaev — a strategy that works against Asian sides but is routinely dismantled by CONMEBOL-quality combinations. Colombia's width through Luis Diaz, Daniel Munoz, and Johan Mojica, combined with the creative interplay of James and Carrascal, should consistently unlock a defensive block that hasn't faced this level of technical quality. This matchup strongly favours Colombia.",
+      "goals_assessment": "Expect Colombia to score 2-3 goals; Uzbekistan finding the net against a solid Colombian defence is possible but not probable. The altitude and rain actually suppress total goal volume somewhat — heavy legs and a heavier ball reduce clinical finishing rates — but Colombia's quality advantage is large enough to override that suppression on their end. Over 2.5 is a reasonable call given Colombia's expected dominance, though not a certainty if Uzbekistan park the bus effectively. BTTS is unlikely — Colombia's defensive structure under their current setup is solid and Uzbekistan's attacking resources at this level are modest.",
+      "market_read": "Colombia win (h2h away_win) is correctly priced as a strong favourite and represents genuine value on the handicap at -1.5 or -2 given the quality gap. Uzbekistan win at ~9.8 is a price signal without footballing justification — avoid. Over 2.5 goals is reasonable but not certainty given potential Uzbekistan bus-parking. Under 2.5 is overpriced relative to Colombia's attacking talent. Colombia -1.5 Asian handicap (Uzbekistan +1.5 from the other side) is the market that best reflects the true footballing gap without needing a blowout.",
+      "recommended_bets": [
+        {
+          "market": "h2h",
+          "outcome": "away_win",
+          "confidence": "high",
+          "reasoning": "Colombia possess categorically superior squad quality — six players from elite European and South American clubs versus Uzbekistan's predominantly domestic roster — and are better adapted to the altitude conditions at Azteca. There is no realistic footballing scenario in which Uzbekistan outperform a fully-fit Colombia side in this fixture.",
+          "strength": "strong"
+        },
+        {
+          "market": "spreads",
+          "outcome": "away_+1.5",
+          "confidence": "medium",
+          "reasoning": "Colombia's combination of altitude acclimatisation advantage, vastly superior squad depth, and attacking width through Luis Diaz and the full-backs makes a winning margin of 2 or more goals the most probable outcome — Colombia +1.5 (from Uzbekistan's perspective) means backing Colombia to win by 2 or more, which aligns with the expected 2-3 goal Colombia victory. Even in a rain-affected, low-tempo game, the quality gap is too wide for Uzbekistan to stay within one goal.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "medium",
+          "reasoning": "Colombia's creative engine — James, Luis Diaz, Carrascal — generates enough chances against any organised defence to breach the 2.5 goal line, and Uzbekistan's limited attacking threat means the game is unlikely to become a dour stalemate where Colombia manage the game at 1-0. The main risk is Uzbekistan successfully parking 11 men behind the ball and Colombia being wasteful, but at this quality differential that is a low-probability outcome.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Colombia to win — the quality gap is simply too large at every position for Uzbekistan to compete, and Colombia's altitude experience gives them an additional structural edge at Azteca that Uzbekistan's Central Asian-based squad cannot replicate. For those seeking better value, Colombia on the -1.5 Asian handicap (i.e. away_+1.5 voided the other way) captures the most likely scoreline range of a 2-0 or 3-0 Colombia victory without requiring a cricket score. Over 2.5 goals is a supporting play given Colombia's attacking quality, though Uzbekistan's defensive organisation means it is the least certain of the three recommended bets.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "The most important unknown is Colombia's tactical setup and whether Néstor Lorenzo rotates key players (James, Luis Diaz) given this is an opening group match against a weaker side — any significant rotation would reduce the handicap edge. Additionally, Uzbekistan's tactical game plan is poorly scouted at this level; if they produce an exceptionally disciplined defensive performance as a debut World Cup side, the over 2.5 bet is vulnerable.",
+      "conditions": {
+        "city": "Mexico City",
+        "stadium": "Estadio Azteca",
+        "has_roof": false,
+        "altitude_m": 2240.0,
+        "local_kickoff": "20:00 CST (Wednesday)",
+        "avg_high_c": 23,
+        "feels_like_c": 26,
+        "humidity_pct": 77,
+        "precip_prob_pct": 82,
+        "wind_max_kmh": 7,
+        "notes": "Estadio Azteca, Mexico City",
+        "source": "forecast",
+        "days_out": 9
+      },
+      "cached_at": 1780948522
+    },
+    "cached_at": 1780948522,
+    "label": "Uzbekistan vs Colombia"
+  },
+  "e5b72fe5de609770441460c5b3ccd2b5": {
+    "intel": {
+      "home_form": "Canada are a tournament host playing at BC Place in front of a partisan crowd, with Jonathan David (Juventus) leading a genuine attacking threat alongside Buchanan, Larin and Eustàquio providing quality in midfield. They qualified through CONCACAF comfortably and possess clear Premier League and European-level quality throughout the squad, making them substantial favourites on home soil.",
+      "away_form": "Qatar are the defending Asian champions but their squad is overwhelmingly domestic-based (Qatar Stars League), with key names such as Afif, Almoez Ali and Muntari their primary attacking outlets. Almoez Ali's fitness is a real concern after two surgeries and minimal match time in 2026, and the squad's overall level drops sharply against top-tier opposition outside of the Gulf.",
+      "key_absences": "Canada are missing Moïse Bombito (leg injury, ruled out of the tournament) and Marcelo Flores (ACL tear), while Alphonso Davies has not played since March 2025 after an ACL injury — his availability and match sharpness are serious doubts even if included in the squad. Qatar have no confirmed absences but Almoez Ali's fitness rhythm is compromised by two surgeries and barely two competitive appearances in 2026.",
+      "conditions_impact": "BC Place is roofed and climate-controlled so neither side gains a weather advantage; conditions are neutral and suit an open, fast-paced game. The afternoon local kick-off (15:00 PDT) is entirely routine and does not favour either side, though the home crowd atmosphere will tangibly benefit Canada.",
+      "tactical_matchup": "Canada will press high and look to exploit wide areas through Davies (fitness permitting), Buchanan and Larin, with Eustàquio dictating tempo — a style designed to suffocate teams with lower defensive quality. Qatar's domestic-based back line, which will face the likes of Jonathan David and a fluid Canadian attacking unit for the first time in a high-pressure World Cup setting, is likely to be overrun; Lopetegui's defensive organisation may mitigate damage but Qatar lack the quality to hurt Canada consistently.",
+      "goals_assessment": "Canada should control large portions of this game and create multiple chances; the question is whether they convert efficiently against an organised but limited Qatar defence. Expect Canada to score 2+ goals — BTTS is possible but Qatar's limited attacking threat (especially with Almoez Ali compromised) suggests a Canada-dominant scoreline rather than an open exchange. Over 1.5 goals is highly likely; over 2.5 is plausible but requires Canadian clinical efficiency, which has historically been inconsistent. Lean: over 1.5 comfortably, over 2.5 at moderate probability.",
+      "market_read": "The Canada win (home_-0.5) is well-priced and logical but short odds mean the handicap markets offer better value. Canada -1.5 (win by 2+) is the key question — footballing logic supports it given the gulf in quality, Davies' availability doubt and Bombito's absence introduce defensive uncertainty but don't affect Canada's attacking edge. The draw at 5.7 (Betfair) is theoretically offering a marginal book edge but the football reality — a home host nation with clearly superior players against a weakened Gulf state — makes the draw a genuinely poor football outcome to back despite the price signal. Under 2.5 is not recommended given Canada's attacking depth.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "medium",
+          "reasoning": "Canada's attacking quality — Jonathan David (Juventus), Buchanan, Larin — significantly outclasses a Qatar defensive unit composed entirely of domestic-league players, and playing in front of a home World Cup crowd at BC Place should amplify that advantage. Qatar's key striker Almoez Ali is severely undercooked for match fitness, reducing their counter-threat and making a 2+ goal Canadian victory the most logical footballing outcome.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_1.5",
+          "confidence": "high",
+          "reasoning": "Canada will generate sustained attacking pressure throughout this match and possess sufficient quality across the forward line to register at least two goals against a Qatar side whose domestic-level defenders have never faced this calibre of CONCACAF-host-level opposition in a World Cup arena. Even if Canada win narrowly, a single Qatar counter-attack goal alongside one Canadian goal clears this line — it is the most structurally sound total in the match.",
+          "strength": "strong"
+        }
+      ],
+      "overall_summary": "The single best bet is Canada -1.5 (win by 2+ goals): the gap in squad quality, playing environment, and Qatar's compromised striker fitness all point toward a comfortable Canadian victory at home, making the straight win market redundant when the handicap offers meaningful uplift. Back over 1.5 goals as a near-certainty given Canada's attacking depth and Qatar's inability to keep clean sheets against European-level opposition. Avoid the draw at 5.7 despite the book edge — the football simply does not support a draw as a likely outcome in this fixture.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Alphonso Davies' actual fitness and whether he starts is the single biggest unknown — if fully fit he transforms Canada's attacking width and decisively settles the -1.5 handicap argument; if absent or playing at 70%, Canada's left flank loses its most dangerous weapon. Qatar's tactical setup under Lopetegui (a highly experienced coach) could produce a defensive low-block that limits Canadian scoring chances, introducing more uncertainty around the -1.5 line than the raw quality gap implies.",
+      "conditions": {
+        "city": "Vancouver",
+        "stadium": "BC Place",
+        "has_roof": true,
+        "altitude_m": 2.0,
+        "local_kickoff": "15:00 PDT (Thursday)",
+        "avg_high_c": 16,
+        "feels_like_c": 16,
+        "humidity_pct": null,
+        "precip_prob_pct": null,
+        "wind_max_kmh": null,
+        "notes": "BC Place, Vancouver — roofed / climate-controlled",
+        "source": "controlled",
+        "days_out": null
+      },
+      "cached_at": 1780948592
+    },
+    "cached_at": 1780948592,
+    "label": "Canada vs Qatar"
+  },
+  "7e067ddcee01ff1b8628a1fedcf2b49f": {
+    "intel": {
+      "home_form": "Tunisia arrive at a first World Cup group stage in 2026 with a squad blending European-based quality (Skhiri, Mejbri, Khedira) and domestic depth, playing a disciplined, low-block style that suits tight defensive contests. Their recent AFCON qualifying record showed resilience and a tendency toward low-scoring outcomes, with few high-tempo attacking performances but consistent defensive structure.",
+      "away_form": "Japan are arguably the strongest Asian side at this tournament, with a deep European-based squad featuring Kubo, Doan, Kamada and Daizen Maeda, capable of pressing intensity and quick transitions. However, the absences of Mitoma and Minamino — two of their most dynamic forward options — meaningfully reduce their attacking threat and ability to unlock compact defences.",
+      "key_absences": "Japan: Kaoru Mitoma (hamstring, tournament-ending) and Takumi Minamino (ACL, tournament-ending) are both confirmed out — significant losses to Japan's attacking width and clinical finishing. Wataru Endo carries an ankle ligament concern that could limit his range and intensity. Tunisia: Hannibal Mejbri is a fitness doubt with a hamstring strain; his availability is genuinely uncertain and he is a key creative outlet.",
+      "conditions_impact": "A 04:00 UTC kick-off means 22:00 local CST — evening conditions in Monterrey in late June still carry 34°C heat and 66% humidity with a feels-like of 36°C. While this reduces the heat burden somewhat compared to a daytime kick-off, it still represents challenging conditions. Japan, as a nation accustomed to similar summer humidity, should not be entirely disadvantaged, but Tunisia's squad is predominantly based in temperate European leagues and may find pace and intensity harder to sustain. The conditions modestly favour a lower-tempo game and marginally benefit Tunisia's defensive approach over Japan's high-press.",
+      "tactical_matchup": "Japan's identity under Hajime Moriyasu is high-press, high-tempo transitional football that relies on width and movement — precisely the attributes blunted by Mitoma and Minamino's absence. Tunisia are likely to deploy a compact 4-3-3 or 4-5-1 mid-block, inviting pressure and looking to frustrate Japan before exploiting counter-attacks through Achouri or Saad, a matchup that structurally suits Tunisia's strengths.",
+      "goals_assessment": "This match has all the hallmarks of a low-scoring encounter: Tunisia's defensive discipline, Japan's weakened forward line, humid evening conditions reducing pressing intensity, and both teams likely cautious in their opening group game. Under 2.5 goals is strongly supported. BTTS is possible but not likely — Tunisia's defensive solidity and Japan's forward absentees make a clean sheet realistic for one side. Over 1.5 goals is plausible but not compelling enough to bet positively on.",
+      "market_read": "The match result market appears to have Japan as moderate favourites on squad quality grounds, but this underestimates Tunisia's structural strengths in this specific context (conditions, compact defence, Japan's absences). The draw is arguably the most natural footballing result and is likely underpriced relative to expectation. Under 2.5 goals is the clearest market edge — both teams' defensive tendencies, conditions, and Japan's attacking injuries all point the same direction. Tunisia win at 5.5 (Betfair) has marginal bookmaker edge but the +1.2% gap is slim and the outcome is far from certain.",
+      "recommended_bets": [
+        {
+          "market": "totals",
+          "outcome": "under_2.5",
+          "confidence": "high",
+          "reasoning": "Tunisia's defensive structure combined with Japan's significantly weakened attack (no Mitoma, no Minamino, Endo a fitness doubt) makes goals hard to come by. Late evening Monterrey humidity further suppresses tempo and pressing intensity, making high-scoring football unlikely.",
+          "strength": "strong"
+        },
+        {
+          "market": "h2h",
+          "outcome": "draw",
+          "confidence": "medium",
+          "reasoning": "Japan's squad quality is real but their attacking edge is blunted by key absences, while Tunisia's defensive organisation makes them hard to break down — particularly in an opening group game where both teams will prioritise avoiding defeat. A tight, cagey 0-0 or 1-1 is a highly plausible outcome that the market may undervalue relative to Japan win.",
+          "strength": "moderate"
+        },
+        {
+          "market": "spreads",
+          "outcome": "away_+1",
+          "confidence": "medium",
+          "reasoning": "Japan (+1) covers both a Japan win and a draw and only loses if Tunisia win by 2 or more goals — given Tunisia's limited attacking firepower and the likelihood of a tight match, this handicap line offers a reasonable safety net on a Japan team that retains enough quality to avoid a heavy defeat even without Mitoma and Minamino.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet here is Under 2.5 goals: Japan's attack is materially weakened by the absence of their two most dangerous forwards, Tunisia defend in a compact low block, and evening Monterrey heat suppresses the high-pressing football Japan need to create chances. As a complement, the draw at likely generous odds reflects the most natural footballing outcome given both teams' opening-game caution and the tactical balance. Avoid backing Tunisia to win outright at 5.5 — the price edge is too slim (just +1.2%) for the genuine uncertainty involved when Japan still carry Kubo, Doan and Kamada.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Mejbri's fitness status for Tunisia is unconfirmed and his inclusion or absence materially changes their attacking creativity. Endo's ankle condition is also unresolved — if he starts at less than full fitness, Japan's midfield engine is compromised further. Final team sheets closer to kick-off are essential before committing significant stakes.",
+      "conditions": {
+        "city": "Monterrey / Guadalupe",
+        "stadium": "Estadio BBVA",
+        "has_roof": false,
+        "altitude_m": 540.0,
+        "local_kickoff": "22:00 CST (Saturday)",
+        "avg_high_c": 34,
+        "feels_like_c": 36,
+        "humidity_pct": 66,
+        "precip_prob_pct": 52,
+        "wind_max_kmh": 20,
+        "notes": "Estadio BBVA, Monterrey / Guadalupe",
+        "source": "forecast",
+        "days_out": 12
+      },
+      "cached_at": 1780948628
+    },
+    "cached_at": 1780948628,
+    "label": "Tunisia vs Japan"
+  },
+  "77670d9fff08b2086109ec648206c1bf": {
+    "intel": {
+      "home_form": "Switzerland arrive at WC2026 as a well-organised, tactically disciplined European side with a settled spine — Kobel in goal, Akanji marshalling defence, Xhaka controlling midfield, and Vargas/Embolo providing attacking threat. They have consistently performed above expectations in major tournaments, grinding results through defensive solidity and clinical transitions.",
+      "away_form": "Canada qualified as CONCACAF hosts and carry genuine talent in Jonathan David (Juventus) and Alphonso Davies, but their preparation has been disrupted by significant injuries. Their squad lacks top-level European tournament experience at this stage, and their defensive unit has been undermined by key absences.",
+      "key_absences": "Canada: Moïse Bombito (leg injury, ruled out — projected starting CB), Marcelo Flores (ACL, ruled out), Alphonso Davies (ACL March 2025 — on squad but major fitness doubt, likely not at full capacity or absent). Switzerland: no significant absences reported — full-strength squad available.",
+      "conditions_impact": "BC Place is roofed and climate-controlled, eliminating any heat or humidity advantage for the Canadian side. The 12:00 PDT midday kick-off is neutral for both teams in terms of temperature. Switzerland, accustomed to high-pressure tournament football in controlled European venues, will not be disadvantaged by the environment. Canada's home crowd advantage exists but is offset by the neutral conditions removing any weather edge.",
+      "tactical_matchup": "Switzerland will likely sit in a compact 4-2-3-1 or 3-4-2-1, using Xhaka and Freuler to dominate the midfield zone and frustrate Canada's creative outlets. Canada's system relies heavily on wide dynamism (Davies, Buchanan) and David's movement, but with Davies doubtful/diminished and their CB pairing destabilised by Bombito's absence, Switzerland's structured press and disciplined backline should be able to nullify Canada's threat and exploit spaces on the counter through Vargas and Okafor.",
+      "goals_assessment": "This match profiles as a low-to-moderate scoring affair. Switzerland are not free-scoring but are efficient; Canada's defensive disruption makes them vulnerable to conceding but their attacking quality means they are not toothless. Expect Switzerland to create the better chances. A 1-0 or 2-0 Swiss win is the most likely scenario. Over 1.5 goals is highly probable given Canada's defensive frailty and Switzerland's attacking quality. Over 2.5 is possible but not the base case — Switzerland may manage the game conservatively once ahead. BTTS is uncertain: Canada will find it difficult to score against a full-strength Swiss defence, making BTTS unlikely.",
+      "market_read": "The h2h market at roughly 45% Swiss win probability feels slightly conservative given full Swiss squad vs. a depleted Canadian defence and a doubtful Davies. The draw price reflects the realistic scenario where Canada stay organised, but Canada's defensive holes make a Swiss win the most likely outcome. Goals markets: over 1.5 is strongly supported by Canada's CB vulnerability; over 2.5 is speculative. Asian handicap Switzerland (-1) or (-1.5) offers value if Canada's backline is as disrupted as injury reports suggest. Canada (+1.5) has no strong appeal given they are likely to concede.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1",
+          "confidence": "medium",
+          "reasoning": "Switzerland have a full-strength squad including their elite defensive and midfield core, while Canada are missing their best CB (Bombito) and have Davies severely doubted with an ACL — their two most impactful players in different positions. A Swiss side of this quality, structured under Yakin, should be capable of winning by at least two goals against a defensively unsettled Canadian team at a neutral venue.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_1.5",
+          "confidence": "high",
+          "reasoning": "Canada's CB pairing is makeshift without Bombito, and Switzerland have enough attacking quality across Vargas, Okafor, Embolo, and Amdouni to find the net. Jonathan David's threat at the other end means Canada will not sit entirely deep, keeping the game open enough for at least two goals across 90 minutes.",
+          "strength": "strong"
+        },
+        {
+          "market": "h2h",
+          "outcome": "home_win",
+          "confidence": "medium",
+          "reasoning": "Switzerland's superior squad depth, full fitness, and tournament experience relative to a Canada side missing their best centre-back and facing serious doubts over their most dangerous wide player gives the Swiss a clear footballing edge. The controlled BC Place environment removes the only potential Canadian advantage (home crowd weather factor), making a Swiss win the most logical base-case outcome.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Over 1.5 Goals: Canada's makeshift defence without Bombito is exposed to a clinical Swiss attack, and Jonathan David's quality guarantees Canada will probe forward too, keeping the match open. Switzerland Win is the next-best play given the injury asymmetry — Canada are missing arguably their two most important players in Bombito and Davies while Switzerland arrive at full strength. Swiss (-1) handicap is a credible third angle for those seeking better value than the straight win, though it carries more risk if Canada defend deep and grind out a 1-0 defeat.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Alphonso Davies' exact fitness status is the single biggest unknown — if he starts and plays near full capacity, Canada's attacking threat and defensive width increases substantially, potentially tightening the handicap market significantly. Additionally, Murat Yakin's exact formation choice and whether fringe attackers like Nodye or Amdouni get opportunities over a cautious lineup is unknown and affects the goals total ceiling.",
+      "conditions": {
+        "city": "Vancouver",
+        "stadium": "BC Place",
+        "has_roof": true,
+        "altitude_m": 2.0,
+        "local_kickoff": "12:00 PDT (Wednesday)",
+        "avg_high_c": 16,
+        "feels_like_c": 16,
+        "humidity_pct": null,
+        "precip_prob_pct": null,
+        "wind_max_kmh": null,
+        "notes": "BC Place, Vancouver — roofed / climate-controlled",
+        "source": "controlled",
+        "days_out": null
+      },
+      "cached_at": 1780948700
+    },
+    "cached_at": 1780948700,
+    "label": "Switzerland vs Canada"
+  },
+  "3e4469d81342429a2d4e4c15b57c9df8": {
+    "intel": {
+      "home_form": "Qatar, as host nation, carry the advantage of preparation and familiarity with the tournament environment, though their club football is entirely domestic (Qatar Stars League) and the quality gap versus European opposition is significant. Afif is their creative fulcrum and Almoez Ali is a goal threat but fitness concerns after two surgeries limit his reliability across a full tournament campaign.",
+      "away_form": "Switzerland arrive as a well-drilled, tactically coherent European side with quality across the pitch — Xhaka anchoring midfield, Akanji commanding at the back, and Embolo/Vargas providing attacking punch. They qualified comfortably and their squad depth, with players from Bundesliga, Serie A, and Premier League clubs, represents a significant step up in class from Qatar's domestic competition.",
+      "key_absences": "Qatar: Almoez Ali is a fitness doubt given two surgeries and minimal match time in 2026 — even if named in squad his sharpness is compromised. Switzerland: no significant injuries or suspensions reported.",
+      "conditions_impact": "A 35°C high with 12:00 PDT kick-off means near-peak heat; this is brutal midday football in California. Qatar train and play in Gulf heat year-round and are physiologically and mentally conditioned for this — this is arguably the closest thing to their home environment. Switzerland, playing in central European conditions, are likely to wilt physically in the second half, reducing their pressing intensity and line speed. Heat strongly favours Qatar and suppresses total goals.",
+      "tactical_matchup": "Qatar under Lopetegui will likely set up compactly and hit on the counter, exploiting Afif's pace and the channels behind Switzerland's high defensive line. Switzerland press high and play structured possession football, but in 35°C heat their pressing will deteriorate, and Qatar's counter-attacking setup becomes more dangerous as the match progresses.",
+      "goals_assessment": "The heat, Qatar's defensive discipline under Lopetegui, and Switzerland's likely energy depletion in the second half all point strongly to a low-scoring game. Expect a tight, attritional contest; under 2.5 goals is the clear call. BTTS is possible but not likely — Qatar will sit deep and absorb, making it difficult for either side to create multiple clear chances.",
+      "market_read": "Switzerland are rightly heavy favourites on pure quality grounds but the heat is a genuine X-factor that bookmakers may be underweighting. The draw is underpriced at 15.3% book fair given the conditions — a stalemate is a realistic outcome if Qatar sit deep and Switzerland tire. Under 2.5 goals aligns with both the tactical setup and the heat suppressing output. Qatar outright win at 7.4% book fair is too short for the football quality gap even accounting for conditions.",
+      "recommended_bets": [
+        {
+          "market": "totals",
+          "outcome": "under_2.5",
+          "confidence": "high",
+          "reasoning": "Midday 35°C heat in California directly reduces the intensity and pressing output of Switzerland, who rely on high-energy structured play; Qatar's Lopetegui-coached side will be compact and disciplined. Both tactical shape (Qatar sitting deep) and physical conditions (heat-induced fatigue reducing attacking incision) converge strongly on a low-scoring game.",
+          "strength": "strong"
+        },
+        {
+          "market": "h2h",
+          "outcome": "draw",
+          "confidence": "medium",
+          "reasoning": "Qatar are far better conditioned for 35°C midday football than Switzerland, and Lopetegui's compact defensive structure makes them hard to break down; a disciplined Qatar side holding a fatiguing Switzerland team to a stalemate is a genuinely plausible footballing outcome. The 15.3% book fair probability underestimates the heat factor — this price deserves serious consideration.",
+          "strength": "moderate"
+        },
+        {
+          "market": "spreads",
+          "outcome": "away_+1.5",
+          "confidence": "medium",
+          "reasoning": "Even if Switzerland win, doing so by two or more goals against a Lopetegui-organised Qatar side in brutal midday heat is a tall order — their energy to push for a second or third goal will be severely compromised by the conditions. Switzerland (+1.5) covers a draw, a Switzerland narrow win, and a Qatar win, offering solid insurance against the heat narrative without needing to back Qatar outright.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The standout bet is Under 2.5 Goals: midday 35°C heat, Qatar's defensive compactness under Lopetegui, and Switzerland's energy depletion in the second half all converge on a tight, low-scoring contest — this is the strongest play of the match. The Draw at its current price is also worth considering as a secondary angle, since Qatar are genuinely better equipped for these conditions and can frustrate a tiring Swiss side. Avoid backing Switzerland at short prices to win comfortably — the heat is a real leveller that makes covering Asian handicap lines the safer route if you want Swiss exposure.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Almoez Ali's precise fitness status and whether he starts is the biggest unknown — if fully fit he changes Qatar's attacking threat significantly. Also, Lopetegui's exact defensive/tactical setup at this tournament is unconfirmed; if he sets up more aggressively than expected, the low-scoring logic weakens. Switzerland's acclimatisation schedule and whether they have spent time heat-training in warm conditions prior to this fixture is unknown and could meaningfully affect the heat-impact assessment.",
+      "conditions": {
+        "city": "San Francisco Bay Area / Santa Clara",
+        "stadium": "Levi's Stadium",
+        "has_roof": false,
+        "altitude_m": 25.0,
+        "local_kickoff": "12:00 PDT (Saturday)",
+        "avg_high_c": 35,
+        "feels_like_c": 34,
+        "humidity_pct": 30,
+        "precip_prob_pct": 0,
+        "wind_max_kmh": 18,
+        "notes": "Levi's Stadium, San Francisco Bay Area / Santa Clara",
+        "source": "forecast",
+        "days_out": 5
+      },
+      "cached_at": 1780948900
+    },
+    "cached_at": 1780948900,
+    "label": "Qatar vs Switzerland"
+  },
+  "b6db49fb39ccc0bb43a74b9ac74e1656": {
+    "intel": {
+      "home_form": "Saudi Arabia showed flashes of quality in Asian qualification but remain reliant on domestically-based players from the Saudi Pro League, limiting their international exposure. Their attacking unit — led by Salem Al-Dawsari and Saleh Al-Shehri — has pace and directness, but consistency against top-tier opposition is questionable.",
+      "away_form": "Uruguay arrive with a world-class midfield spine in Valverde, Ugarte, and Bentancur, and a proven striker in Darwin Núñez, giving them genuine quality at this level. Bielsa's side conceded sparingly in CONMEBOL qualification but created chances in volume, suggesting a team capable of controlling games rather than chasing them.",
+      "key_absences": "Uruguay: Ronald Araujo (minor muscle injury, highly unlikely to start this game), José María Giménez (severe sprained ankle, major doubt — effectively rules out both first-choice centre-backs for this match). Saudi Arabia: Walid Al-Ahmad (knee injury, confirmed out).",
+      "conditions_impact": "A 38°C feels-like temperature with 53% humidity in Miami at 18:00 EDT is punishing. Saudi Arabia players train and compete year-round in similar Gulf conditions, giving them a meaningful physical edge in the final 20 minutes when fitness gaps widen. Uruguay — predominantly European-based players — will find the heat draining, slowing their press and reducing their ability to sustain high-tempo attacks, which is central to Bielsa's system.",
+      "tactical_matchup": "Bielsa demands relentless pressing and vertical play, but that system is metabolically expensive in extreme heat with both first-choice centre-backs unavailable — forcing inexperienced cover (Cáceres, Bueno) into action. Saudi Arabia's deeper, counter-attacking block suits these conditions perfectly; they can absorb pressure and exploit space behind an Uruguay defensive line that will be slower and less organised than normal.",
+      "goals_assessment": "The loss of both Araujo and Giménez is a structural problem for Uruguay and opens Saudi Arabia's pace on the counter, but the heat simultaneously suppresses overall scoring intensity. Expect a tight, low-scoring game — likely 1-0 or 1-1. Under 2.5 goals is the most logical total: conditions drain energy, Uruguay's defensive vulnerability is partially offset by their midfield quality controlling tempo, and Saudi Arabia are unlikely to press for multiple goals. BTTS is possible but not certain — Uruguay's depleted defence may concede but their own attack may be blunted by heat.",
+      "market_read": "The match result market has Uruguay as clear favourites despite their two key centre-backs being effectively absent and conditions strongly disfavouring European-based players — this appears to overestimate Uruguay's reliability in these specific circumstances. Under 2.5 goals is correctly identified as the lean by conditions alone but is further supported by defensive compactness on both sides and the energy drain on Uruguay's press. Uruguay (+1) Asian handicap offers Uruguay insurance on their quality differential while acknowledging Saudi Arabia's legitimate edge in conditions — this is the balanced play for those wanting Uruguay involvement without backing a potentially laboured win.",
+      "recommended_bets": [
+        {
+          "market": "totals",
+          "outcome": "under_2.5",
+          "confidence": "high",
+          "reasoning": "38°C feels-like heat and 53% humidity will suppress Uruguay's high-energy Bielsa press, reducing their ability to create volume chances in open play — exactly the system that generates goals. Saudi Arabia are set up to defend and counter, not to chase a high-scoring game, and both teams lack the conditions to sustain end-to-end football for 90 minutes.",
+          "strength": "strong"
+        },
+        {
+          "market": "h2h",
+          "outcome": "draw",
+          "confidence": "medium",
+          "reasoning": "Uruguay lose both Araujo and Giménez — their entire first-choice centre-back pairing — robbing them of the defensive platform Bielsa's aggressive system requires, while Saudi Arabia's heat acclimatisation and defensive counter-attacking style makes a competitive, tight game the most logical outcome. A 1-1 or 0-0 result is structurally plausible: Uruguay have enough quality in midfield to avoid defeat but not enough defensive cover or physical freshness to impose themselves for a win.",
+          "strength": "moderate"
+        },
+        {
+          "market": "spreads",
+          "outcome": "away_+1",
+          "confidence": "medium",
+          "reasoning": "Uruguay (+1) covers the scenario where Saudi Arabia snatch a narrow 1-0 win on the counter — the single most realistic threat given conditions and the absence of Araujo/Giménez — while still paying out on a draw or Uruguay win. This gives Uruguay insurance on the one credible losing margin while not requiring faith in a comfortable Uruguay victory that their depleted defence and exhausted press cannot guarantee in these conditions.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Under 2.5 goals: the combination of extreme Miami heat draining Uruguay's pressing engine, Saudi Arabia's conservative counter-attacking block, and both teams operating below peak output structurally points to a low-scoring affair regardless of quality differential. Layering the draw as a second bet makes sense given Uruguay's defensive crisis — both Araujo and Giménez are out, which removes the backbone of Bielsa's system and makes a comfortable Uruguay win unlikely. For those wanting coverage, Uruguay (+1) Asian handicap provides sensible protection if Saudi Arabia nick a single-goal win on the break, which is the main risk to a straight draw or Uruguay win position.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "The Araujo and Giménez injury statuses are the pivotal unknowns — if either recovers in time to start (especially Giménez), Uruguay's defensive structure is significantly restored and the draw/Saudi threat reduces materially. Additionally, exact bookmaker prices for the draw and under 2.5 goals are not provided, so value confirmation depends on obtaining current market odds before placing.",
+      "conditions": {
+        "city": "Miami Gardens",
+        "stadium": "Hard Rock Stadium",
+        "has_roof": false,
+        "altitude_m": 2.0,
+        "local_kickoff": "18:00 EDT (Monday)",
+        "avg_high_c": 35,
+        "feels_like_c": 38,
+        "humidity_pct": 53,
+        "precip_prob_pct": 64,
+        "wind_max_kmh": 22,
+        "notes": "Hard Rock Stadium, Miami Gardens",
+        "source": "forecast",
+        "days_out": 7
+      },
+      "cached_at": 1780948934
+    },
+    "cached_at": 1780948934,
+    "label": "Saudi Arabia vs Uruguay"
+  },
+  "a35442ca96abc13371c3e87194d171a7": {
+    "intel": {
+      "home_form": "Germany arrive at the 2026 World Cup as one of Europe's strongest sides, with Wirtz, Musiala and Havertz forming a devastating attacking trio capable of dismantling most defences at international level. Their pressing-intensive system under Nagelsmann has produced consistent results, and the squad depth across all positions is among the best in the tournament.",
+      "away_form": "Ivory Coast qualified for the World Cup but their squad represents a significant step down in quality from their AFCON-winning peak years, with key creative roles now filled by players from mid-table European clubs and the Saudi Pro League. Their attacking options are pacy and dangerous on the counter — Amad, Adingra and Bonny give them a real threat in transition — but they lack the quality to sustain pressure against elite opposition.",
+      "key_absences": "Germany lose Lennart Karl (thigh, muscle tear) but he was a fringe squad player and replacement Ouédraogo is an able cover — impact is minimal. Ivory Coast lost Clément Akpa to injury pre-tournament, replaced by Opéri. No senior first-team starters are confirmed absent for either side.",
+      "conditions_impact": "BMO Field in Toronto at 16:00 EDT in late June at 19°C with 70% humidity is comfortable rather than extreme — neither team faces a significant physiological disadvantage. The mild temperature and potential 35% rain chance if light actually slightly favours Germany's high-tempo pressing game, as the slippery surface can disrupt a more physically-oriented Ivory Coast midfield. No altitude factor. Germany benefit marginally.",
+      "tactical_matchup": "Germany's high-press, positional-play system will look to dominate possession and pin Ivory Coast back, where Sangare and Kessie's physicality matters less and Fofana's declining legs at 31 will be exposed by Wirtz and Musiala in tight spaces. Ivory Coast will look to defend compactly and use the pace of Amad and Adingra on the counter, but Germany's defensive line — Rüdiger, Anton, Tah — is experienced enough to manage the transition threat; this matchup strongly favours Germany.",
+      "goals_assessment": "Germany should generate 2-4 expected goals against Ivory Coast's defensively modest setup, with Havertz as a physical focal point and Wirtz/Musiala creating constantly. Ivory Coast will create at least one genuine chance on the break given their pace up front, making BTTS a realistic possibility but not a certainty — their finishing quality is inconsistent. Over 2.5 goals is the stronger call: Germany alone should contribute 2+ and Ivory Coast's counter-threat adds to the total probability.",
+      "market_read": "Germany win is correctly priced as a strong favourite — no value there in the 1X2 unless the handicap is used. The draw at 4.7 (Betfair) is only marginally above fair value (+1.3% edge per the model) and does not represent compelling value given how poorly the football logic supports it — Germany should be winning this game comfortably. Germany (-1.5) Asian handicap is the market that correctly reflects the class gap: Germany should win by 2+ goals against this Ivory Coast side, and the price on that line typically offers reasonable expected value. Over 2.5 goals aligns with Germany's attacking output expectation even if Ivory Coast stay compact in the first half.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "medium",
+          "reasoning": "The quality gap between Germany's attacking trio of Wirtz, Musiala and Havertz and Ivory Coast's midfield-heavy defence is substantial enough that a 2-goal winning margin is a realistic base case, not a stretch. Ivory Coast lack the defensive organisation and squad depth at this level to prevent Germany from scoring multiple, and their best hope — the counter-attack — is unlikely to be enough to keep the scoreline close.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "medium",
+          "reasoning": "Germany's attacking system under Nagelsmann generates high shot volumes and xG against compact defences, and Ivory Coast's midfield (an ageing Kessie, declining Seri) will struggle to press and protect effectively in a 90-minute World Cup context. Even if Ivory Coast keep it tight early, Germany's quality in the final third means the game is likely to open up past the 60-minute mark and produce 3+ goals in total.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Germany (-1.5) Asian handicap: the class gap between Germany's world-class attacking midfield trio and Ivory Coast's ageing, lower-tier central midfield is the defining matchup, and a 2+ goal German win is a realistic expectation rather than a speculative punt. Over 2.5 goals supports this narrative and can be played alongside it as a correlated reinforcement. The draw has minimal footballing logic despite marginal model edge — avoid it here.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Exact tactical setup and starting XI selections are unknown — if Nagelsmann opts for a conservative first-game approach or rotates key attackers (Wirtz, Musiala), the handicap case weakens. Ivory Coast's true defensive shape and any late injury news to their first-choice centre-back pairing (Diomande, Kossounou) are also unknowns that could tighten the expected scoreline.",
+      "conditions": {
+        "city": "Toronto",
+        "stadium": "BMO Field",
+        "has_roof": false,
+        "altitude_m": 76.0,
+        "local_kickoff": "16:00 EDT (Saturday)",
+        "avg_high_c": 19,
+        "feels_like_c": 18,
+        "humidity_pct": 70,
+        "precip_prob_pct": 35,
+        "wind_max_kmh": 21,
+        "notes": "BMO Field, Toronto",
+        "source": "forecast",
+        "days_out": 12
+      },
+      "cached_at": 1780949453
+    },
+    "cached_at": 1780949453,
+    "label": "Germany vs Ivory Coast"
+  },
+  "d5b187a586cc913f9ebd609b02e15232": {
+    "intel": {
+      "home_form": "Portugal arrive at this World Cup as one of Europe's most technically gifted squads, with a forward line featuring Ronaldo, Rafa Leão, Gonçalo Ramos, and João Félix capable of dismantling any defence in the world. Their qualifying campaign was dominant, and with Bruno Fernandes pulling strings in midfield alongside Bernardo Silva and João Neves, Portugal regularly produce multi-goal performances against technically inferior opponents.",
+      "away_form": "DR Congo qualified impressively through AFCON and CAF World Cup qualifying, with Wissa, Banza, and Bakambu providing genuine threat up front, but their squad depth is drawn largely from mid-table European clubs and outside the top five leagues. They are a well-organised, physically competitive unit but have limited experience at this level of tournament football and will face a severe quality gap against Portugal.",
+      "key_absences": "No confirmed absences for Portugal — Rafa Leão's red card in a friendly does not carry over to World Cup fixtures and he is available. No significant injury or suspension news for DR Congo either, though intelligence on the Congolese squad is limited.",
+      "conditions_impact": "NRG Stadium is fully roofed and climate-controlled, eliminating the Houston heat and humidity as a factor — this removes any potential African adaptation advantage DR Congo might have hoped for in outdoor conditions. The 12:00 CDT midday kick-off is neutralised by the indoor environment, meaning neither team is significantly impacted by external conditions.",
+      "tactical_matchup": "Portugal will likely dominate possession with their high-quality midfield trio and press high up the pitch, while DR Congo will sit in a compact defensive shape and look to threaten on the counter through the pace of Wissa and Elia. The mismatch in individual quality and Portugal's ability to break down deep defences — particularly through wide runners Leão and Conceição — strongly favours the Europeans.",
+      "goals_assessment": "Portugal should generate a high volume of chances against a DR Congo side that will be defensively stretched by the quality and movement ahead of them. Expecting 3+ goals in the match is realistic — Portugal alone are likely to score 2 or 3 — but BTTS is uncertain because DR Congo may find it difficult to penetrate a Rúben Dias-led Portugal defence with any consistency. Over 2.5 goals is the comfortable call, driven by Portuguese attacking quality rather than a genuinely open game.",
+      "market_read": "The Portugal win market is correctly priced as a heavy favourite and offers little standalone value. The DR Congo win price reflects genuine statistical long-shot status — the bookmaker edge signal of +1.3% is marginal and not supported by football logic. The draw also has negligible football support given the quality gap. The real value lies in the handicap and totals markets: Portugal (-1.5) aligns with the expected margin given their attacking firepower versus DR Congo's limited pedigree, and over 2.5 goals is well-supported by Portugal's attacking output. The DR Congo +1.5 handicap is a structural consideration but only worth looking at defensively, and the football logic does not strongly support it when Portugal's depth and quality are factored in.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "medium",
+          "reasoning": "Portugal possess one of the most technically complete attacking units in the tournament — Gonçalo Ramos, Leão, João Félix, and Ronaldo provide multiple routes to goal against a DR Congo defence built largely from players in mid-table European football or lower. Against an opponent of this quality gap, in a controlled indoor environment that removes any heat disadvantage, a two-goal winning margin is a reasonable baseline expectation rather than an optimistic one.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "high",
+          "reasoning": "Portugal have the individual and collective attacking quality to score 2-3 goals alone, and DR Congo — despite being defensively organised — will be exposed by Portugal's movement, width, and set-piece threat over 90 minutes. Even if DR Congo keep it tight early, Portugal's squad depth and tactical flexibility under Roberto Martínez means they can shift the game as needed, making 3+ total goals highly probable.",
+          "strength": "strong"
+        }
+      ],
+      "overall_summary": "The single best bet here is Over 2.5 Goals — Portugal's attacking depth and quality virtually guarantees they reach two or three goals alone against a side of DR Congo's standing, and the indoor climate-controlled venue removes any conditions-based excuse for a low-scoring affair. Supporting this with Portugal (-1.5) on the Asian handicap adds genuine conviction that the margin, not just the result, will reflect the true quality gap. Avoid the DR Congo win or draw markets despite any price signal — the football logic simply does not support backing those outcomes when Portugal have a fully fit, elite squad.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "DR Congo squad intelligence is thin — their tactical setup, fitness levels entering the tournament, and any late injury news are largely unknown, and a more disciplined or well-drilled defensive unit than expected could keep the margin tighter than anticipated and threaten the -1.5 handicap specifically.",
+      "conditions": {
+        "city": "Houston",
+        "stadium": "NRG Stadium",
+        "has_roof": true,
+        "altitude_m": 15.0,
+        "local_kickoff": "12:00 CDT (Wednesday)",
+        "avg_high_c": 28,
+        "feels_like_c": 28,
+        "humidity_pct": null,
+        "precip_prob_pct": null,
+        "wind_max_kmh": null,
+        "notes": "NRG Stadium, Houston — roofed / climate-controlled",
+        "source": "controlled",
+        "days_out": null
+      },
+      "cached_at": 1780949485
+    },
+    "cached_at": 1780949485,
+    "label": "Portugal vs DR Congo"
+  },
+  "95b9d9f74f609de554a271415ed9f38f": {
+    "intel": {
+      "home_form": "Colombia arrive at this World Cup as one of CONMEBOL's most cohesive units, having qualified comfortably with an attack built around Luis Díaz (Bayern Munich), James Rodríguez, and a creative midfield that averaged over 2 goals per game in qualifying. They are organised under a settled system with no significant injury concerns, giving Néstor Lorenzo a full complement of quality to select from.",
+      "away_form": "DR Congo qualified through CAF as one of Africa's better-organised sides, with a squad largely based in European leagues, but the quality gap between CONMEBOL and CAF competition is significant. Their best attacking threat comes from Wissa (Newcastle) and Banza, but their squad lacks the creative depth and high-altitude or high-pressure tournament experience to trouble a side of Colombia's calibre.",
+      "key_absences": "None known for either side. Both squads appear fully fit and available.",
+      "conditions_impact": "The 1566m altitude at Estadio Akron in Guadalajara meaningfully favours Colombia, who are acclimatised through CONMEBOL qualifying at altitude (Bogotá sits at 2600m — Colombian players are altitude-adapted). DR Congo, predominantly European-based, have minimal altitude exposure and will experience respiratory fatigue particularly in the second half. The 29°C heat with 68% humidity further compounds this, and the 85% rain chance could produce a heavy pitch that suits Colombia's technical, possession-based style. These conditions are a genuine physical disadvantage for DR Congo.",
+      "tactical_matchup": "Colombia press high and play through midfield with James and Ríos pulling strings, while Luis Díaz offers explosive wide attacking play that will expose DR Congo's full-backs Wan Bissaka and Masuaku in transitions. DR Congo tend to be organised defensively in a compact mid-block, but Colombia's movement and quality in the final third — combined with altitude-induced fatigue — means the Leopards are unlikely to hold a clean sheet for the full 90 minutes. This matchup heavily favours Colombia.",
+      "goals_assessment": "Expect Colombia to score at least twice, with DR Congo unlikely to offer sustained attacking threat at altitude. The over 2.5 line is well-supported: Colombia's attacking firepower (Díaz, James, Suárez, Hernández all available) against an altitude-fatigued DR Congo defence points to a multi-goal Colombian performance. BTTS is less convincing — DR Congo may grab a goal from a set piece or counter, but a Colombian clean sheet is also plausible. Over 2.5 is the cleaner call, with the handicap line offering additional value.",
+      "market_read": "The match result market should be heavily skewed toward Colombia — DR Congo at 8.6 (Betfair) is still not value given the conditions, altitude disadvantage, and quality gap; the book's implied 12.8% for DR Congo is already generous and the real probability is likely below 8%. Colombia (-1.5) Asian handicap is the sharpest market: this team has the quality and the conditions to win by 2+ goals against an altitude-hampered African side with limited tournament pedigree. Over 2.5 goals is independently supported by Colombia's attacking depth and DR Congo's likely second-half defensive disintegration at altitude.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "medium",
+          "reasoning": "Colombia have the altitude advantage, a fully fit squad featuring Luis Díaz, James Rodríguez, and multiple clinical forwards, against a DR Congo side that will be physically compromised by 1566m altitude from roughly the 60th minute onwards. Winning by 2 or more goals is a realistic and well-supported outcome given the quality differential, conditions, and Colombia's attacking depth.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "medium",
+          "reasoning": "Colombia's attack is too talented and varied for an altitude-fatigued DR Congo defence to contain for a full 90 minutes, and the conditions (heavy potential rain, fatigue setting in for DR Congo) point to the game opening up in the second half. With Díaz, Suárez, James, and Hernández all available, Colombia alone are likely to exceed 2.5 goals without needing DR Congo to contribute.",
+          "strength": "moderate"
+        },
+        {
+          "market": "h2h",
+          "outcome": "home_win",
+          "confidence": "high",
+          "reasoning": "Colombia are a top-10 level CONMEBOL side facing an African qualifier at altitude in conditions that specifically disadvantage DR Congo's primarily European-based squad; the footballing logic for a Colombia win is overwhelming regardless of price. With a full-strength squad, home-continent support, and altitude adaptation built in from years of CONMEBOL qualifying, a Colombia win is the single most justified outcome on the card.",
+          "strength": "strong"
+        }
+      ],
+      "overall_summary": "The single best bet is Colombia to win — the footballing logic is unambiguous: altitude advantage, far superior technical quality, full squad availability, and DR Congo facing conditions they are structurally unprepared for. Backing Colombia (-1.5) on the Asian handicap is the value play for those seeking better returns, as the Leopards are likely to be running on empty after 60 minutes at 1566m against a side of this quality. Over 2.5 goals completes a logical treble of selections, all grounded in conditions and quality rather than price chasing.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Exact tournament form from group-stage warm-up matches and any last-minute injury news (particularly for Luis Díaz or James Rodríguez) is not confirmed; if either key creative player is unavailable, the handicap and goals selections would need revisiting. DR Congo's tactical setup and whether they set up to frustrate or attack is also unknown and could influence the goals total significantly.",
+      "conditions": {
+        "city": "Guadalajara / Zapopan",
+        "stadium": "Estadio Akron",
+        "has_roof": false,
+        "altitude_m": 1566.0,
+        "local_kickoff": "20:00 CST (Tuesday)",
+        "avg_high_c": 29,
+        "feels_like_c": 32,
+        "humidity_pct": 68,
+        "precip_prob_pct": 85,
+        "wind_max_kmh": 6,
+        "notes": "Estadio Akron, Guadalajara / Zapopan",
+        "source": "forecast",
+        "days_out": 15
+      },
+      "cached_at": 1780949520
+    },
+    "cached_at": 1780949520,
+    "label": "Colombia vs DR Congo"
+  },
+  "6dbe34af4335efd70750c5ac083d1118": {
+    "intel": {
+      "home_form": "USA enter their home World Cup with a strong squad built around Premier League and European-based talent — Pulisic (AC Milan), McKennie (Juventus), Adams (Bournemouth), and Tillman (Leverkusen) give them genuine quality in every line. Playing on home soil with an expectant crowd, the USMNT will be highly motivated and have shown in recent cycles they are capable of controlling games at home.",
+      "away_form": "Australia's squad has taken a significant step back from their 2022 vintage — the loss of Mathew Leckie's peak years, Mitch Duke, and particularly the absence of Riley McGree (hamstring) removes their best creative midfielder from a group already thin in quality at that level. Their squad is heavily reliant on Championship/lower Bundesliga/A-League players, with no genuine world-class presence to threaten a USA side of this calibre.",
+      "key_absences": "USA: Cardoso (ankle) and Agyemang (Achilles) absent — Cardoso is the more significant loss as a combative central midfielder, but depth is adequate. Australia: McGree (hamstring, key absence — their most technically gifted CM), Nathaniel Phillips (Achilles, long-term). McGree's absence is the most impactful on this match, leaving Australia's midfield notably weaker.",
+      "conditions_impact": "Lumen Field in Seattle at noon PDT on June 19 — forecast 22°C, 59% humidity, minimal rain. Conditions are mild and ideal for football, favouring neither side on weather grounds. However, the home crowd factor is enormous for USA at a home World Cup; the Socceroos will face a hostile 70,000+ crowd, which historically suppresses away performances in knockout-style pressure matches.",
+      "tactical_matchup": "USA under Mauricio Pochettino will likely press high and use wide overloads through Pulisic, Weah, and Dest/Freeman, looking to exploit Australia's limited full-back quality (Behich 35, Geria 33 — ageing and exposed against pace). Australia will attempt to be compact and counter, but without McGree to drive transitions and with Irankunda/Mabil as primary threats, their attacking output against a well-organised USA backline looks very limited.",
+      "goals_assessment": "USA should control possession and create chances regularly; Australia's attacking quality without McGree is modest at best. Expect USA to score — likely 1-2 goals — but Australia are unlikely to find the net against a USA defence that has Trusty, Richards, and A. Robinson all in decent form. Under 2.5 goals is a genuine possibility if USA manage the game at 1-0, but the more likely scenario across the full 90 is USA winning 2-0 or 2-1, pushing just over 2.5. BTTS looks unlikely given Australia's attacking limitations and the tendency for organised defences to keep a clean sheet in these matchups.",
+      "market_read": "USA win is correctly priced as favourite and there is no standout value in the straight 1X2 market. The draw price at 4.10 carries a marginal theoretical edge per the book signal (+1.1%) but the football logic does NOT support recommending the draw — USA are clearly superior and Australia's best outcome realistically is keeping it to one goal. The genuine value market is the Asian handicap: Australia (+1.5) reflects a scenario where Australia can lose by one goal — which is footballing plausible given their defensive organisation — and protects against a 1-0 USA win, which is the single most likely scoreline. USA (-1.5) requires a two-goal win which, while possible, carries risk given Australia will sit deep. Goals under 2.5 makes moderate sense as a tight, controlled USA win is more probable than a high-scoring affair.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "away_+1.5",
+          "confidence": "medium",
+          "reasoning": "Australia are defensively organised and without the attacking quality to be blown away; a 1-0 USA win is the most probable single scoreline, which Australia (+1.5) covers comfortably. Even in a 2-0 USA win scenario (plausible but not the plurality outcome), this bet only loses, making the coverage versus the likeliest results genuinely attractive.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "under_2.5",
+          "confidence": "medium",
+          "reasoning": "Australia's attack — depleted by McGree's absence and relying on ageing or lower-division forwards — is unlikely to score against USA's back line, and USA themselves may be content to manage a 1-0 lead once they take it. Low-scoring matches dominate when one side parks defensively and the other lacks urgency to over-commit, making under 2.5 the natural total.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Australia (+1.5) on the Asian handicap — USA are favourites but a controlled 1-0 win is the most likely scoreline and Australia's defensive shape (without needing to score) makes this line highly coverable. Back this with under 2.5 goals as a complementary bet: Australia lack the attacking quality to score, and USA are unlikely to run riot against a deep defensive block even at home. Avoid the draw at 4.10 despite the marginal book edge — the footballing logic simply does not support Australia holding USA at a home World Cup.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Exact tactical setup and fitness levels of key USA players (particularly Pulisic, Adams, and Dest) in the days immediately before the match are unknown — any late injury to Pulisic or Adams would significantly affect USA's ceiling. Australia's squad selection and Popovic's tactical shape against a high-press USA side is also unconfirmed, and their exact defensive setup could shift the goals total materially.",
+      "conditions": {
+        "city": "Seattle",
+        "stadium": "Lumen Field",
+        "has_roof": false,
+        "altitude_m": 56.0,
+        "local_kickoff": "12:00 PDT (Friday)",
+        "avg_high_c": 22,
+        "feels_like_c": 22,
+        "humidity_pct": 59,
+        "precip_prob_pct": 13,
+        "wind_max_kmh": 13,
+        "notes": "Lumen Field, Seattle",
+        "source": "forecast",
+        "days_out": 11
+      },
+      "cached_at": 1780949593
+    },
+    "cached_at": 1780949593,
+    "label": "USA vs Australia"
+  },
+  "76a48ea8b0f9b61fbe1330454aeaf52a": {
+    "intel": {
+      "home_form": "Argentina enter as reigning world champions with a squad built around Messi, Lautaro Martínez, Julián Álvarez and a deep, battle-hardened midfield — Scaloni's side lost only once in qualifying and are among the tournament favourites. Their attacking quality across multiple positions is exceptional, and at a neutral US venue they effectively function as a home side given the enormous South American diaspora support.",
+      "away_form": "Austria qualified impressively for their first World Cup since 1998, finishing strongly in European qualification under Ralf Rangnick's high-energy pressing system. Alaba's return from a long-term knee injury is a significant boost to their defensive leadership, though the squad lacks genuine world-class attacking output — Arnautovic at 37 and Gregoritsch are their most experienced forwards but neither is at peak level.",
+      "key_absences": "Argentina: Leonardo Balerdi (soleus muscle injury, confirmed out, no replacement). Austria: no confirmed absences reported; Alaba fit and included after knee rehabilitation.",
+      "conditions_impact": "AT&T Stadium is roofed and climate-controlled, neutralising any heat or humidity concerns that would otherwise favour Europeans over South Americans in Texas in June. Neutral conditions slightly benefit Austria's high-pressing style, as Rangnick's team press intensively and fatigue from heat was a non-issue here. However, the 12:00 CDT Monday kick-off is a routine timing for professional players — no meaningful advantage to either side.",
+      "tactical_matchup": "Austria's Rangnick system relies on aggressive man-oriented pressing and quick transitions to unsettle possession-based teams — in theory a legitimate threat to Argentina's rhythm-dependent build-up. However, Argentina have faced and overcome every elite pressing system en route to and since their World Cup win, with Mac Allister, De Paul and Enzo Fernández all capable of breaking lines under pressure, and Messi operating in pockets to exploit the spaces pressing leaves behind.",
+      "goals_assessment": "Argentina are a high-quality attacking side who score in most matches and face an Austria team that, while well-organised defensively under Rangnick, will be stretched in transition by Messi, Lautaro and Álvarez. Austria's own press creates open games — they gave up goals regularly in qualification when pressed back. Expect 2-4 goals total; over 2.5 is the natural call. BTTS is plausible given Austria's counter-threat, but Argentina's defensive solidity (Romero, Otamendi anchoring) makes a clean sheet a genuine possibility, so BTTS is not the core thesis.",
+      "market_read": "The Argentina win market is correctly priced as a heavy favourite — no value in backing the bare result at short odds. The draw at ~4.1 is not supported by football logic; Austria are unlikely to contain Argentina for 90 minutes without creating a win-threatening opportunity of their own. The most logical markets are the Asian handicap at Argentina -1.5 (requires a 2-goal win, very achievable against this level of opposition for this quality of Argentina) and the totals over 2.5 market, which reflects the attacking class Argentina bring and Austria's tendency to concede in open games.",
+      "recommended_bets": [
+        {
+          "market": "spreads",
+          "outcome": "home_-1.5",
+          "confidence": "medium",
+          "reasoning": "Argentina have the attacking depth — Messi, Lautaro, Álvarez, Nico Paz off the bench — to win by two or more goals against an Austria side making their first World Cup in 28 years and facing the best player in history. Argentina routinely win by comfortable margins against opponents of this calibre, and Austria's forwards (an ageing Arnautovic, recovering Alaba in defence) do not offer enough to keep this competitive beyond the first goal.",
+          "strength": "moderate"
+        },
+        {
+          "market": "totals",
+          "outcome": "over_2.5",
+          "confidence": "medium",
+          "reasoning": "Austria's high-pressing, man-oriented system under Rangnick inherently creates open, transitional football with space behind defensive lines — exactly what Messi and Argentina's attackers thrive on. Even if Austria score once on the counter (a realistic threat given their direct style), Argentina's attacking firepower makes three or more goals across the match a likely outcome.",
+          "strength": "moderate"
+        }
+      ],
+      "overall_summary": "The single best bet is Argentina -1.5 on the Asian handicap: the quality gap between a Messi-led, world-champion Argentina and an Austria side absent from the tournament for 28 years is significant, and a two-goal winning margin is a realistic and well-supported outcome rather than an optimistic one. Over 2.5 goals is a complementary bet supported by Austria's pressing style generating open, transitional football that suits Argentina's counter-attacking pace and individual brilliance. Avoid the draw — there is no credible football logic for Austria holding Argentina at AT&T Stadium, and the 4.1 price does not compensate for the structural mismatch.",
+      "intel_confidence": "medium",
+      "knowledge_caveat": "Alaba's actual match sharpness after a long knee rehabilitation is unknown — if he is short of form he could be a significant liability in high-speed transitions against Lautaro and Álvarez, which would strengthen the -1.5 case further. Additionally, Argentina's exact starting lineup and Messi's minutes management policy in the group stage are unknown; if Scaloni rests Messi or plays him conservatively, the -1.5 handicap becomes riskier.",
+      "conditions": {
+        "city": "Dallas / Arlington",
+        "stadium": "AT&T Stadium",
+        "has_roof": true,
+        "altitude_m": 190.0,
+        "local_kickoff": "12:00 CDT (Monday)",
+        "avg_high_c": 28,
+        "feels_like_c": 28,
+        "humidity_pct": null,
+        "precip_prob_pct": null,
+        "wind_max_kmh": null,
+        "notes": "AT&T Stadium, Dallas / Arlington — roofed / climate-controlled",
+        "source": "controlled",
+        "days_out": null
+      },
+      "cached_at": 1780950117
+    },
+    "cached_at": 1780950117,
+    "label": "Argentina vs Austria"
+  }
+}

@@ -1,0 +1,16 @@
+# Render Blueprint. Deploy: render.com → New + → Blueprint → pick this repo.
+# Then set ODDS_API_KEY and ANTHROPIC_API_KEY in the dashboard when prompted.
+services:
+  - type: web
+    name: wc-edge-finder
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: ODDS_API_KEY          # set in dashboard (kept out of git)
+        sync: false
+      - key: ANTHROPIC_API_KEY     # set in dashboard (kept out of git)
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12.6"
