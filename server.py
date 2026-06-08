@@ -1094,6 +1094,13 @@ def admin_stats(key: str = ""):
     })
 
 
+@app.get("/api/injuries")
+def injuries():
+    """Cached tournament-wide injury digest for the Injuries tab — reads the
+    cache only (no web search), so viewing it is free."""
+    return JSONResponse(fintel.injury_digest_info())
+
+
 @app.get("/api/refresh-injuries")
 def refresh_injuries():
     """Refresh the tournament-wide injury digest (ONE BBC search), then invalidate

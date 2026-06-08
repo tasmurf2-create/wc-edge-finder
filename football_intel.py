@@ -526,6 +526,12 @@ def peek_injury_digest():
     return (_load_json(INJURY_DIGEST_FILE) or {}).get("digest")
 
 
+def injury_digest_info():
+    """Cached digest text + fetch timestamp for the Injuries tab — no network."""
+    d = _load_json(INJURY_DIGEST_FILE) or {}
+    return {"digest": d.get("digest"), "fetched_at": d.get("fetched_at")}
+
+
 def _team_context(team):
     """The SOURCED squad (official FIFA list) + current FIFA world ranking for a
     team. Injuries are a single tournament-wide digest injected separately."""

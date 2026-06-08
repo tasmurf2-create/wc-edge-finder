@@ -337,6 +337,7 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
   <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
+  <button class="tab-btn" data-tab="injuries" onclick="switchTab('injuries')">🩹 Injuries</button>
 </div>
 
 <!-- ===================== DIVERGENCE TAB ===================== -->
@@ -458,6 +459,24 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- ===================== INJURIES TAB ===================== -->
+<div id="tab-injuries" class="tab-panel">
+  <div class="filter-bar">
+    <button id="injuries-refresh-btn" onclick="refreshInjuriesDigest()"
+      style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">
+      Refresh injuries
+    </button>
+    <span id="injuries-updated" style="font-size:0.78rem;color:#6e7681"></span>
+  </div>
+  <div class="legend">
+    <span>Tournament-wide injury &amp; suspension news. This is the same data the analyst uses for its "Absences" reasoning.</span>
+    <span style="color:#6e7681">Refreshing costs one web search and updates the analyst too — it does not auto-refresh.</span>
+  </div>
+  <div id="injuries-panel" style="padding:18px 24px">
+    <div class="loading-inner"><div class="spinner"></div><span>Loading injuries...</span></div>
+  </div>
+</div>
+
 <script>
 // ---- state ----
 let allMatches    = [];
@@ -474,6 +493,7 @@ let accaMarkets   = [];           // market keys currently in the odds feed
 let accaRound     = '';           // round filter ('' = all rounds)
 let roundsAvailable = [];         // round labels present in the schedule
 let accaSort      = 'chance';     // 'chance' | 'return'
+let _injuriesLoaded = false;      // Injuries tab loads once (cached digest); never auto-polls
 
 // ---- tab switching ----
 function switchTab(tab) {
@@ -483,6 +503,58 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'picks') renderTopPicks();
+  if (tab === 'injuries' && !_injuriesLoaded) loadInjuries();
+}
+
+// ---- injuries (manual refresh only — never auto-polls, to control cost) ----
+function fmtInjuryDigest(text) {
+  if (!text) return '<div class="empty">No injury data yet — hit "Refresh injuries".</div>';
+  // Light markdown: ## TEAM headers, **bold**, line breaks.
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc(text)
+    .replace(/^#+\s*\*\*(.+?)\*\*/gm, '<div style="color:#58a6ff;font-weight:700;margin:14px 0 4px;font-size:0.95rem">$1</div>')
+    .replace(/^#+\s*(.+)$/gm, '<div style="color:#58a6ff;font-weight:700;margin:14px 0 4px;font-size:0.95rem">$1</div>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f6fc">$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+function renderInjuries(info) {
+  const panel = document.getElementById('injuries-panel');
+  const upd   = document.getElementById('injuries-updated');
+  panel.innerHTML = `<div style="line-height:1.6;font-size:0.86rem;color:#c9d1d9">${fmtInjuryDigest(info.digest)}</div>`;
+  if (info.fetched_at) {
+    const d = new Date(info.fetched_at * 1000);
+    upd.textContent = 'Last refreshed: ' + d.toLocaleString();
+  } else {
+    upd.textContent = '';
+  }
+}
+
+async function loadInjuries() {
+  const panel = document.getElementById('injuries-panel');
+  try {
+    const res = await fetch('/api/injuries');   // cached digest — no web search, free
+    const info = await res.json();
+    _injuriesLoaded = true;
+    renderInjuries(info);
+  } catch (e) {
+    panel.innerHTML = `<div class="empty">Couldn't load injuries: ${e.message}</div>`;
+  }
+}
+
+async function refreshInjuriesDigest() {
+  const btn = document.getElementById('injuries-refresh-btn');
+  btn.disabled = true; btn.textContent = 'Refreshing (~30s)…';
+  try {
+    await fetch('/api/refresh-injuries');   // one web search; also re-analyses affected matches
+    // Give the digest fetch time to land, then reload the cached copy.
+    setTimeout(async () => {
+      await loadInjuries();
+      btn.disabled = false; btn.textContent = 'Refresh injuries';
+    }, 30000);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Refresh injuries';
+  }
 }
 
 // ---- data loading ----
