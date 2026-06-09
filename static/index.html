@@ -1610,10 +1610,12 @@ function sensibleScore(s) {
     reasons.push({t:'warn', x:`⚠ small +${s.edge.toFixed(1)}% edge on a long price — speculative`});
   }
 
-  // 2. Prediction-market confirmation (Kalshi / Polymarket)
+  // 2. Kalshi confirmation (Polymarket has no individual WC match markets)
   if (s.pm_gap != null) {
-    if (s.pm_gap > 1)       { score += 2; reasons.push({t:'good', x:`✅ prediction markets agree (+${s.pm_gap}%)`}); }
-    else if (s.pm_gap < -2) { score -= 2; reasons.push({t:'warn', x:`⚠ prediction markets disagree (${s.pm_gap}%)`}); }
+    if (s.pm_gap > 1)       { score += 2; reasons.push({t:'good', x:`✅ Kalshi agrees (+${s.pm_gap}%)`}); }
+    else if (s.pm_gap < -2) { score -= 2; reasons.push({t:'warn', x:`⚠ Kalshi disagrees (${s.pm_gap}%)`}); }
+  } else {
+    reasons.push({t:'muted', x:`— no Kalshi data for this match`});
   }
 
   // 3. Weather / conditions
@@ -1686,7 +1688,7 @@ function sensibleCardHTML(s, sc, stake) {
     ? `<span style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid ${iconf==='high'?'#3fb95066':iconf==='medium'?'#d2992266':'#6e767166'};color:${iconf==='high'?'#3fb950':iconf==='medium'?'#d29922':'#6e7681'}">analyst: ${iconf}</span>`
     : '';
   const tags = sc.reasons.map(r =>
-    `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':'#d29922'}">${r.x}</span>`).join('');
+    `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':r.t==='muted'?'#484f58':'#d29922'}">${r.x}</span>`).join('');
   const legId = `leg_${s.match.replace(/\W/g,'_')}_${s.outcome.replace(/\W/g,'_')}`;
   const checked = _accaLegs.has(legId) ? 'checked' : '';
   return `<div class="single-card${sc.tier==='speculative'?' demoted':''}" id="card_${legId}">
@@ -1724,7 +1726,8 @@ function renderSensible() {
   const nStrong = scored.filter(x => x.sc.tier === 'strong').length;
   const intro = `<div class="ev-banner good">
       🎯 <strong>Sensible Bets — what the data backs, across every game.</strong>
-      Every value bet scored on: reliability-weighted edge + prediction-market agreement + conditions + analyst overlap${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''}. Tags show exactly why. These are singles — placeable at the named book.
+      Every value bet scored on: reliability-weighted edge + <span title="Kalshi is pricing all 72 WC matches. Polymarket has no individual match markets for WC 2026.">Kalshi agreement</span> + conditions + analyst overlap${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''}. Tags show exactly why. These are singles — placeable at the named book.
+      <span style="font-size:0.75rem;color:#6e7681;display:block;margin-top:4px">Prediction market source: Kalshi (72 WC matches). Polymarket not pricing individual WC match results.</span>
     </div>`;
   if (!list.length) { panel.innerHTML = intro + '<div class="empty" style="padding:24px">No bets at this tier yet.</div>'; return; }
   panel.innerHTML = intro + list.map(x => sensibleCardHTML(x.s, x.sc, stake)).join('');
