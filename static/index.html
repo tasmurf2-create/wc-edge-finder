@@ -2111,35 +2111,62 @@ function renderFixtureAcca() {
 
   if (summary) summary.style.display = 'block';
 
-  // Best single book covering all legs
   const singles  = legs.map(l => l.single);
-  const bookSets = singles.map(s => new Set(Object.keys(s.per_book || {})));
-  const common   = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
-  let bestBook = null, bestOdds = 0;
-  common.forEach(bk => {
-    const combined = singles.reduce((p, s) => p * (s.per_book[bk] || 0), 1);
-    if (combined > bestOdds) { bestOdds = combined; bestBook = bk; }
-  });
+  const stake    = parseFloat(document.getElementById('fix-stake')?.value) || 10;
+  const fairCombo = singles.reduce((p, s) => p * (s.fair_prob || 0), 1);
 
-  const stake      = parseFloat(document.getElementById('fix-stake')?.value) || 10;
-  const fairCombo  = singles.reduce((p, s) => p * (s.fair_prob || 0), 1);
-  const impliedProb = bestOdds > 0 ? 1 / bestOdds : 0;
-  const ev = (fairCombo > 0 && impliedProb > 0) ? ((fairCombo - impliedProb) * 100).toFixed(1) : null;
+  // Build per-bookmaker combined odds (only books that price ALL legs)
+  const allBooks = new Set(singles.flatMap(s => Object.keys(s.per_book || {})));
+  const bookOdds = [];
+  allBooks.forEach(bk => {
+    const prices = singles.map(s => s.per_book?.[bk]);
+    if (prices.every(p => p > 0)) {
+      bookOdds.push({ bk, combined: prices.reduce((a, b) => a * b, 1) });
+    }
+  });
+  bookOdds.sort((a, b) => b.combined - a.combined);
+
+  const best = bookOdds[0] || null;
+  const bestOdds = best?.combined || 0;
+  const bestBook = best?.bk || null;
 
   const oddsStr = bestOdds > 0 ? bestOdds.toFixed(2) : '—';
   document.getElementById('fix-acca-odds-header').textContent = bestOdds > 0 ? `· Acca ${oddsStr}` : '';
   document.getElementById('fix-acca-odds').textContent   = oddsStr;
   document.getElementById('fix-acca-return').textContent = bestOdds > 0 ? `€${(stake * bestOdds).toFixed(2)}` : '—';
-  document.getElementById('fix-acca-book').textContent   = bestBook ? `Best single book: ${bestBook}` : legs.length > 1 ? 'No single book covers all legs' : '';
 
+  // EV
+  const impliedProb = bestOdds > 0 ? 1 / bestOdds : 0;
+  const ev = (fairCombo > 0 && impliedProb > 0) ? ((fairCombo - impliedProb) * 100).toFixed(1) : null;
   const evEl = document.getElementById('fix-acca-ev');
   if (ev !== null) {
     const c = parseFloat(ev) >= 0 ? '#3fb950' : '#f85149';
-    evEl.innerHTML = `<span style="color:${c}">EV ${parseFloat(ev) >= 0 ? '+' : ''}${ev}% · fair chance ${(fairCombo*100).toFixed(1)}%</span>`;
+    evEl.innerHTML = `<span style="color:${c}">EV ${parseFloat(ev) >= 0 ? '+' : ''}${ev}%</span> <span style="color:#6e7681">· fair chance ${(fairCombo*100).toFixed(1)}%</span>`;
   } else { evEl.textContent = ''; }
 
-  document.getElementById('fix-acca-nobook').textContent = (!bestBook && legs.length > 1)
-    ? 'Try removing a leg — no single book prices all selections' : '';
+  // Bookmaker comparison table
+  const bookEl = document.getElementById('fix-acca-book');
+  if (!bookOdds.length) {
+    bookEl.innerHTML = legs.length > 1
+      ? '<span style="color:#d29922">No single bookmaker prices all your selections — try removing a leg</span>'
+      : '';
+  } else {
+    bookEl.innerHTML = `
+      <div style="font-size:0.72rem;color:#6e7681;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Where to place it</div>
+      ${bookOdds.map((b, i) => {
+        const ret = (stake * b.combined).toFixed(2);
+        const isBest = i === 0;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:6px;margin-bottom:3px;background:${isBest ? '#0d2818' : '#161b22'};border:1px solid ${isBest ? '#3fb95044' : '#21262d'}">
+          <span style="font-size:0.78rem;color:${isBest ? '#3fb950' : '#8b949e'};font-weight:${isBest ? '600' : '400'}">${isBest ? '★ ' : ''}${b.bk}</span>
+          <div style="text-align:right">
+            <span style="font-size:0.82rem;font-weight:700;color:${isBest ? '#f0f6fc' : '#c9d1d9'}">${b.combined.toFixed(2)}</span>
+            <span style="font-size:0.72rem;color:#6e7681;margin-left:5px">→ €${ret}</span>
+          </div>
+        </div>`;
+      }).join('')}`;
+  }
+
+  document.getElementById('fix-acca-nobook').textContent = '';
 }
 
 // ---- boot ----
