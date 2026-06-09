@@ -11,7 +11,9 @@ Run:  python server.py
 Then open http://localhost:8000
 """
 import os
+import sys
 import time
+import pathlib
 import secrets
 import itertools
 import threading
@@ -111,7 +113,8 @@ ACCA_GUARD_TOL_PCT = -4.0
 # Cache — one shared fetch for all endpoints
 # ---------------------------------------------------------------------------
 _cache = {"raw": None, "fetched_at": 0}
-_CACHE_TTL = 300
+_CACHE_TTL = 7200  # 2 hours — WC odds move slowly, no need to hammer the API
+_ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
 _lock = threading.Lock()
 
 # Separate intel cache — populated by background thread
@@ -971,10 +974,30 @@ def _leg_summary(s):
 
 def get_raw(force=False):
     with _lock:
+        # On first call after restart, try loading from disk before hitting the API
+        if _cache["raw"] is None and not force and _ODDS_CACHE_FILE.exists():
+            try:
+                saved = json.loads(_ODDS_CACHE_FILE.read_text())
+                age = time.time() - saved.get("fetched_at", 0)
+                if age < _CACHE_TTL:
+                    _cache["raw"] = saved["raw"]
+                    _cache["fetched_at"] = saved["fetched_at"]
+                    print(f"[odds] loaded from disk (age {age/60:.0f}m)", file=sys.stderr)
+                    return _cache["raw"]
+            except Exception:
+                pass
+
         age = time.time() - _cache["fetched_at"]
         if force or _cache["raw"] is None or age > _CACHE_TTL:
             _cache["raw"] = _build_raw()
             _cache["fetched_at"] = time.time()
+            try:
+                _ODDS_CACHE_FILE.write_text(json.dumps({
+                    "raw": _cache["raw"],
+                    "fetched_at": _cache["fetched_at"],
+                }))
+            except Exception:
+                pass
         return _cache["raw"]
 
 
