@@ -1296,7 +1296,7 @@ function analystConfirms(single, intel) {
     const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
     if (sMarket === 'h2h') {
       if (ao === 'home_win' && sOutcome === homeName) return true;
-      if (ao === 'away_win' && sOutcome !== homeName && sOutcome !== 'draw') return true;
+      if (ao === 'away_win' && sOutcome === awayName) return true;
       if (ao === 'draw' && sOutcome === 'draw') return true;
     } else if (sMarket === 'totals') {
       if (ao.startsWith('over')  && sOutcome.includes('over'))  return true;
@@ -1517,11 +1517,16 @@ function recommendedAccaHTML(parlays, book, stake) {
     return analystConfirms(s, intel) === true;
   });
 
-  // Pick top 2-4 legs by fair_prob (highest probability first), no duplicate matches
+  // Pick top 2-4 legs: R1 first, then by fair_prob descending, no duplicate matches
   const seen = new Set();
   const legs = [];
   [...confirmedSingles]
-    .sort((a, b) => (b.fair_prob || 0) - (a.fair_prob || 0))
+    .sort((a, b) => {
+      const rA = (a.round || {}).order || 99;
+      const rB = (b.round || {}).order || 99;
+      if (rA !== rB) return rA - rB;
+      return (b.fair_prob || 0) - (a.fair_prob || 0);
+    })
     .forEach(s => {
       if (legs.length >= 4) return;
       if (seen.has(s.match)) return;
@@ -1561,8 +1566,8 @@ function recommendedAccaHTML(parlays, book, stake) {
 
   const grossReturn = stake * combinedPrice;
   const profit = grossReturn - stake;
-  // Combined fair prob = product of each leg's fair_prob
-  const fairProb = legs.reduce((p, s) => p * ((s.fair_prob || 50) / 100), 1);
+  // fair_prob is stored as decimal 0-1 — multiply directly
+  const fairProb = legs.reduce((p, s) => p * (s.fair_prob != null ? s.fair_prob : 0.5), 1);
   const impliedProb = 1 / combinedPrice;
   const evRaw = (fairProb - impliedProb) * 100;
 
