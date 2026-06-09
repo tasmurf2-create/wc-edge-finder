@@ -472,8 +472,26 @@ tr:last-child td { border-bottom: none; }
       <option value="week">This week</option>
     </select>
   </div>
-  <div id="sensible-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:12px">
+  <div id="sensible-panel" style="padding:18px 24px 120px;display:flex;flex-direction:column;gap:12px">
     <div class="loading-inner"><div class="spinner"></div><span>Scoring bets...</span></div>
+  </div>
+  <!-- Acca builder tray — sticky at bottom, appears when 2+ legs ticked -->
+  <div id="acca-tray" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#161b22;border-top:2px solid #388bfd;padding:12px 24px;z-index:100;box-shadow:0 -4px 24px #0008">
+    <div style="max-width:900px;margin:0 auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <span style="font-size:0.8rem;color:#8b949e" id="tray-legs-summary"></span>
+          <div id="tray-warning" style="font-size:0.75rem;color:#f85149;margin-top:2px"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div id="tray-book" style="font-size:0.82rem;color:#c9d1d9"></div>
+          <div id="tray-price" style="font-size:1.1rem;font-weight:700;color:#f0f6fc"></div>
+          <div id="tray-ev" style="font-size:0.82rem"></div>
+          <button onclick="clearAccaBuilder()" style="background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer">Clear</button>
+        </div>
+      </div>
+      <div id="tray-leg-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
   </div>
 </div>
 
@@ -1669,11 +1687,17 @@ function sensibleCardHTML(s, sc, stake) {
     : '';
   const tags = sc.reasons.map(r =>
     `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':'#d29922'}">${r.x}</span>`).join('');
-  return `<div class="single-card${sc.tier==='speculative'?' demoted':''}">
+  const legId = `leg_${s.match.replace(/\W/g,'_')}_${s.outcome.replace(/\W/g,'_')}`;
+  const checked = _accaLegs.has(legId) ? 'checked' : '';
+  return `<div class="single-card${sc.tier==='speculative'?' demoted':''}" id="card_${legId}">
     <div class="single-top">
-      <div>
-        <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
-        <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <input type="checkbox" ${checked} onchange="toggleAccaLeg(this,'${legId}',${JSON.stringify(s).replace(/"/g,'&quot;')})"
+          style="margin-top:3px;width:15px;height:15px;accent-color:#388bfd;cursor:pointer;flex-shrink:0">
+        <div>
+          <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
+          <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         ${tierBadge}
@@ -1704,6 +1728,86 @@ function renderSensible() {
     </div>`;
   if (!list.length) { panel.innerHTML = intro + '<div class="empty" style="padding:24px">No bets at this tier yet.</div>'; return; }
   panel.innerHTML = intro + list.map(x => sensibleCardHTML(x.s, x.sc, stake)).join('');
+}
+
+// ---- acca builder ----
+const _accaLegs   = new Map();  // legId -> single object
+
+function toggleAccaLeg(cb, legId, s) {
+  if (cb.checked) _accaLegs.set(legId, s);
+  else            _accaLegs.delete(legId);
+  const card = document.getElementById('card_' + legId);
+  if (card) card.style.outline = cb.checked ? '2px solid #388bfd' : '';
+  renderAccaTray();
+}
+
+function clearAccaBuilder() {
+  _accaLegs.clear();
+  document.querySelectorAll('#sensible-panel input[type=checkbox]').forEach(cb => {
+    cb.checked = false;
+    const card = cb.closest('.single-card');
+    if (card) card.style.outline = '';
+  });
+  renderAccaTray();
+}
+
+function renderAccaTray() {
+  const tray = document.getElementById('acca-tray');
+  const legs = [..._accaLegs.values()];
+  if (legs.length < 2) { tray.style.display = 'none'; return; }
+  tray.style.display = 'block';
+
+  const stake = parseFloat(document.getElementById('sensible-stake-input')?.value) || 10;
+
+  // Same-match warning
+  const matches = legs.map(s => s.match);
+  const dupes = matches.filter((m, i) => matches.indexOf(m) !== i);
+  document.getElementById('tray-warning').textContent = dupes.length
+    ? `⚠ Same-match legs detected (${[...new Set(dupes)].join(', ')}) — most books won't allow this`
+    : '';
+
+  // Find best single bookmaker covering all legs
+  const bookSets = legs.map(s => new Set(Object.keys(s.per_book || {})));
+  const common   = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
+
+  let bestBook = null, bestCombined = 0;
+  common.forEach(bk => {
+    const combined = legs.reduce((p, s) => p * (s.per_book[bk] || 0), 1);
+    if (combined > bestCombined) { bestCombined = combined; bestBook = bk; }
+  });
+
+  // Fair combined probability
+  const fairCombined = legs.reduce((p, s) => p * (s.fair_prob || 0), 1);
+  const impliedProb  = bestCombined > 0 ? 1 / bestCombined : 0;
+  const ev           = fairCombined > 0 ? ((fairCombined - impliedProb) * 100).toFixed(1) : null;
+  const grossReturn  = stake * bestCombined;
+  const profit       = grossReturn - stake;
+
+  // Summary line
+  document.getElementById('tray-legs-summary').textContent =
+    `${legs.length}-leg acca · fair chance: ${(fairCombined * 100).toFixed(1)}%`;
+
+  if (bestBook) {
+    document.getElementById('tray-book').textContent = `Best book: ${bestBook}`;
+    document.getElementById('tray-price').textContent = bestCombined.toFixed(2);
+    const evColor = parseFloat(ev) >= 0 ? '#3fb950' : '#f85149';
+    document.getElementById('tray-ev').innerHTML =
+      `<span style="color:${evColor}">EV ${parseFloat(ev) >= 0 ? '+' : ''}${ev}%</span>` +
+      `<span style="color:#8b949e;font-size:0.75rem;margin-left:8px">€${stake.toFixed(2)} → €${grossReturn.toFixed(2)}</span>`;
+  } else {
+    document.getElementById('tray-book').textContent = 'No single book covers all legs';
+    document.getElementById('tray-price').textContent = '';
+    document.getElementById('tray-ev').textContent = '';
+  }
+
+  // Leg chips
+  document.getElementById('tray-leg-list').innerHTML = legs.map(s => {
+    const bookPrice = bestBook && s.per_book?.[bestBook] ? s.per_book[bestBook].toFixed(2) : '—';
+    return `<span style="background:#21262d;border:1px solid #30363d;border-radius:14px;padding:3px 10px;font-size:0.75rem;color:#c9d1d9">
+      ${s.outcome} <span style="color:#8b949e">${s.match.split(' vs ')[0]} v ${s.match.split(' vs ')[1]}</span>
+      <strong style="color:#f0f6fc;margin-left:4px">${bookPrice}</strong>
+    </span>`;
+  }).join('');
 }
 
 // ---- boot ----
