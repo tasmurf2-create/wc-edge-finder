@@ -332,6 +332,16 @@ tr:last-child td { border-bottom: none; }
   </div>
 </header>
 
+<div style="padding:8px 24px;background:#0d1117;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px">
+  <input id="team-search" type="text" placeholder="Search team… (e.g. Brazil)" autocomplete="off"
+    oninput="onTeamSearch(this.value)"
+    style="background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.85rem;padding:5px 10px;width:220px;outline:none">
+  <span id="team-search-clear" onclick="clearTeamSearch()" style="display:none;cursor:pointer;color:#6e7681;font-size:0.85rem">✕ clear</span>
+  <span id="team-search-summary" style="font-size:0.8rem;color:#8b949e"></span>
+</div>
+
+<div id="team-search-results" style="display:none;padding:18px 24px;display:none;flex-direction:column;gap:20px"></div>
+
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
   <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
@@ -504,6 +514,102 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'picks') renderTopPicks();
   if (tab === 'injuries' && !_injuriesLoaded) loadInjuries();
+}
+
+// ---- team search ----
+function onTeamSearch(q) {
+  const resultsEl = document.getElementById('team-search-results');
+  const clearEl   = document.getElementById('team-search-clear');
+  const summaryEl = document.getElementById('team-search-summary');
+  const tabBar    = document.querySelector('.tab-bar');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  q = q.trim();
+  if (!q) { clearTeamSearch(); return; }
+
+  clearEl.style.display = '';
+  tabBar.style.display = 'none';
+  tabPanels.forEach(p => p.style.display = 'none');
+  resultsEl.style.display = 'flex';
+
+  const lq = q.toLowerCase();
+  const matchesTeam = str => str.toLowerCase().includes(lq);
+
+  // --- Singles ---
+  const singles = allSingles.filter(s => matchesTeam(s.outcome || '') || matchesTeam(s.match || ''));
+
+  // --- Accas ---
+  const accas = allParlays.filter(p => p.legs && p.legs.some(l => matchesTeam(l.match || '') || matchesTeam(l.outcome || '')));
+
+  // --- Divergence matches ---
+  const divMatches = allMatches.filter(m => matchesTeam(m.home || '') || matchesTeam(m.away || ''));
+
+  // --- Sensible bets (scored singles) ---
+  const sensible = allSingles.filter(s => (s.tier || s.sc?.tier) && (matchesTeam(s.outcome || '') || matchesTeam(s.match || '')));
+
+  const total = singles.length + accas.length + divMatches.length;
+  summaryEl.textContent = total ? `${total} result${total !== 1 ? 's' : ''} for "${q}"` : `No results for "${q}"`;
+
+  let html = '';
+
+  if (divMatches.length) {
+    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Market Divergence (${divMatches.length})</div>`;
+    divMatches.forEach(m => {
+      const pmHome = m.pm_prob ? (m.pm_prob[m.home] * 100).toFixed(0) : '—';
+      const pmAway = m.pm_prob ? (m.pm_prob[m.away] * 100).toFixed(0) : '—';
+      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
+        <strong style="color:#c9d1d9">${m.home} vs ${m.away}</strong>
+        <span style="color:#6e7681;margin-left:8px">${m.round?.label || ''}</span>
+        <div style="color:#8b949e;margin-top:4px">PM: ${m.home} ${pmHome}% · Draw — · ${m.away} ${pmAway}%</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (singles.length) {
+    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Value Singles (${singles.length})</div>`;
+    singles.forEach(s => {
+      const edge = s.edge != null ? `${s.edge > 0 ? '+' : ''}${s.edge.toFixed(1)}%` : '';
+      const fairPct = s.fair_prob != null ? (s.fair_prob * 100).toFixed(1) : '—';
+      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
+        <strong style="color:#c9d1d9">${s.outcome}</strong>
+        <span style="color:#6e7681;margin-left:6px">${s.match}</span>
+        <span style="float:right;color:${s.edge > 0 ? '#3fb950' : '#f85149'}">${edge}</span>
+        <div style="color:#8b949e;margin-top:2px">Best: ${s.best_price} @ ${s.best_book} · Fair: ${fairPct}%</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (accas.length) {
+    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Accumulators (${accas.length})</div>`;
+    accas.forEach(p => {
+      const legsStr = p.legs.map(l => {
+        const hi = matchesTeam(l.match || '') || matchesTeam(l.outcome || '');
+        return `<span style="color:${hi ? '#c9d1d9' : '#6e7681'}">${l.outcome} (${l.best_price})</span>`;
+      }).join(' + ');
+      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
+        <div style="margin-bottom:4px">${legsStr}</div>
+        <span style="color:#8b949e">Combined: ${p.combined_price?.toFixed(2)} · ${p.legs.length} legs</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (!html) html = '<div style="color:#6e7681;font-size:0.85rem">No mentions of that team across any section.</div>';
+  resultsEl.innerHTML = html;
+}
+
+function clearTeamSearch() {
+  document.getElementById('team-search').value = '';
+  document.getElementById('team-search-clear').style.display = 'none';
+  document.getElementById('team-search-summary').textContent = '';
+  document.getElementById('team-search-results').style.display = 'none';
+  document.querySelector('.tab-bar').style.display = '';
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = '');
+  // Re-activate the current tab panel
+  const activeBtn = document.querySelector('.tab-btn.active');
+  if (activeBtn) document.getElementById('tab-' + activeBtn.dataset.tab).classList.add('active');
 }
 
 // ---- injuries (manual refresh only — never auto-polls, to control cost) ----
