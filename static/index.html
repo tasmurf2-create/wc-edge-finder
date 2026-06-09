@@ -1973,13 +1973,16 @@ function renderFixtures() {
     const isPast    = m.commence && (new Date(m.commence).getTime() < now);
     const selected  = _fixtureLeg.get(matchId);
 
-    const outcomes = ['Home', 'Draw', 'Away'];
+    // outcomes in allMatches use actual team names (lowercase) e.g. "spain", "draw", "cape verde"
+    const homeKey = mHome.toLowerCase();
+    const awayKey = mAway.toLowerCase();
+    const ocKeys   = [homeKey, 'draw', awayKey];
     const outLabels = [mHome, 'Draw', mAway];
 
-    const btns = outcomes.map((oc, i) => {
-      const od = (m.outcomes || []).find(o => o.outcome === oc);
+    const btns = ocKeys.map((ocKey, i) => {
+      const od = (m.outcomes || []).find(o => o.outcome === ocKey);
       const price = od && od.best_price ? od.best_price.toFixed(2) : '—';
-      const isSel = selected && selected.legId === (matchId + '|' + oc);
+      const isSel = selected && selected.legId === (matchId + '|' + ocKey);
       const fairProb = od ? (od.book_fair || 0) / 100 : 0;
       const perBook  = od ? (od.per_book || {}) : {};
       const singleObj = {
@@ -1988,18 +1991,18 @@ function renderFixtures() {
         best_book: od ? od.best_book : null, per_book: perBook,
       };
       const selClass = isSel ? ' selected' : '';
-      const dis = isPast ? ' disabled' : '';
-      const clickAttr = isPast ? '' :
-        ` onclick="toggleFixtureLeg(${JSON.stringify(matchId)},${JSON.stringify(oc)},${JSON.stringify(singleObj).replace(/"/g,'&quot;')})"`;
+      const dis = (isPast || !od) ? ' disabled' : '';
+      const clickAttr = (isPast || !od) ? '' :
+        ` onclick="toggleFixtureLeg(${JSON.stringify(matchId)},${JSON.stringify(ocKey)},${JSON.stringify(singleObj).replace(/"/g,'&quot;')})"`;
       return `<button class="fix-outcome-btn${selClass}"${dis}${clickAttr}>
-        <span>${outLabels[i]}</span>
+        <span style="font-size:0.72rem">${outLabels[i]}</span>
         <span class="fix-price">${price}</span>
       </button>`;
     }).join('');
 
     const kick = m.commence
       ? (() => {
-          const d = new Date(m.kickoff);
+          const d = new Date(m.commence);
           const diffH = (d.getTime() - now) / 36e5;
           if (diffH < -1) return `<span style="color:#f85149">FT</span>`;
           if (diffH < 24) return `<span style="color:#d29922">Today ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
