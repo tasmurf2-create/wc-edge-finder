@@ -1224,7 +1224,20 @@ function analystConfirms(single, intel) {
   const homeName = parts[0].toLowerCase();
   const awayName = parts[1].toLowerCase();
 
-  for (const rb of recs) {
+  // Only compare against recs in the same market — a spread rec (Brazil -2)
+  // doesn't contradict a 1X2 Draw bet; they're separate markets entirely.
+  const isH2hRec      = ao => ao === 'home_win' || ao === 'away_win' || ao === 'draw';
+  const isTotalsRec   = ao => ao.startsWith('over') || ao.startsWith('under');
+  const isSpreadsRec  = ao => ao.startsWith('home_-') || ao.startsWith('home_+') || ao.startsWith('away_-') || ao.startsWith('away_+');
+  const inSameMarket  = ao =>
+    (sMarket === 'h2h'     && isH2hRec(ao))    ||
+    (sMarket === 'totals'  && isTotalsRec(ao))  ||
+    (sMarket === 'spreads' && isSpreadsRec(ao));
+
+  const sameMarketRecs = recs.filter(rb => inSameMarket((rb.outcome || '').toLowerCase().replace(/ /g, '_')));
+  if (!sameMarketRecs.length) return null; // analyst hasn't opined on this market
+
+  for (const rb of sameMarketRecs) {
     const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
     if (sMarket === 'h2h') {
       if (ao === 'home_win' && sOutcome === homeName) return true;
@@ -1234,18 +1247,17 @@ function analystConfirms(single, intel) {
       if (ao.startsWith('over')  && sOutcome.includes('over'))  return true;
       if (ao.startsWith('under') && sOutcome.includes('under')) return true;
     } else if (sMarket === 'spreads') {
-      // e.g. ao = "home_-1.5", sOutcome = "germany (-1.5)"
       if (ao.startsWith('home_')) {
-        const pt = ao.split('home_')[1]; // "-1.5"
+        const pt = ao.split('home_')[1];
         if (sOutcome.includes(homeName) && sOutcome.includes(pt)) return true;
       }
       if (ao.startsWith('away_')) {
-        const pt = ao.split('away_')[1]; // "+1.5"
+        const pt = ao.split('away_')[1];
         if (sOutcome.includes(awayName) && sOutcome.includes(pt)) return true;
       }
     }
   }
-  return false;
+  return false; // analyst has a same-market rec but picked a different outcome
 }
 
 // A small edge on a long-priced outcome is within the de-vig's own margin of
@@ -1768,7 +1780,7 @@ function renderSensible() {
   const stake = sensibleStake();
   const tierFilter = document.getElementById('sensible-tier-filter')?.value || 'all';
   const scored = allSingles.map(s => ({ s, sc: sensibleScore(s) }))
-    .sort((a,b) => b.sc.score - a.sc.score || b.s.edge - a.s.edge);
+    .sort((a,b) => (a.s.commence || '').localeCompare(b.s.commence || '') || b.sc.score - a.sc.score || b.s.edge - a.s.edge);
   let list = scored.filter(x => sensibleTimeFilter(x.s));
   if (tierFilter === 'strong')     list = list.filter(x => x.sc.tier === 'strong');
   else if (tierFilter === 'solid') list = list.filter(x => x.sc.tier !== 'speculative');
