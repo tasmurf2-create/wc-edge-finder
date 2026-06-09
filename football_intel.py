@@ -30,9 +30,9 @@ WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+
 CACHE_TTL       = 43200    # 12 hours — match analysis
 INJURIES_TTL    = 43200    # 12 hours — injury data
 # One broad web search per refresh covers newsworthy injuries tournament-wide,
-# instead of one search per team. NB: BBC (and many news sites) block Anthropic's
-# web crawler, so we do NOT domain-restrict — a locked whitelist returns nothing.
-INJURY_DOMAINS  = None
+# instead of one search per team. NB: BBC, Guardian, Transfermarkt block Anthropic's
+# crawler (confirmed 400 errors). Whitelist tested and returning good results.
+INJURY_DOMAINS  = ["skysports.com", "goal.com", "espn.com", "fifa.com"]
 WEATHER_TTL     = 21600    # 6 hours — weather forecast (refreshes a few times daily)
 WEATHER_HORIZON_DAYS = 15  # Open-Meteo forecasts ~16 days ahead; use live data inside this
 MODEL           = "claude-sonnet-4-6"          # match analysis (reasoning)
