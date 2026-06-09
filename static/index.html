@@ -544,10 +544,10 @@ function onTeamSearch(q) {
   // --- Divergence matches ---
   const divMatches = allMatches.filter(m => matchesTeam(m.home || '') || matchesTeam(m.away || ''));
 
-  // --- Sensible bets (scored singles) ---
-  const sensible = allSingles.filter(s => (s.tier || s.sc?.tier) && (matchesTeam(s.outcome || '') || matchesTeam(s.match || '')));
+  // --- Bettor's Analysis intel ---
+  const intelMatches = Object.entries(allIntel).filter(([label]) => matchesTeam(label));
 
-  const total = singles.length + accas.length + divMatches.length;
+  const total = singles.length + accas.length + divMatches.length + intelMatches.length;
   summaryEl.textContent = total ? `${total} result${total !== 1 ? 's' : ''} for "${q}"` : `No results for "${q}"`;
 
   let html = '';
@@ -591,6 +591,27 @@ function onTeamSearch(q) {
       html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
         <div style="margin-bottom:4px">${legsStr}</div>
         <span style="color:#8b949e">Combined: ${p.combined_price?.toFixed(2)} · ${p.legs.length} legs</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (intelMatches.length) {
+    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Bettor's Analysis (${intelMatches.length})</div>`;
+    intelMatches.forEach(([label, intel]) => {
+      const rec = intel.recommendation || {};
+      const conf = intel.intel_confidence || 'low';
+      const confColor = conf === 'high' ? '#3fb950' : conf === 'medium' ? '#d29922' : '#6e7681';
+      const summary = intel.overall_summary || '—';
+      const recs = intel.recommended_bets || [];
+      const recsHtml = recs.length ? recs.map(r => `<div style="color:#c9d1d9;margin-top:3px">→ ${r.bet} <span style="color:#8b949e">(${r.reasoning})</span></div>`).join('') : '';
+      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#c9d1d9">${label}</strong>
+          <span style="font-size:0.75rem;color:${confColor};text-transform:uppercase">${conf} confidence</span>
+        </div>
+        <div style="color:#8b949e;line-height:1.5">${summary}</div>
+        ${recsHtml}
       </div>`;
     });
     html += '</div>';
