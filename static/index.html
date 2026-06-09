@@ -84,6 +84,37 @@ select, input[type=range] {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
+/* ---- fixtures tab ---- */
+.fix-round-btn {
+  background: #21262d; color: #8b949e;
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 4px 14px; font-size: 0.82rem; cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+}
+.fix-round-btn:hover { color: #c9d1d9; }
+.fix-round-btn.active { background: #388bfd22; color: #58a6ff; border-color: #388bfd; font-weight: 600; }
+.fix-card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.fix-card.past { opacity: 0.45; }
+.fix-teams { font-size: 0.95rem; font-weight: 600; color: #f0f6fc; }
+.fix-kick  { font-size: 0.75rem; color: #6e7681; }
+.fix-btns  { display: flex; gap: 8px; }
+.fix-outcome-btn {
+  flex: 1; background: #21262d; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 8px;
+  padding: 7px 4px; font-size: 0.78rem; cursor: pointer; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: all 0.15s;
+}
+.fix-outcome-btn:hover:not(:disabled) { border-color: #58a6ff; color: #f0f6fc; }
+.fix-outcome-btn.selected { background: #388bfd22; border-color: #388bfd; color: #58a6ff; }
+.fix-outcome-btn:disabled { opacity: 0.4; cursor: default; }
+.fix-outcome-btn .fix-price { font-size: 0.88rem; font-weight: 700; color: #f0f6fc; }
+.fix-outcome-btn.selected .fix-price { color: #58a6ff; }
+.fix-snapshot { font-size: 0.75rem; color: #8b949e; line-height: 1.45; border-top: 1px solid #21262d; padding-top: 8px; }
+
 /* ---- divergence grid ---- */
 #matches {
   padding: 18px 24px;
@@ -347,6 +378,7 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
   <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
   <button class="tab-btn" data-tab="injuries" onclick="switchTab('injuries')">🩹 Injuries</button>
+  <button class="tab-btn" data-tab="fixtures" onclick="switchTab('fixtures'); renderFixtures()">📋 Fixtures</button>
   <button class="tab-btn" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
 </div>
 
@@ -493,6 +525,22 @@ tr:last-child td { border-bottom: none; }
       <div id="tray-leg-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
   </div>
+</div>
+
+<!-- ===================== FIXTURES TAB ===================== -->
+<div id="tab-fixtures" class="tab-panel">
+  <div class="filter-bar" style="gap:8px">
+    <span style="font-size:0.82rem;color:#8b949e">Round:</span>
+    <button class="fix-round-btn active" data-round="R1" onclick="setFixtureRound('R1')">R1</button>
+    <button class="fix-round-btn" data-round="R2" onclick="setFixtureRound('R2')">R2</button>
+    <button class="fix-round-btn" data-round="R3" onclick="setFixtureRound('R3')">R3</button>
+    <span style="margin-left:12px;font-size:0.78rem;color:#6e7681">One selection per match · feeds into acca builder below</span>
+  </div>
+  <div id="fixtures-grid" style="padding:18px 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">
+    <div class="loading-inner"><div class="spinner"></div><span>Loading fixtures...</span></div>
+  </div>
+  <!-- padding so tray doesn't cover last row -->
+  <div style="height:80px"></div>
 </div>
 
 <!-- ===================== INJURIES TAB ===================== -->
@@ -762,6 +810,7 @@ async function loadData(force = false) {
     renderBets();
     renderTopPicks();
     renderSensible();
+    renderFixtures();
 
     // If intel is still loading in background, poll for it every 8s
     if (betsData.intel_loading) {
@@ -817,7 +866,7 @@ async function pollIntel() {
       if (!l.intel && data.intel[l.match]) { l.intel = data.intel[l.match]; changed = true; }
     }));
 
-    if (changed) { renderBets(); renderTopPicks(); }
+    if (changed) { renderBets(); renderTopPicks(); renderFixtures(); renderSensible(); }
 
     // Stop polling once intel is done loading
     if (!data.intel_loading) {
@@ -1810,6 +1859,110 @@ function renderAccaTray() {
       ${s.outcome} <span style="color:#8b949e">${s.match.split(' vs ')[0]} v ${s.match.split(' vs ')[1]}</span>
       <strong style="color:#f0f6fc;margin-left:4px">${bookPrice}</strong>
     </span>`;
+  }).join('');
+}
+
+// ---- fixtures tab ----
+let _fixtureRound = 'R1';
+const _fixtureLeg = new Map();  // matchId -> {legId, single}
+
+function setFixtureRound(r) {
+  _fixtureRound = r;
+  document.querySelectorAll('.fix-round-btn').forEach(b => b.classList.toggle('active', b.dataset.round === r));
+  renderFixtures();
+}
+
+function toggleFixtureLeg(matchId, outcome, singleObj) {
+  const existing = _fixtureLeg.get(matchId);
+  if (existing) {
+    _accaLegs.delete(existing.legId);
+    _fixtureLeg.delete(matchId);
+  }
+  const legId = matchId + '|' + outcome;
+  if (!existing || existing.legId !== legId) {
+    _fixtureLeg.set(matchId, { legId, single: singleObj });
+    _accaLegs.set(legId, singleObj);
+  }
+  renderFixtures();
+  renderAccaTray();
+}
+
+function renderFixtures() {
+  const grid = document.getElementById('fixtures-grid');
+  if (!grid) return;
+  if (!allMatches.length) {
+    grid.innerHTML = '<div style="color:#8b949e;padding:20px">No fixture data yet — loading...</div>';
+    return;
+  }
+
+  const rLabel = 'Group Stage ' + _fixtureRound;
+  const now = Date.now();
+
+  const filtered = allMatches.filter(m => m.round && m.round.label === rLabel);
+  if (!filtered.length) {
+    grid.innerHTML = '<div style="color:#8b949e;padding:20px">No matches found for ' + _fixtureRound + '</div>';
+    return;
+  }
+
+  filtered.sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
+
+  grid.innerHTML = filtered.map(m => {
+    const matchId   = m.label;
+    const [mHome, mAway] = m.label.includes(' vs ') ? m.label.split(' vs ') : [m.label, ''];
+    const isPast    = m.commence && (new Date(m.commence).getTime() < now);
+    const selected  = _fixtureLeg.get(matchId);
+
+    const outcomes = ['Home', 'Draw', 'Away'];
+    const outLabels = [mHome, 'Draw', mAway];
+
+    const btns = outcomes.map((oc, i) => {
+      const od = (m.outcomes || []).find(o => o.outcome === oc);
+      const price = od && od.best_price ? od.best_price.toFixed(2) : '—';
+      const isSel = selected && selected.legId === (matchId + '|' + oc);
+      const fairProb = od ? (od.book_fair || 0) / 100 : 0;
+      const perBook  = od ? (od.per_book || {}) : {};
+      const singleObj = {
+        match: matchId, outcome: outLabels[i],
+        fair_prob: fairProb, best_price: od ? od.best_price : null,
+        best_book: od ? od.best_book : null, per_book: perBook,
+      };
+      const selClass = isSel ? ' selected' : '';
+      const dis = isPast ? ' disabled' : '';
+      const clickAttr = isPast ? '' :
+        ` onclick="toggleFixtureLeg(${JSON.stringify(matchId)},${JSON.stringify(oc)},${JSON.stringify(singleObj).replace(/"/g,'&quot;')})"`;
+      return `<button class="fix-outcome-btn${selClass}"${dis}${clickAttr}>
+        <span>${outLabels[i]}</span>
+        <span class="fix-price">${price}</span>
+      </button>`;
+    }).join('');
+
+    const kick = m.commence
+      ? (() => {
+          const d = new Date(m.kickoff);
+          const diffH = (d.getTime() - now) / 36e5;
+          if (diffH < -1) return `<span style="color:#f85149">FT</span>`;
+          if (diffH < 24) return `<span style="color:#d29922">Today ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
+          if (diffH < 48) return `<span style="color:#8b949e">Tomorrow ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
+          return `<span style="color:#6e7681">${d.toLocaleDateString([],{month:'short',day:'numeric'})} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
+        })()
+      : '';
+
+    const intel = allIntel[matchId] || allIntel[mAway + ' vs ' + mHome];
+    let snapshot = '';
+    if (intel) {
+      const sum = intel.overall_summary || '';
+      const abs = intel.key_absences && intel.key_absences !== 'None known' ? '🚑 ' + intel.key_absences : '';
+      if (sum || abs) snapshot = `<div class="fix-snapshot">${sum ? `<div>${sum}</div>` : ''}${abs ? `<div style="margin-top:4px;color:#d29922">${abs}</div>` : ''}</div>`;
+    }
+
+    return `<div class="fix-card${isPast ? ' past' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div class="fix-teams">${mHome} <span style="color:#6e7681;font-weight:400">vs</span> ${mAway}</div>
+        <div class="fix-kick">${kick}</div>
+      </div>
+      <div class="fix-btns">${btns}</div>
+      ${snapshot}
+    </div>`;
   }).join('');
 }
 

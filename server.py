@@ -517,6 +517,7 @@ def _build_raw():
                 "edge":       edge,
                 "pm_gap":     pm_gap,
                 "confidence": confidence,
+                "per_book":   {k: v for k, v in per_book.items() if k not in EXCHANGE_BOOKS},
             }
             h2h_outcomes.append(outcome_obj)
 
