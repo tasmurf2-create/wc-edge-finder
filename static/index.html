@@ -1656,25 +1656,34 @@ function renderTopPicks() {
 }
 
 // ====================================================================
-// SENSIBLE BETS (Option C) — composite, all-match guidance.
-// Purely additive: reads the existing singles + their attached signals,
-// scores each, and ranks. Changes no existing logic.
+// SENSIBLE BETS — analyst-led. A bet only appears if the analyst
+// explicitly recommended that outcome. The maths then scores how good
+// the price is for that pick. Analyst = gate. Maths = quality check.
 // ====================================================================
 function sensibleScore(s) {
   let score = 0; const reasons = [];
 
-  // 1. Reliability-weighted value edge (the backbone)
-  if (edgeReliable(s)) {
+  // 1. Edge — how well priced are the odds for this analyst pick?
+  if (s.edge == null) {
+    reasons.push({t:'muted', x:`— no odds data yet`});
+  } else if (edgeReliable(s) && s.edge > 2) {
+    score += 4;
+    reasons.push({t:'good', x:`✅ great price — +${s.edge.toFixed(1)}% above fair value (${s.best_book})`});
+  } else if (edgeReliable(s)) {
     score += 2;
-    reasons.push({t:'good', x:`✅ reliable edge +${s.edge.toFixed(1)}% (best ${s.best_book})`});
+    reasons.push({t:'good', x:`✅ fair price — +${s.edge.toFixed(1)}% edge (${s.best_book})`});
+  } else if (s.edge > 0) {
+    score += 1;
+    reasons.push({t:'warn', x:`⚠ marginal value — +${s.edge.toFixed(1)}% edge, treat as fair odds`});
   } else {
-    reasons.push({t:'warn', x:`⚠ small +${s.edge.toFixed(1)}% edge on a long price — speculative`});
+    reasons.push({t:'warn', x:`⚠ odds below fair value (${s.edge.toFixed(1)}%) — shop around`});
   }
 
-  // 2. Kalshi confirmation (Polymarket has no individual WC match markets)
+  // 2. Kalshi prediction market — does real-money market agree with analyst?
   if (s.pm_gap != null) {
-    if (s.pm_gap > 1)       { score += 2; reasons.push({t:'good', x:`✅ Kalshi agrees (+${s.pm_gap}%)`}); }
-    else if (s.pm_gap < -2) { score -= 2; reasons.push({t:'warn', x:`⚠ Kalshi disagrees (${s.pm_gap}%)`}); }
+    if (s.pm_gap > 1)       { score += 2; reasons.push({t:'good', x:`✅ Kalshi agrees — prediction market also backs this (+${s.pm_gap}%)`}); }
+    else if (s.pm_gap < -2) { score -= 1; reasons.push({t:'warn', x:`⚠ Kalshi less convinced (${s.pm_gap}%) — analyst and market diverge`}); }
+    else                    { reasons.push({t:'muted', x:`— Kalshi neutral on this outcome`}); }
   } else {
     reasons.push({t:'muted', x:`— no Kalshi data for this match`});
   }
@@ -1685,20 +1694,20 @@ function sensibleScore(s) {
     const o = (s.outcome||'').toLowerCase();
     const fav = (w.favours||'').toLowerCase(), dis = (w.disfavours||'').toLowerCase();
     const hits = (n)=> n && (n.includes(o) || o.includes(n));
-    if (hits(fav))                                            { score += 1; reasons.push({t:'good', x:`🌡️ conditions favour this — ${w.headline}`}); }
-    else if (hits(dis))                                       { score -= 2; reasons.push({t:'warn', x:`🌡️ conditions against this — ${w.headline}`}); }
-    else if (w.goals_lean==='under' && o.includes('under'))   { score += 1; reasons.push({t:'good', x:`🌡️ heat suits Under`}); }
-    else if (w.goals_lean==='under' && o.includes('over'))    { score -= 1; reasons.push({t:'warn', x:`🌡️ heat works against Over`}); }
-    else if (w.goals_lean==='over'  && o.includes('over'))    { score += 1; reasons.push({t:'good', x:`⛰️ altitude suits Over`}); }
+    if (hits(fav))                                          { score += 1; reasons.push({t:'good', x:`🌡️ conditions favour this — ${w.headline}`}); }
+    else if (hits(dis))                                     { score -= 1; reasons.push({t:'warn', x:`🌡️ conditions work against this — ${w.headline}`}); }
+    else if (w.goals_lean==='under' && o.includes('under')) { score += 1; reasons.push({t:'good', x:`🌡️ heat suits Under`}); }
+    else if (w.goals_lean==='under' && o.includes('over'))  { score -= 1; reasons.push({t:'warn', x:`🌡️ heat works against Over`}); }
+    else if (w.goals_lean==='over'  && o.includes('over'))  { score += 1; reasons.push({t:'good', x:`⛰️ altitude suits Over`}); }
   }
 
-  // 4. Analyst overlap (bonus where the analyst has run)
-  let conf = s.analyst_confirms;
-  if (conf === undefined || conf === null) conf = analystConfirms(s, s.intel);
-  if (conf === true)        { score += 3; reasons.push({t:'good', x:`★ analyst backs it (both agree)`}); }
-  else if (conf === false)  { score -= 3; reasons.push({t:'warn', x:`⚠ analyst prefers another outcome`}); }
+  // 4. Analyst confidence level (high/medium/low from the intel itself)
+  const iconf = s.intel?.intel_confidence;
+  if (iconf === 'high')   { score += 2; reasons.push({t:'good', x:`★ analyst is highly confident in this pick`}); }
+  else if (iconf === 'medium') { score += 1; reasons.push({t:'good', x:`analyst is moderately confident`}); }
+  else if (iconf === 'low')    { reasons.push({t:'warn', x:`⚠ analyst confidence is low — treat carefully`}); }
 
-  const tier = score >= 5 ? 'strong' : score >= 2 ? 'solid' : 'speculative';
+  const tier = score >= 6 ? 'strong' : score >= 3 ? 'solid' : 'speculative';
   return { score, reasons, tier };
 }
 
@@ -1777,20 +1786,60 @@ function renderSensible() {
   const panel = document.getElementById('sensible-panel');
   if (!panel) return;
   if (!allSingles.length) { panel.innerHTML = '<div class="empty">No bets yet — data loading…</div>'; return; }
+
   const stake = sensibleStake();
   const tierFilter = document.getElementById('sensible-tier-filter')?.value || 'all';
-  const scored = allSingles.map(s => ({ s, sc: sensibleScore(s) }))
-    .sort((a,b) => (a.s.commence || '').localeCompare(b.s.commence || '') || b.sc.score - a.sc.score || b.s.edge - a.s.edge);
+  const hasIntel = Object.keys(allIntel).length > 0;
+
+  // OPTION B: analyst-led gate — only show bets the analyst explicitly recommended
+  const analystBacked = allSingles.filter(s => {
+    const intel = s.intel || allIntel[s.match];
+    if (!intel) return false;
+    return analystConfirms(s, intel) === true;
+  });
+
+  const scored = analystBacked
+    .map(s => ({ s, sc: sensibleScore(s) }))
+    .sort((a,b) => (a.s.commence || '').localeCompare(b.s.commence || '') || b.sc.score - a.sc.score);
+
   let list = scored.filter(x => sensibleTimeFilter(x.s));
   if (tierFilter === 'strong')     list = list.filter(x => x.sc.tier === 'strong');
   else if (tierFilter === 'solid') list = list.filter(x => x.sc.tier !== 'speculative');
-  const nStrong = scored.filter(x => x.sc.tier === 'strong').length;
-  const intro = `<div class="ev-banner good">
-      🎯 <strong>Sensible Bets — what the data backs, across every game.</strong>
-      Every value bet scored on: reliability-weighted edge + <span title="Kalshi is pricing all 72 WC matches. Polymarket has no individual match markets for WC 2026.">Kalshi agreement</span> + conditions + analyst overlap${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''}. Tags show exactly why. These are singles — placeable at the named book.
-      <span style="font-size:0.75rem;color:#6e7681;display:block;margin-top:4px">Prediction market source: Kalshi (72 WC matches). Polymarket not pricing individual WC match results.</span>
+
+  const nStrong  = scored.filter(x => x.sc.tier === 'strong').length;
+  const nTotal   = scored.length;
+  const intelCoverage = Object.keys(allIntel).length;
+
+  const intro = `<div class="ev-banner good" style="flex-direction:column;align-items:flex-start;gap:10px">
+    <div>
+      🎯 <strong>Sensible Bets — analyst-recommended picks with odds quality scored.</strong>
+    </div>
+    <div style="font-size:0.83rem;color:#c9d1d9;line-height:1.6">
+      Every bet here passed two gates:<br>
+      <span style="color:#3fb950">①</span> The <strong>AI analyst</strong> studied the match — squad, form, injuries, conditions — and explicitly recommended this outcome.<br>
+      <span style="color:#3fb950">②</span> The <strong>bookmaker odds</strong> were checked: are you getting fair or better value for that pick?<br>
+      Tiers show how well the odds stack up: <strong style="color:#3fb950">★ Strong</strong> = great price + Kalshi agrees · <strong>Solid</strong> = fair price · <em style="color:#6e7681">Speculative</em> = analyst backed it but odds are tight.
+    </div>
+    <div style="font-size:0.75rem;color:#6e7681;border-top:1px solid #21262d;padding-top:8px;width:100%">
+      ${intelCoverage} matches analysed · ${nTotal} analyst-backed bet${nTotal !== 1 ? 's' : ''} found${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''} · Prediction markets: Kalshi (72 WC matches) · <em>Analyst runs in background — more bets appear as analysis completes</em>
+    </div>
+  </div>`;
+
+  if (!hasIntel) {
+    panel.innerHTML = intro + `<div class="empty" style="padding:24px;color:#8b949e">
+      Analyst is running in the background — sensible bets will appear as matches are analysed. Check back in a moment.
     </div>`;
-  if (!list.length) { panel.innerHTML = intro + '<div class="empty" style="padding:24px">No bets at this tier yet.</div>'; return; }
+    return;
+  }
+
+  if (!list.length) {
+    panel.innerHTML = intro + `<div class="empty" style="padding:24px;color:#8b949e">
+      No analyst-backed bets match the current filters.
+      ${tierFilter !== 'all' ? 'Try loosening the tier filter.' : ''}
+    </div>`;
+    return;
+  }
+
   panel.innerHTML = intro + list.map(x => sensibleCardHTML(x.s, x.sc, stake)).join('');
 }
 
