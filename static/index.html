@@ -463,6 +463,14 @@ tr:last-child td { border-bottom: none; }
       <option value="strong">★ Strong only</option>
       <option value="solid">Solid + Strong</option>
     </select>
+    <label>When:</label>
+    <select id="sensible-time-filter" onchange="renderSensible()">
+      <option value="all">All matches</option>
+      <option value="today">Today</option>
+      <option value="tomorrow">Tomorrow</option>
+      <option value="2days">Next 2 days</option>
+      <option value="week">This week</option>
+    </select>
   </div>
   <div id="sensible-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:12px">
     <div class="loading-inner"><div class="spinner"></div><span>Scoring bets...</span></div>
@@ -1615,6 +1623,38 @@ function sensibleScore(s) {
 
 function sensibleStake() { return parseFloat(document.getElementById('sensible-stake-input')?.value) || 10; }
 
+function kickoffCountdown(iso) {
+  if (!iso) return '';
+  const now = new Date();
+  const ko  = new Date(iso);
+  const diffMs = ko - now;
+  if (diffMs < 0) return 'In progress / finished';
+  const diffH = diffMs / 3600000;
+  const time  = ko.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+  const nowDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const koDay    = new Date(ko.getFullYear(), ko.getMonth(), ko.getDate());
+  const daysDiff = Math.round((koDay - nowDay) / 86400000);
+  if (daysDiff === 0) return `<span style="color:#f0883e;font-weight:600">Today ${time}</span>`;
+  if (daysDiff === 1) return `<span style="color:#d29922;font-weight:600">Tomorrow ${time}</span>`;
+  return fmt(iso);
+}
+
+function sensibleTimeFilter(s) {
+  const f = document.getElementById('sensible-time-filter')?.value || 'all';
+  if (f === 'all') return true;
+  if (!s.commence) return true;
+  const now = new Date();
+  const ko  = new Date(s.commence);
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const koDay  = new Date(ko.getFullYear(), ko.getMonth(), ko.getDate());
+  const days   = Math.round((koDay - nowDay) / 86400000);
+  if (f === 'today')    return days === 0;
+  if (f === 'tomorrow') return days === 1;
+  if (f === '2days')    return days >= 0 && days <= 1;
+  if (f === 'week')     return days >= 0 && days <= 6;
+  return true;
+}
+
 function sensibleCardHTML(s, sc, stake) {
   const price = s.best_price, ret = stake*price, profit = ret-stake;
   const mkt = s.market==='totals'?'Over/Under':s.market==='spreads'?'Handicap':'1X2';
@@ -1623,16 +1663,21 @@ function sensibleCardHTML(s, sc, stake) {
     : sc.tier==='solid'
     ? `<span class="badge" style="background:#1c2128;color:#c9d1d9;border:1px solid #30363d">Solid</span>`
     : `<span class="badge badge-muted">Speculative</span>`;
+  const iconf = s.intel?.intel_confidence;
+  const iconfBadge = iconf
+    ? `<span style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid ${iconf==='high'?'#3fb95066':iconf==='medium'?'#d2992266':'#6e767166'};color:${iconf==='high'?'#3fb950':iconf==='medium'?'#d29922':'#6e7681'}">analyst: ${iconf}</span>`
+    : '';
   const tags = sc.reasons.map(r =>
     `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':'#d29922'}">${r.x}</span>`).join('');
   return `<div class="single-card${sc.tier==='speculative'?' demoted':''}">
     <div class="single-top">
       <div>
         <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
-        <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>
+        <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         ${tierBadge}
+        ${iconfBadge}
         <span style="font-size:0.78rem;color:#8b949e">@ <strong style="color:#f0f6fc">${price.toFixed(2)}</strong> ${s.best_book}</span>
       </div>
     </div>
@@ -1649,9 +1694,9 @@ function renderSensible() {
   const tierFilter = document.getElementById('sensible-tier-filter')?.value || 'all';
   const scored = allSingles.map(s => ({ s, sc: sensibleScore(s) }))
     .sort((a,b) => b.sc.score - a.sc.score || b.s.edge - a.s.edge);
-  let list = scored;
-  if (tierFilter === 'strong')     list = scored.filter(x => x.sc.tier === 'strong');
-  else if (tierFilter === 'solid') list = scored.filter(x => x.sc.tier !== 'speculative');
+  let list = scored.filter(x => sensibleTimeFilter(x.s));
+  if (tierFilter === 'strong')     list = list.filter(x => x.sc.tier === 'strong');
+  else if (tierFilter === 'solid') list = list.filter(x => x.sc.tier !== 'speculative');
   const nStrong = scored.filter(x => x.sc.tier === 'strong').length;
   const intro = `<div class="ev-banner good">
       🎯 <strong>Sensible Bets — what the data backs, across every game.</strong>
