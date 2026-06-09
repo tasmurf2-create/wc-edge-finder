@@ -341,18 +341,27 @@ def _run_intel_bg(intel_requests):
         _intel_busy = False
 
 
-MAX_INTEL_MATCHES = 72  # all group stage matches
-                        # (30k input tokens/min). Raise once on a higher API tier.
+MAX_INTEL_MATCHES = 24  # current active round only (~24 group stage matches)
 
 def _team_key(t):
     return t.lower().strip()
 
 
-def _trigger_intel_bg(singles, all_matches=None):
-    """Start background intel fetch for matches missing from cache.
+def _active_round(all_matches):
+    """Return the lowest round order that still has upcoming matches."""
+    now = datetime.now(timezone.utc).isoformat()
+    upcoming = [m for m in (all_matches or []) if (m.get("commence") or "") > now]
+    if not upcoming:
+        return None
+    orders = [m["round"]["order"] for m in upcoming if m.get("round")]
+    return min(orders) if orders else None
 
-    Prioritises: R1 matches first (tournament starts soon), then other
-    matches with value singles, then remaining priced matches.
+
+def _trigger_intel_bg(singles, all_matches=None):
+    """Start background intel fetch for the current active round only.
+
+    Only analyses matches in the lowest round that still has upcoming
+    fixtures — no point running R2/R3 analysis weeks in advance.
     """
     global _intel_busy
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -363,28 +372,28 @@ def _trigger_intel_bg(singles, all_matches=None):
     with _intel_lock:
         cached_labels = set(_intel_cache.keys())
 
-    # 1. Matches that have value singles (sorted by edge)
-    singles_requests = _build_intel_requests(singles)
+    # Determine which round is currently active
+    active_order = _active_round(all_matches)
 
-    # 2. All priced matches that have odds but no singles (no edge but still need analysis)
+    # 1. Value singles in the active round (sorted by edge)
+    active_singles = [s for s in singles
+                      if (s.get("round") or {}).get("order") == active_order] if active_order else singles
+    singles_requests = _build_intel_requests(active_singles or singles)
+
+    # 2. All other priced matches in the active round with no singles
     extra_requests = []
-    if all_matches:
+    if all_matches and active_order is not None:
         seen = {r["home"] + " vs " + r["away"] for r in singles_requests}
         for m in all_matches:
+            if (m.get("round") or {}).get("order") != active_order:
+                continue
             label = m.get("label", "")
             if label in seen or label in cached_labels:
                 continue
             parts = label.split(" vs ", 1)
             if len(parts) != 2:
                 continue
-            rnd = m.get("round") or {}
-            order = rnd.get("order", 99)
-            extra_requests.append({
-                "home": parts[0], "away": parts[1],
-                "price_notes": "", "_order": order
-            })
-        # R1 first, then R2, R3
-        extra_requests.sort(key=lambda r: r.get("_order", 99))
+            extra_requests.append({"home": parts[0], "away": parts[1], "price_notes": ""})
 
     all_requests = singles_requests + extra_requests
     missing = [r for r in all_requests
