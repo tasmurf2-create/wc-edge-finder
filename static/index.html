@@ -2090,6 +2090,26 @@ function renderFixtureAcca() {
     const price = single.best_price ? single.best_price.toFixed(2) : '—';
     const enc   = JSON.stringify(single).replace(/"/g, '&quot;');
     const safeMatch = single.match.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    // Analyst verdict for this leg
+    const intel    = allIntel[single.match] || allIntel[single.match.split(' vs ').reverse().join(' vs ')];
+    const confirms = intel ? analystConfirms(single, intel) : null;
+    let analystLine = '';
+    if (!intel) {
+      analystLine = `<div style="font-size:0.7rem;color:#484f58;margin-top:4px">⏳ Analyst not yet run for this match</div>`;
+    } else if (confirms === true) {
+      const snippet = intel.overall_summary ? intel.overall_summary.split('.')[0] + '.' : '';
+      analystLine = `<div style="font-size:0.7rem;color:#3fb950;margin-top:4px">★ Analyst backs this pick${snippet ? ' — ' + snippet : ''}</div>`;
+    } else if (confirms === false) {
+      // Find what the analyst actually recommended in the same market
+      const recs = (intel.recommended_bets || []).map(r => r.outcome).filter(Boolean).join(', ');
+      analystLine = `<div style="font-size:0.7rem;color:#d29922;margin-top:4px">⚠ Analyst prefers: ${recs || 'a different outcome'}</div>`;
+    } else {
+      // null = analyst ran but no same-market rec
+      const snippet = intel.overall_summary ? intel.overall_summary.split('.')[0] + '.' : '';
+      analystLine = `<div style="font-size:0.7rem;color:#6e7681;margin-top:4px">${snippet || 'Analyst has no 1X2 recommendation for this match'}</div>`;
+    }
+
     return `<div style="border-bottom:1px solid #21262d;padding:10px 14px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
         <div style="flex:1;min-width:0">
@@ -2098,6 +2118,7 @@ function renderFixtureAcca() {
             <span style="font-size:0.88rem;font-weight:700;color:#f0f6fc">${single.outcome}</span>
           </div>
           <div style="font-size:0.75rem;color:#6e7681">${single.match}</div>
+          ${analystLine}
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           <span style="font-size:0.95rem;font-weight:700;color:#c9d1d9">${price}</span>
