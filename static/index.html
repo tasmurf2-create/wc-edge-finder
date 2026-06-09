@@ -93,27 +93,34 @@ select, input[type=range] {
 }
 .fix-round-btn:hover { color: #c9d1d9; }
 .fix-round-btn.active { background: #388bfd22; color: #58a6ff; border-color: #388bfd; font-weight: 600; }
-.fix-card {
-  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
-  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+
+.fix-row {
+  display: flex; align-items: center; gap: 10px;
+  background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+  padding: 8px 12px;
+  transition: border-color 0.15s;
 }
-.fix-card.past { opacity: 0.45; }
-.fix-teams { font-size: 0.95rem; font-weight: 600; color: #f0f6fc; }
-.fix-kick  { font-size: 0.75rem; color: #6e7681; }
-.fix-btns  { display: flex; gap: 8px; }
+.fix-row:hover { border-color: #30363d; }
+.fix-row.past { opacity: 0.38; }
+.fix-row.selected-row { border-color: #388bfd44; }
+.fix-match-info { flex: 1; min-width: 0; }
+.fix-match-name { font-size: 0.88rem; font-weight: 600; color: #e6edf3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fix-match-time { font-size: 0.72rem; color: #6e7681; margin-top: 1px; }
+.fix-btns { display: flex; gap: 5px; flex-shrink: 0; }
 .fix-outcome-btn {
-  flex: 1; background: #21262d; color: #c9d1d9;
-  border: 1px solid #30363d; border-radius: 8px;
-  padding: 7px 4px; font-size: 0.78rem; cursor: pointer; font-family: inherit;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  transition: all 0.15s;
+  background: #21262d; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 5px 8px; font-size: 0.72rem; cursor: pointer; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 58px; transition: all 0.15s;
 }
-.fix-outcome-btn:hover:not(:disabled) { border-color: #58a6ff; color: #f0f6fc; }
-.fix-outcome-btn.selected { background: #388bfd22; border-color: #388bfd; color: #58a6ff; }
-.fix-outcome-btn:disabled { opacity: 0.4; cursor: default; }
-.fix-outcome-btn .fix-price { font-size: 0.88rem; font-weight: 700; color: #f0f6fc; }
+.fix-outcome-btn:hover:not(:disabled) { border-color: #58a6ff; background: #21262d; }
+.fix-outcome-btn.selected { background: #1c2e4a; border-color: #388bfd; }
+.fix-outcome-btn:disabled { opacity: 0.3; cursor: default; }
+.fix-price { font-size: 0.85rem; font-weight: 700; color: #f0f6fc; }
 .fix-outcome-btn.selected .fix-price { color: #58a6ff; }
-.fix-snapshot { font-size: 0.75rem; color: #8b949e; line-height: 1.45; border-top: 1px solid #21262d; padding-top: 8px; }
+.fix-label { font-size: 0.68rem; color: #8b949e; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fix-outcome-btn.selected .fix-label { color: #388bfd; }
 
 /* ---- divergence grid ---- */
 #matches {
@@ -534,13 +541,43 @@ tr:last-child td { border-bottom: none; }
     <button class="fix-round-btn active" data-round="R1" onclick="setFixtureRound('R1')">R1</button>
     <button class="fix-round-btn" data-round="R2" onclick="setFixtureRound('R2')">R2</button>
     <button class="fix-round-btn" data-round="R3" onclick="setFixtureRound('R3')">R3</button>
-    <span style="margin-left:12px;font-size:0.78rem;color:#6e7681">One selection per match · feeds into acca builder below</span>
   </div>
-  <div id="fixtures-grid" style="padding:18px 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">
-    <div class="loading-inner"><div class="spinner"></div><span>Loading fixtures...</span></div>
+  <div style="display:flex;align-items:flex-start">
+    <!-- Match list -->
+    <div id="fixtures-grid" style="flex:1;min-width:0;padding:14px 20px;display:flex;flex-direction:column;gap:6px">
+      <div class="loading-inner"><div class="spinner"></div><span>Loading fixtures...</span></div>
+    </div>
+    <!-- Acca sidebar -->
+    <div id="fix-sidebar" style="width:260px;flex-shrink:0;position:sticky;top:48px;max-height:calc(100vh - 48px);overflow-y:auto;padding:14px 16px 14px 0">
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px">
+        <div style="font-size:0.85rem;font-weight:600;color:#f0f6fc;margin-bottom:10px">🎰 Acca Builder</div>
+        <div id="fix-acca-legs" style="display:flex;flex-direction:column;gap:6px;min-height:40px">
+          <div style="font-size:0.78rem;color:#484f58;text-align:center;padding:12px 0">Pick outcomes from the left to build your acca</div>
+        </div>
+        <div id="fix-acca-summary" style="display:none;border-top:1px solid #21262d;margin-top:10px;padding-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:0.75rem;color:#8b949e" id="fix-acca-count"></span>
+            <button onclick="clearFixtureAcca()" style="background:none;border:1px solid #30363d;color:#6e7681;border-radius:4px;padding:2px 8px;font-size:0.72rem;cursor:pointer">Clear</button>
+          </div>
+          <div id="fix-acca-book" style="font-size:0.78rem;color:#8b949e;margin-bottom:4px"></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+            <span style="font-size:0.78rem;color:#8b949e">Combined odds</span>
+            <span id="fix-acca-odds" style="font-size:1.2rem;font-weight:700;color:#f0f6fc"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:0.78rem;color:#8b949e">€</span>
+            <input type="number" id="fix-stake" value="10" min="1" step="1"
+              style="width:60px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:5px;padding:3px 6px;font-size:0.82rem"
+              oninput="renderFixtureAcca()">
+            <span style="font-size:0.78rem;color:#8b949e">→</span>
+            <span id="fix-acca-return" style="font-size:0.88rem;font-weight:600;color:#3fb950"></span>
+          </div>
+          <div id="fix-acca-ev" style="font-size:0.75rem"></div>
+          <div id="fix-acca-nobook" style="font-size:0.73rem;color:#d29922;margin-top:4px"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <!-- padding so tray doesn't cover last row -->
-  <div style="height:80px"></div>
 </div>
 
 <!-- ===================== INJURIES TAB ===================== -->
@@ -1925,7 +1962,7 @@ function renderAccaTray() {
 
 // ---- fixtures tab ----
 let _fixtureRound = 'R1';
-const _fixtureLeg = new Map();  // matchId -> {legId, single}
+const _fixtureLeg = new Map();  // matchId -> {legId, ocKey, single}
 
 function setFixtureRound(r) {
   _fixtureRound = r;
@@ -1933,19 +1970,22 @@ function setFixtureRound(r) {
   renderFixtures();
 }
 
-function toggleFixtureLeg(matchId, outcome, singleObj) {
+function toggleFixtureLeg(matchId, ocKey, singleObj) {
   const existing = _fixtureLeg.get(matchId);
-  if (existing) {
-    _accaLegs.delete(existing.legId);
+  // clicking same button again = deselect
+  if (existing && existing.ocKey === ocKey) {
     _fixtureLeg.delete(matchId);
-  }
-  const legId = matchId + '|' + outcome;
-  if (!existing || existing.legId !== legId) {
-    _fixtureLeg.set(matchId, { legId, single: singleObj });
-    _accaLegs.set(legId, singleObj);
+  } else {
+    _fixtureLeg.set(matchId, { legId: matchId + '|' + ocKey, ocKey, single: singleObj });
   }
   renderFixtures();
-  renderAccaTray();
+  renderFixtureAcca();
+}
+
+function clearFixtureAcca() {
+  _fixtureLeg.clear();
+  renderFixtures();
+  renderFixtureAcca();
 }
 
 function renderFixtures() {
@@ -1958,76 +1998,132 @@ function renderFixtures() {
 
   const rLabel = 'Group Stage ' + _fixtureRound;
   const now = Date.now();
+  const filtered = allMatches
+    .filter(m => m.round && m.round.label === rLabel)
+    .sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
 
-  const filtered = allMatches.filter(m => m.round && m.round.label === rLabel);
   if (!filtered.length) {
     grid.innerHTML = '<div style="color:#8b949e;padding:20px">No matches found for ' + _fixtureRound + '</div>';
     return;
   }
 
-  filtered.sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
-
   grid.innerHTML = filtered.map(m => {
-    const matchId   = m.label;
+    const matchId = m.label;
     const [mHome, mAway] = m.label.includes(' vs ') ? m.label.split(' vs ') : [m.label, ''];
-    const isPast    = m.commence && (new Date(m.commence).getTime() < now);
-    const selected  = _fixtureLeg.get(matchId);
+    const isPast  = m.commence && (new Date(m.commence).getTime() < now);
+    const sel     = _fixtureLeg.get(matchId);
 
-    // outcomes in allMatches use actual team names (lowercase) e.g. "spain", "draw", "cape verde"
     const homeKey = mHome.toLowerCase();
     const awayKey = mAway.toLowerCase();
-    const ocKeys   = [homeKey, 'draw', awayKey];
-    const outLabels = [mHome, 'Draw', mAway];
+    const cols = [
+      { ocKey: homeKey, label: mHome },
+      { ocKey: 'draw',  label: 'Draw' },
+      { ocKey: awayKey, label: mAway },
+    ];
 
-    const btns = ocKeys.map((ocKey, i) => {
-      const od = (m.outcomes || []).find(o => o.outcome === ocKey);
-      const price = od && od.best_price ? od.best_price.toFixed(2) : '—';
-      const isSel = selected && selected.legId === (matchId + '|' + ocKey);
-      const fairProb = od ? (od.book_fair || 0) / 100 : 0;
-      const perBook  = od ? (od.per_book || {}) : {};
-      const singleObj = {
-        match: matchId, outcome: outLabels[i],
-        fair_prob: fairProb, best_price: od ? od.best_price : null,
-        best_book: od ? od.best_book : null, per_book: perBook,
+    const btns = cols.map(({ ocKey, label }) => {
+      const od      = (m.outcomes || []).find(o => o.outcome === ocKey);
+      const price   = od?.best_price ? od.best_price.toFixed(2) : '—';
+      const isSel   = sel?.ocKey === ocKey;
+      const noOdds  = !od?.best_price;
+      const single  = {
+        match: matchId, outcome: label,
+        fair_prob: od ? (od.book_fair || 0) / 100 : 0,
+        best_price: od?.best_price ?? null,
+        best_book:  od?.best_book  ?? null,
+        per_book:   od?.per_book   ?? {},
       };
-      const selClass = isSel ? ' selected' : '';
-      const dis = (isPast || !od) ? ' disabled' : '';
-      const clickAttr = (isPast || !od) ? '' :
-        ` onclick="toggleFixtureLeg(${JSON.stringify(matchId)},${JSON.stringify(ocKey)},${JSON.stringify(singleObj).replace(/"/g,'&quot;')})"`;
-      return `<button class="fix-outcome-btn${selClass}"${dis}${clickAttr}>
-        <span style="font-size:0.72rem">${outLabels[i]}</span>
+      const enc = JSON.stringify(single).replace(/"/g, '&quot;');
+      const click = (isPast || noOdds) ? '' : ` onclick="toggleFixtureLeg('${matchId.replace(/'/g,"\\'")}','${ocKey}',${enc})"`;
+      return `<button class="fix-outcome-btn${isSel ? ' selected' : ''}"${(isPast || noOdds) ? ' disabled' : ''}${click}>
+        <span class="fix-label">${label}</span>
         <span class="fix-price">${price}</span>
       </button>`;
     }).join('');
 
-    const kick = m.commence
-      ? (() => {
-          const d = new Date(m.commence);
-          const diffH = (d.getTime() - now) / 36e5;
-          if (diffH < -1) return `<span style="color:#f85149">FT</span>`;
-          if (diffH < 24) return `<span style="color:#d29922">Today ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
-          if (diffH < 48) return `<span style="color:#8b949e">Tomorrow ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
-          return `<span style="color:#6e7681">${d.toLocaleDateString([],{month:'short',day:'numeric'})} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;
-        })()
-      : '';
+    const kick = (() => {
+      if (!m.commence) return '';
+      const d = new Date(m.commence);
+      const h = (d.getTime() - now) / 36e5;
+      if (h < -1)  return '<span style="color:#484f58">FT</span>';
+      if (h < 0)   return '<span style="color:#f85149">Live</span>';
+      const t = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const day = Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())) / 86400000);
+      if (day === 0) return `<span style="color:#d29922">Today ${t}</span>`;
+      if (day === 1) return `<span style="color:#8b949e">Tomorrow ${t}</span>`;
+      return `<span style="color:#6e7681">${d.toLocaleDateString([],{month:'short',day:'numeric'})} ${t}</span>`;
+    })();
 
-    const intel = allIntel[matchId] || allIntel[mAway + ' vs ' + mHome];
-    let snapshot = '';
-    if (intel) {
-      const sum = intel.overall_summary || '';
-      const abs = intel.key_absences && intel.key_absences !== 'None known' ? '🚑 ' + intel.key_absences : '';
-      if (sum || abs) snapshot = `<div class="fix-snapshot">${sum ? `<div>${sum}</div>` : ''}${abs ? `<div style="margin-top:4px;color:#d29922">${abs}</div>` : ''}</div>`;
-    }
-
-    return `<div class="fix-card${isPast ? ' past' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <div class="fix-teams">${mHome} <span style="color:#6e7681;font-weight:400">vs</span> ${mAway}</div>
-        <div class="fix-kick">${kick}</div>
+    return `<div class="fix-row${isPast ? ' past' : ''}${sel ? ' selected-row' : ''}">
+      <div class="fix-match-info">
+        <div class="fix-match-name">${mHome} <span style="color:#484f58;font-weight:400">v</span> ${mAway}</div>
+        <div class="fix-match-time">${kick}</div>
       </div>
       <div class="fix-btns">${btns}</div>
-      ${snapshot}
     </div>`;
   }).join('');
+}
+
+function renderFixtureAcca() {
+  const legs    = [..._fixtureLeg.values()];
+  const summary = document.getElementById('fix-acca-summary');
+  const legsEl  = document.getElementById('fix-acca-legs');
+  if (!legsEl) return;
+
+  if (!legs.length) {
+    legsEl.innerHTML = '<div style="font-size:0.78rem;color:#484f58;text-align:center;padding:12px 0">Pick outcomes from the left to build your acca</div>';
+    if (summary) summary.style.display = 'none';
+    return;
+  }
+
+  legsEl.innerHTML = legs.map(({ legId, ocKey, single }) => {
+    const price = single.best_price ? single.best_price.toFixed(2) : '—';
+    const [home, away] = single.match.includes(' vs ') ? single.match.split(' vs ') : [single.match, ''];
+    const shortMatch = home.split(' ').pop() + ' v ' + away.split(' ').pop();
+    return `<div style="display:flex;justify-content:space-between;align-items:center;background:#21262d;border-radius:6px;padding:5px 8px;font-size:0.75rem">
+      <div>
+        <div style="color:#f0f6fc;font-weight:600">${single.outcome}</div>
+        <div style="color:#6e7681">${shortMatch}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="color:#58a6ff;font-weight:700">${price}</span>
+        <button onclick="toggleFixtureLeg('${single.match.replace(/'/g,"\\'")}','${ocKey}',${JSON.stringify(single).replace(/"/g,"&quot;")})"
+          style="background:none;border:none;color:#484f58;cursor:pointer;font-size:0.9rem;line-height:1;padding:0">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (summary) summary.style.display = 'block';
+
+  // Combined odds from best single book covering all legs
+  const singles = legs.map(l => l.single);
+  const bookSets = singles.map(s => new Set(Object.keys(s.per_book || {})));
+  const common = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
+
+  let bestBook = null, bestOdds = 0;
+  common.forEach(bk => {
+    const combined = singles.reduce((p, s) => p * (s.per_book[bk] || 0), 1);
+    if (combined > bestOdds) { bestOdds = combined; bestBook = bk; }
+  });
+
+  const stake      = parseFloat(document.getElementById('fix-stake')?.value) || 10;
+  const fairCombo  = singles.reduce((p, s) => p * (s.fair_prob || 0), 1);
+  const impliedProb = bestOdds > 0 ? 1 / bestOdds : 0;
+  const ev         = fairCombo > 0 && impliedProb > 0 ? ((fairCombo - impliedProb) * 100).toFixed(1) : null;
+
+  document.getElementById('fix-acca-count').textContent = `${legs.length}-leg acca · fair chance: ${(fairCombo * 100).toFixed(1)}%`;
+  document.getElementById('fix-acca-odds').textContent  = bestOdds > 0 ? bestOdds.toFixed(2) : '—';
+  document.getElementById('fix-acca-return').textContent = bestOdds > 0 ? `€${(stake * bestOdds).toFixed(2)}` : '—';
+  document.getElementById('fix-acca-book').textContent  = bestBook ? `Best book: ${bestBook}` : '';
+
+  const evEl = document.getElementById('fix-acca-ev');
+  if (ev !== null) {
+    const c = parseFloat(ev) >= 0 ? '#3fb950' : '#f85149';
+    evEl.innerHTML = `<span style="color:${c}">EV ${parseFloat(ev)>=0?'+':''}${ev}%</span>`;
+  } else { evEl.textContent = ''; }
+
+  document.getElementById('fix-acca-nobook').textContent = !bestBook && legs.length > 1
+    ? 'No single book covers all legs — try removing one' : '';
 }
 
 // ---- boot ----
