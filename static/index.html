@@ -343,15 +343,15 @@ tr:last-child td { border-bottom: none; }
 <div id="team-search-results" style="display:none;padding:18px 24px;display:none;flex-direction:column;gap:20px"></div>
 
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
-  <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
-  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
+  <button class="tab-btn active" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
+  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
   <button class="tab-btn" data-tab="injuries" onclick="switchTab('injuries')">🩹 Injuries</button>
+  <button class="tab-btn" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
 </div>
 
 <!-- ===================== DIVERGENCE TAB ===================== -->
-<div id="tab-divergence" class="tab-panel active">
+<div id="tab-divergence" class="tab-panel">
   <div class="filter-bar">
     <label>Sort:</label>
     <select id="sort-select" onchange="renderDivergence()">
@@ -448,7 +448,7 @@ tr:last-child td { border-bottom: none; }
 </div>
 
 <!-- ===================== SENSIBLE BETS TAB ===================== -->
-<div id="tab-sensible" class="tab-panel">
+<div id="tab-sensible" class="tab-panel active">
   <div class="filter-bar">
     <label>Stake:</label>
     <span style="display:flex;align-items:center;gap:4px">
@@ -735,6 +735,7 @@ async function loadData(force = false) {
     renderDivergence();
     renderBets();
     renderTopPicks();
+    renderSensible();
 
     // If intel is still loading in background, poll for it every 8s
     if (betsData.intel_loading) {

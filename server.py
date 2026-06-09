@@ -341,7 +341,7 @@ def _run_intel_bg(intel_requests):
         _intel_busy = False
 
 
-MAX_INTEL_MATCHES = 6   # top N matches analysed; sized to fit Tier-1 rate limits
+MAX_INTEL_MATCHES = 20  # top N matches analysed per fetch cycle
                         # (30k input tokens/min). Raise once on a higher API tier.
 
 def _team_key(t):

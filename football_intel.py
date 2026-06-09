@@ -27,7 +27,7 @@ CACHE_FILE      = Path("intel_cache.json")
 SEED_FILE       = Path("intel_seed.json")        # committed seed: analyst cards for a fresh deploy
 INJURY_DIGEST_FILE = Path("injury_digest.json")  # ONE tournament-wide injury digest (BBC)
 WEATHER_FILE    = Path("weather_cache.json")   # Open-Meteo forecasts per venue+date
-CACHE_TTL       = 43200    # 12 hours — match analysis
+CACHE_TTL       = 604800   # 7 days — re-run only if injuries invalidate the entry
 INJURIES_TTL    = 43200    # 12 hours — injury data
 # One broad web search per refresh covers newsworthy injuries tournament-wide,
 # instead of one search per team. NB: BBC, Guardian, Transfermarkt block Anthropic's
