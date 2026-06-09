@@ -1230,6 +1230,7 @@ function renderBets() {
           <small>${parlays.length} slip${parlays.length !== 1 ? 's' : ''}, ranked by chance of landing · ${book === 'best' ? 'best available price' : book}</small>
         </div>
       </div>
+      ${recommendedAccaHTML(allParlays, book, stake)}
       <div class="ev-banner warn">
         ⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong>
         Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small.
@@ -1491,6 +1492,144 @@ function weatherFlagHTML(item) {
                 : '  [Historical climate normal — live forecast unavailable, so an abnormal forecast would NOT be reflected here.]'
               )).replace(/"/g, '&quot;');
   return `<div class="${cls}" title="${tip}">${w.emoji} ${prefix}${w.headline}${srcTag}</div>`;
+}
+
+function recommendedAccaHTML(parlays, book, stake) {
+  // Find the best analyst-backed acca: all legs confirmed by analyst, best EV
+  const bookUrls = {
+    'Paddy Power': 'https://www.paddypower.com',
+    'Betfair Sportsbook': 'https://www.betfair.com/sport/football',
+    'Betfair': 'https://www.betfair.com/sport/football',
+    'Ladbrokes': 'https://www.ladbrokes.com',
+    'Coral': 'https://www.coral.co.uk',
+    'William Hill': 'https://www.williamhill.com',
+    'Bet365': 'https://www.bet365.com',
+    'Sky Bet': 'https://www.skybet.com',
+    'BetVictor': 'https://www.betvictor.com',
+    'BoyleSports': 'https://www.boylesports.com',
+  };
+
+  const analystBacked = parlays.filter(p =>
+    p.legs.every(l => {
+      const intel = allIntel[l.match] || allIntel[l.match.split(' vs ').reverse().join(' vs ')];
+      if (!intel) return false;
+      return analystConfirms(l, intel) === true;
+    })
+  );
+
+  if (!analystBacked.length) {
+    // No fully analyst-backed acca available yet
+    const hasIntel = Object.keys(allIntel).length > 0;
+    return `<div style="margin:16px 24px;padding:16px;border:1px solid #30363d;border-radius:8px;background:#0d1117">
+      <div style="font-size:0.8rem;font-weight:700;color:#f0f6fc;letter-spacing:.04em;margin-bottom:6px">⭐ RECOMMENDED ACCA</div>
+      <div style="color:#8b949e;font-size:0.85rem">${hasIntel ? 'No acca found where the analyst backs every leg — check back as more intel loads.' : '⏳ Analyst intel loading — recommended acca will appear shortly.'}</div>
+    </div>`;
+  }
+
+  // Pick best by EV, then by combined_fair as tiebreak
+  const best = analystBacked.sort((a, b) => {
+    const evA = (a.combined_fair / 100) - (1 / a.combined_price);
+    const evB = (b.combined_fair / 100) - (1 / b.combined_price);
+    return evB - evA || b.combined_fair - a.combined_fair;
+  })[0];
+
+  const slipBook = (book === 'best') ? (best.acca_book || 'best') : book;
+  let combinedPrice = 1;
+  const legData = best.legs.map(l => {
+    const { price, bookLabel } = priceForBook(l, slipBook);
+    combinedPrice *= price;
+    return { ...l, usedPrice: price, usedBook: bookLabel };
+  });
+
+  const grossReturn = stake * combinedPrice;
+  const profit = grossReturn - stake;
+  const fairProb = best.combined_fair / 100;
+  const impliedProb = 1 / combinedPrice;
+  const evRaw = (fairProb - impliedProb) * 100;
+
+  // Build "why" blurb from analyst intel
+  const whyParts = best.legs.map(l => {
+    const intel = allIntel[l.match] || allIntel[l.match.split(' vs ').reverse().join(' vs ')];
+    const teams = l.match.split(' vs ');
+    const home = teams[0], away = teams[1] || '';
+    const outcome = l.outcome === 'draw' ? 'Draw'
+      : l.outcome === home?.toLowerCase() ? home
+      : l.outcome === away?.toLowerCase() ? away
+      : l.outcome;
+    if (!intel) return `${outcome} (${l.match})`;
+    const recs = (intel.recommended_bets || []);
+    const matchingRec = recs.find(r => {
+      const ro = (r.outcome || '').toLowerCase();
+      return ro === 'home_win' ? l.outcome === home?.toLowerCase()
+           : ro === 'away_win' ? l.outcome === away?.toLowerCase()
+           : ro === 'draw'     ? l.outcome === 'draw'
+           : false;
+    });
+    const reason = matchingRec?.rationale || intel.overall_summary || '';
+    const shortReason = reason.split('.')[0];
+    return `<strong>${outcome}</strong> (${l.match}): ${shortReason}.`;
+  });
+
+  const whyHTML = whyParts.map(w => `<div style="margin-bottom:4px;color:#c9d1d9;font-size:0.82rem">★ ${w}</div>`).join('');
+
+  const legsHTML = legData.map(l => {
+    const teams = l.match.split(' vs ');
+    const home = teams[0], away = teams[1] || '';
+    const outcomeLabel = l.outcome === 'draw' ? 'Draw'
+      : l.outcome === home?.toLowerCase() ? home
+      : l.outcome === away?.toLowerCase() ? away
+      : l.outcome.toUpperCase();
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #21262d">
+      <div>
+        <div style="font-weight:700;color:#f0f6fc">${outcomeLabel}</div>
+        <div style="font-size:0.77rem;color:#8b949e">${l.match}${l.round ? ' · ' + l.round.label.replace('Group Stage ','') : ''} · ${fmt(l.commence)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:#3fb950;font-size:1.05rem">${l.usedPrice.toFixed(2)}</div>
+        <div style="font-size:0.7rem;color:#8b949e">${l.usedBook}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const bookUrl = bookUrls[slipBook] || bookUrls[best.acca_book] || 'https://www.paddypower.com';
+  const bookName = slipBook !== 'best' ? slipBook : (best.acca_book || 'your bookmaker');
+
+  const legLines = legData.map(l => {
+    const teams = l.match.split(' vs ');
+    const home = teams[0], away = teams[1] || '';
+    const ol = l.outcome === 'draw' ? 'Draw'
+      : l.outcome === home?.toLowerCase() ? home
+      : l.outcome === away?.toLowerCase() ? away
+      : l.outcome.toUpperCase();
+    return `${ol} @ ${l.usedPrice.toFixed(2)} (${l.match})`;
+  }).join('\n');
+  const waMsg = `⭐ WC 2026 Recommended Acca\n\n${legLines}\n\nCombined: ${combinedPrice.toFixed(2)}\nStake €${stake} → Returns €${grossReturn.toFixed(2)}\n\nBuilt with WC Edge Finder`;
+
+  return `<div style="margin:16px 24px;border:1px solid #3fb95044;border-radius:8px;background:#0d1117;overflow:hidden">
+    <div style="background:#0d1117;padding:14px 16px;border-bottom:1px solid #21262d">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-size:0.8rem;font-weight:700;color:#3fb950;letter-spacing:.04em">⭐ RECOMMENDED ACCA</span>
+        <span style="font-size:0.75rem;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:1px 7px">${legData.length}-leg · ${best.combined_fair.toFixed(1)}% chance · ${combinedPrice.toFixed(2)} odds</span>
+        <span style="font-size:0.75rem;color:${evRaw >= 0 ? '#3fb950' : '#f85149'};background:#161b22;border:1px solid ${evRaw >= 0 ? '#3fb95044' : '#f8514944'};border-radius:4px;padding:1px 7px">EV ${evRaw >= 0 ? '+' : ''}${evRaw.toFixed(1)}%</span>
+      </div>
+      <div style="font-size:0.8rem;color:#8b949e;margin-bottom:10px">Every leg is backed by the analyst. Here's why:</div>
+      ${whyHTML}
+    </div>
+    <div style="padding:0 16px">${legsHTML}</div>
+    <div style="padding:12px 16px;background:#161b22;border-top:1px solid #21262d">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px">
+        <div><div style="font-size:0.7rem;color:#6e7681">Stake</div><div style="font-weight:700;color:#f0f6fc">${eur(stake)}</div></div>
+        <div style="color:#484f58;padding-top:14px">→</div>
+        <div><div style="font-size:0.7rem;color:#6e7681">Combined odds</div><div style="font-weight:700;color:#f0f6fc">${combinedPrice.toFixed(2)}</div></div>
+        <div><div style="font-size:0.7rem;color:#6e7681">Returns if wins</div><div style="font-weight:700;color:#3fb950">${eur(grossReturn)}</div></div>
+        <div><div style="font-size:0.7rem;color:#6e7681">Profit</div><div style="font-weight:700;color:#3fb950">+${eur(profit)}</div></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="${bookUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#238636;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.82rem;font-weight:600;text-decoration:none;cursor:pointer">🏦 Place at ${bookName}</a>
+        <a href="https://wa.me/?text=${encodeURIComponent(waMsg)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#25D366;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.82rem;font-weight:600;text-decoration:none;cursor:pointer">📲 Share on WhatsApp</a>
+      </div>
+    </div>
+  </div>`;
 }
 
 function parlayHTML(p, book, stake) {
