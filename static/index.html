@@ -547,34 +547,40 @@ tr:last-child td { border-bottom: none; }
     <div id="fixtures-grid" style="flex:1;min-width:0;padding:14px 20px;display:flex;flex-direction:column;gap:6px">
       <div class="loading-inner"><div class="spinner"></div><span>Loading fixtures...</span></div>
     </div>
-    <!-- Acca sidebar -->
-    <div id="fix-sidebar" style="width:260px;flex-shrink:0;position:sticky;top:48px;max-height:calc(100vh - 48px);overflow-y:auto;padding:14px 16px 14px 0">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px">
-        <div style="font-size:0.85rem;font-weight:600;color:#f0f6fc;margin-bottom:10px">🎰 Acca Builder</div>
-        <div id="fix-acca-legs" style="display:flex;flex-direction:column;gap:6px;min-height:40px">
-          <div style="font-size:0.78rem;color:#484f58;text-align:center;padding:12px 0">Pick outcomes from the left to build your acca</div>
+    <!-- Betslip sidebar -->
+    <div id="fix-sidebar" style="width:280px;flex-shrink:0;position:sticky;top:48px;height:calc(100vh - 48px);overflow-y:auto;border-left:1px solid #21262d">
+      <!-- header -->
+      <div style="background:#161b22;border-bottom:1px solid #30363d;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:#388bfd;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700" id="fix-leg-count">0</span>
+          <span style="font-size:0.85rem;font-weight:600;color:#f0f6fc">Betslip</span>
+          <span style="font-size:0.75rem;color:#8b949e" id="fix-acca-odds-header"></span>
         </div>
-        <div id="fix-acca-summary" style="display:none;border-top:1px solid #21262d;margin-top:10px;padding-top:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span style="font-size:0.75rem;color:#8b949e" id="fix-acca-count"></span>
-            <button onclick="clearFixtureAcca()" style="background:none;border:1px solid #30363d;color:#6e7681;border-radius:4px;padding:2px 8px;font-size:0.72rem;cursor:pointer">Clear</button>
-          </div>
-          <div id="fix-acca-book" style="font-size:0.78rem;color:#8b949e;margin-bottom:4px"></div>
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-            <span style="font-size:0.78rem;color:#8b949e">Combined odds</span>
-            <span id="fix-acca-odds" style="font-size:1.2rem;font-weight:700;color:#f0f6fc"></span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-            <span style="font-size:0.78rem;color:#8b949e">€</span>
-            <input type="number" id="fix-stake" value="10" min="1" step="1"
-              style="width:60px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:5px;padding:3px 6px;font-size:0.82rem"
-              oninput="renderFixtureAcca()">
-            <span style="font-size:0.78rem;color:#8b949e">→</span>
-            <span id="fix-acca-return" style="font-size:0.88rem;font-weight:600;color:#3fb950"></span>
-          </div>
-          <div id="fix-acca-ev" style="font-size:0.75rem"></div>
-          <div id="fix-acca-nobook" style="font-size:0.73rem;color:#d29922;margin-top:4px"></div>
+        <button onclick="clearFixtureAcca()" style="background:none;border:none;color:#484f58;font-size:0.75rem;cursor:pointer;padding:0">Clear all</button>
+      </div>
+      <!-- leg list -->
+      <div id="fix-acca-legs" style="display:flex;flex-direction:column">
+        <div style="font-size:0.78rem;color:#484f58;text-align:center;padding:28px 16px;line-height:1.5">Click any odds button<br>to add to your betslip</div>
+      </div>
+      <!-- stake + returns footer -->
+      <div id="fix-acca-summary" style="display:none;border-top:1px solid #30363d;background:#161b22;padding:12px 14px">
+        <div id="fix-acca-book" style="font-size:0.72rem;color:#6e7681;margin-bottom:8px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:0.82rem;color:#8b949e;white-space:nowrap">Stake €</span>
+          <input type="number" id="fix-stake" value="10" min="1" step="1"
+            style="flex:1;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;padding:5px 8px;font-size:0.88rem;font-weight:600"
+            oninput="renderFixtureAcca()">
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:0.78rem;color:#8b949e">Acca odds</span>
+          <span id="fix-acca-odds" style="font-size:1rem;font-weight:700;color:#f0f6fc"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:0.78rem;color:#8b949e">Potential returns</span>
+          <span id="fix-acca-return" style="font-size:1.1rem;font-weight:700;color:#3fb950"></span>
+        </div>
+        <div id="fix-acca-ev" style="font-size:0.75rem;text-align:right;margin-bottom:4px"></div>
+        <div id="fix-acca-nobook" style="font-size:0.72rem;color:#d29922"></div>
       </div>
     </div>
   </div>
@@ -2065,41 +2071,50 @@ function renderFixtures() {
 }
 
 function renderFixtureAcca() {
-  const legs    = [..._fixtureLeg.values()];
+  const legs   = [..._fixtureLeg.values()];
+  const legsEl = document.getElementById('fix-acca-legs');
   const summary = document.getElementById('fix-acca-summary');
-  const legsEl  = document.getElementById('fix-acca-legs');
+  const countEl = document.getElementById('fix-leg-count');
   if (!legsEl) return;
 
+  if (countEl) countEl.textContent = legs.length || '0';
+
   if (!legs.length) {
-    legsEl.innerHTML = '<div style="font-size:0.78rem;color:#484f58;text-align:center;padding:12px 0">Pick outcomes from the left to build your acca</div>';
+    legsEl.innerHTML = '<div style="font-size:0.78rem;color:#484f58;text-align:center;padding:28px 16px;line-height:1.5">Click any odds button<br>to add to your betslip</div>';
     if (summary) summary.style.display = 'none';
+    document.getElementById('fix-acca-odds-header').textContent = '';
     return;
   }
 
-  legsEl.innerHTML = legs.map(({ legId, ocKey, single }) => {
+  legsEl.innerHTML = legs.map(({ ocKey, single }) => {
     const price = single.best_price ? single.best_price.toFixed(2) : '—';
-    const [home, away] = single.match.includes(' vs ') ? single.match.split(' vs ') : [single.match, ''];
-    const shortMatch = home.split(' ').pop() + ' v ' + away.split(' ').pop();
-    return `<div style="display:flex;justify-content:space-between;align-items:center;background:#21262d;border-radius:6px;padding:5px 8px;font-size:0.75rem">
-      <div>
-        <div style="color:#f0f6fc;font-weight:600">${single.outcome}</div>
-        <div style="color:#6e7681">${shortMatch}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="color:#58a6ff;font-weight:700">${price}</span>
-        <button onclick="toggleFixtureLeg('${single.match.replace(/'/g,"\\'")}','${ocKey}',${JSON.stringify(single).replace(/"/g,"&quot;")})"
-          style="background:none;border:none;color:#484f58;cursor:pointer;font-size:0.9rem;line-height:1;padding:0">✕</button>
+    const enc   = JSON.stringify(single).replace(/"/g, '&quot;');
+    const safeMatch = single.match.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div style="border-bottom:1px solid #21262d;padding:10px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+            <span style="color:#3fb950;font-size:0.75rem">✓</span>
+            <span style="font-size:0.88rem;font-weight:700;color:#f0f6fc">${single.outcome}</span>
+          </div>
+          <div style="font-size:0.75rem;color:#6e7681">${single.match}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span style="font-size:0.95rem;font-weight:700;color:#c9d1d9">${price}</span>
+          <button onclick="toggleFixtureLeg('${safeMatch}','${ocKey}',${enc})"
+            style="background:none;border:none;color:#484f58;cursor:pointer;font-size:1rem;line-height:1;padding:2px;transition:color 0.15s"
+            onmouseover="this.style.color='#f85149'" onmouseout="this.style.color='#484f58'">✕</button>
+        </div>
       </div>
     </div>`;
   }).join('');
 
   if (summary) summary.style.display = 'block';
 
-  // Combined odds from best single book covering all legs
-  const singles = legs.map(l => l.single);
+  // Best single book covering all legs
+  const singles  = legs.map(l => l.single);
   const bookSets = singles.map(s => new Set(Object.keys(s.per_book || {})));
-  const common = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
-
+  const common   = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
   let bestBook = null, bestOdds = 0;
   common.forEach(bk => {
     const combined = singles.reduce((p, s) => p * (s.per_book[bk] || 0), 1);
@@ -2109,21 +2124,22 @@ function renderFixtureAcca() {
   const stake      = parseFloat(document.getElementById('fix-stake')?.value) || 10;
   const fairCombo  = singles.reduce((p, s) => p * (s.fair_prob || 0), 1);
   const impliedProb = bestOdds > 0 ? 1 / bestOdds : 0;
-  const ev         = fairCombo > 0 && impliedProb > 0 ? ((fairCombo - impliedProb) * 100).toFixed(1) : null;
+  const ev = (fairCombo > 0 && impliedProb > 0) ? ((fairCombo - impliedProb) * 100).toFixed(1) : null;
 
-  document.getElementById('fix-acca-count').textContent = `${legs.length}-leg acca · fair chance: ${(fairCombo * 100).toFixed(1)}%`;
-  document.getElementById('fix-acca-odds').textContent  = bestOdds > 0 ? bestOdds.toFixed(2) : '—';
+  const oddsStr = bestOdds > 0 ? bestOdds.toFixed(2) : '—';
+  document.getElementById('fix-acca-odds-header').textContent = bestOdds > 0 ? `· Acca ${oddsStr}` : '';
+  document.getElementById('fix-acca-odds').textContent   = oddsStr;
   document.getElementById('fix-acca-return').textContent = bestOdds > 0 ? `€${(stake * bestOdds).toFixed(2)}` : '—';
-  document.getElementById('fix-acca-book').textContent  = bestBook ? `Best book: ${bestBook}` : '';
+  document.getElementById('fix-acca-book').textContent   = bestBook ? `Best single book: ${bestBook}` : legs.length > 1 ? 'No single book covers all legs' : '';
 
   const evEl = document.getElementById('fix-acca-ev');
   if (ev !== null) {
     const c = parseFloat(ev) >= 0 ? '#3fb950' : '#f85149';
-    evEl.innerHTML = `<span style="color:${c}">EV ${parseFloat(ev)>=0?'+':''}${ev}%</span>`;
+    evEl.innerHTML = `<span style="color:${c}">EV ${parseFloat(ev) >= 0 ? '+' : ''}${ev}% · fair chance ${(fairCombo*100).toFixed(1)}%</span>`;
   } else { evEl.textContent = ''; }
 
-  document.getElementById('fix-acca-nobook').textContent = !bestBook && legs.length > 1
-    ? 'No single book covers all legs — try removing one' : '';
+  document.getElementById('fix-acca-nobook').textContent = (!bestBook && legs.length > 1)
+    ? 'Try removing a leg — no single book prices all selections' : '';
 }
 
 // ---- boot ----
