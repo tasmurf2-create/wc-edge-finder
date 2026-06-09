@@ -341,15 +341,19 @@ def _run_intel_bg(intel_requests):
         _intel_busy = False
 
 
-MAX_INTEL_MATCHES = 20  # top N matches analysed per fetch cycle
+MAX_INTEL_MATCHES = 72  # all group stage matches
                         # (30k input tokens/min). Raise once on a higher API tier.
 
 def _team_key(t):
     return t.lower().strip()
 
 
-def _trigger_intel_bg(singles):
-    """Start background intel fetch only for matches missing from cache."""
+def _trigger_intel_bg(singles, all_matches=None):
+    """Start background intel fetch for matches missing from cache.
+
+    Prioritises: R1 matches first (tournament starts soon), then other
+    matches with value singles, then remaining priced matches.
+    """
     global _intel_busy
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return
@@ -359,10 +363,33 @@ def _trigger_intel_bg(singles):
     with _intel_lock:
         cached_labels = set(_intel_cache.keys())
 
-    all_requests = _build_intel_requests(singles)   # already sorted by edge (singles are sorted)
+    # 1. Matches that have value singles (sorted by edge)
+    singles_requests = _build_intel_requests(singles)
+
+    # 2. All priced matches that have odds but no singles (no edge but still need analysis)
+    extra_requests = []
+    if all_matches:
+        seen = {r["home"] + " vs " + r["away"] for r in singles_requests}
+        for m in all_matches:
+            label = m.get("label", "")
+            if label in seen or label in cached_labels:
+                continue
+            parts = label.split(" vs ", 1)
+            if len(parts) != 2:
+                continue
+            rnd = m.get("round") or {}
+            order = rnd.get("order", 99)
+            extra_requests.append({
+                "home": parts[0], "away": parts[1],
+                "price_notes": "", "_order": order
+            })
+        # R1 first, then R2, R3
+        extra_requests.sort(key=lambda r: r.get("_order", 99))
+
+    all_requests = singles_requests + extra_requests
     missing = [r for r in all_requests
                if (r["home"] + " vs " + r["away"]) not in cached_labels]
-    missing = missing[:MAX_INTEL_MATCHES]           # cap to top N
+    missing = missing[:MAX_INTEL_MATCHES]
 
     if not missing:
         return
@@ -725,8 +752,8 @@ def _build_raw():
         for leg in p["legs"]:
             leg["intel"] = cached_intel.get(leg["match"])
 
-    # Kick off background intel fetch (pre-fetches team snapshots then runs analysis)
-    _trigger_intel_bg(singles)
+    # Kick off background intel fetch — prioritises R1, then value singles, then rest
+    _trigger_intel_bg(singles, all_matches=matches)
 
     # Sorted bookmaker list for the frontend dropdown
     # Put Paddy Power first if present, then alphabetical
@@ -1159,7 +1186,8 @@ def refresh_injuries():
               f"invalidated (teams named in digest), rest kept")
 
         # Re-analyse the invalidated matches promptly.
-        _trigger_intel_bg(get_raw()["bets"]["singles"])
+        raw = get_raw()
+        _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
 
     threading.Thread(target=_do_refresh, daemon=True).start()
     return JSONResponse({"status": "refreshing"})
