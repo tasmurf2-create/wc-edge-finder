@@ -1495,7 +1495,8 @@ function weatherFlagHTML(item) {
 }
 
 function recommendedAccaHTML(parlays, book, stake) {
-  // Find the best analyst-backed acca: all legs confirmed by analyst, best EV
+  // Find the best analyst-backed acca: all legs confirmed by analyst, ranked by combined_fair.
+  // Search allSingles directly (not just parlay pool) so EV gate doesn't exclude favourites.
   const bookUrls = {
     'Paddy Power': 'https://www.paddypower.com',
     'Betfair Sportsbook': 'https://www.betfair.com/sport/football',
@@ -1509,46 +1510,64 @@ function recommendedAccaHTML(parlays, book, stake) {
     'BoyleSports': 'https://www.boylesports.com',
   };
 
-  const analystBacked = parlays.filter(p =>
-    p.legs.every(l => {
-      const intel = allIntel[l.match] || allIntel[l.match.split(' vs ').reverse().join(' vs ')];
-      if (!intel) return false;
-      return analystConfirms(l, intel) === true;
-    })
-  );
+  // Build analyst-confirmed singles pool (ignores EV — analyst signal is enough)
+  const confirmedSingles = allSingles.filter(s => {
+    const intel = s.intel || allIntel[s.match] || allIntel[s.match.split(' vs ').reverse().join(' vs ')];
+    if (!intel) return false;
+    return analystConfirms(s, intel) === true;
+  });
 
-  if (!analystBacked.length) {
-    // No fully analyst-backed acca available yet
+  // Pick top 2-4 legs by fair_prob (highest probability first), no duplicate matches
+  const seen = new Set();
+  const legs = [];
+  [...confirmedSingles]
+    .sort((a, b) => (b.fair_prob || 0) - (a.fair_prob || 0))
+    .forEach(s => {
+      if (legs.length >= 4) return;
+      if (seen.has(s.match)) return;
+      seen.add(s.match);
+      legs.push(s);
+    });
+
+  if (legs.length < 2) {
     const hasIntel = Object.keys(allIntel).length > 0;
     return `<div style="margin:16px 24px;padding:16px;border:1px solid #30363d;border-radius:8px;background:#0d1117">
       <div style="font-size:0.8rem;font-weight:700;color:#f0f6fc;letter-spacing:.04em;margin-bottom:6px">⭐ RECOMMENDED ACCA</div>
-      <div style="color:#8b949e;font-size:0.85rem">${hasIntel ? 'No acca found where the analyst backs every leg — check back as more intel loads.' : '⏳ Analyst intel loading — recommended acca will appear shortly.'}</div>
+      <div style="color:#8b949e;font-size:0.85rem">${hasIntel ? 'No acca found where the analyst backs multiple legs — check back as more intel loads.' : '⏳ Analyst intel loading — recommended acca will appear shortly.'}</div>
     </div>`;
   }
 
-  // Pick best by EV, then by combined_fair as tiebreak
-  const best = analystBacked.sort((a, b) => {
-    const evA = (a.combined_fair / 100) - (1 / a.combined_price);
-    const evB = (b.combined_fair / 100) - (1 / b.combined_price);
-    return evB - evA || b.combined_fair - a.combined_fair;
-  })[0];
-
-  const slipBook = (book === 'best') ? (best.acca_book || 'best') : book;
+  // Build combined price from per_book or best_price
+  const slipBook = book === 'best' ? 'best' : book;
   let combinedPrice = 1;
-  const legData = best.legs.map(l => {
-    const { price, bookLabel } = priceForBook(l, slipBook);
+  const legData = legs.map(s => {
+    const { price, bookLabel } = priceForBook(s, slipBook);
     combinedPrice *= price;
-    return { ...l, usedPrice: price, usedBook: bookLabel };
+    return { match: s.match, outcome: s.outcome, commence: s.commence, round: s.round,
+             usedPrice: price, usedBook: bookLabel };
   });
+
+  // Best single book that prices all legs
+  const allBooks = [...new Set(legs.flatMap(s => Object.keys(s.per_book || {})))];
+  let bestBook = slipBook !== 'best' ? slipBook : (legData[0]?.usedBook || 'your bookmaker');
+  if (slipBook === 'best') {
+    const bookTotals = allBooks.map(bk => {
+      const prices = legs.map(s => (s.per_book || {})[bk]);
+      if (!prices.every(p => p > 0)) return null;
+      return { bk, combined: prices.reduce((a, b) => a * b, 1) };
+    }).filter(Boolean);
+    if (bookTotals.length) bestBook = bookTotals.sort((a, b) => b.combined - a.combined)[0].bk;
+  }
 
   const grossReturn = stake * combinedPrice;
   const profit = grossReturn - stake;
-  const fairProb = best.combined_fair / 100;
+  // Combined fair prob = product of each leg's fair_prob
+  const fairProb = legs.reduce((p, s) => p * ((s.fair_prob || 50) / 100), 1);
   const impliedProb = 1 / combinedPrice;
   const evRaw = (fairProb - impliedProb) * 100;
 
   // Build "why" blurb from analyst intel
-  const whyParts = best.legs.map(l => {
+  const whyParts = legData.map(l => {
     const intel = allIntel[l.match] || allIntel[l.match.split(' vs ').reverse().join(' vs ')];
     const teams = l.match.split(' vs ');
     const home = teams[0], away = teams[1] || '';
@@ -1591,8 +1610,8 @@ function recommendedAccaHTML(parlays, book, stake) {
     </div>`;
   }).join('');
 
-  const bookUrl = bookUrls[slipBook] || bookUrls[best.acca_book] || 'https://www.paddypower.com';
-  const bookName = slipBook !== 'best' ? slipBook : (best.acca_book || 'your bookmaker');
+  const bookUrl = bookUrls[bestBook] || 'https://www.paddypower.com';
+  const bookName = bestBook;
 
   const legLines = legData.map(l => {
     const teams = l.match.split(' vs ');
@@ -1609,7 +1628,7 @@ function recommendedAccaHTML(parlays, book, stake) {
     <div style="background:#0d1117;padding:14px 16px;border-bottom:1px solid #21262d">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
         <span style="font-size:0.8rem;font-weight:700;color:#3fb950;letter-spacing:.04em">⭐ RECOMMENDED ACCA</span>
-        <span style="font-size:0.75rem;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:1px 7px">${legData.length}-leg · ${best.combined_fair.toFixed(1)}% chance · ${combinedPrice.toFixed(2)} odds</span>
+        <span style="font-size:0.75rem;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:1px 7px">${legData.length}-leg · ${(fairProb*100).toFixed(1)}% chance · ${combinedPrice.toFixed(2)} odds</span>
         <span style="font-size:0.75rem;color:${evRaw >= 0 ? '#3fb950' : '#f85149'};background:#161b22;border:1px solid ${evRaw >= 0 ? '#3fb95044' : '#f8514944'};border-radius:4px;padding:1px 7px">EV ${evRaw >= 0 ? '+' : ''}${evRaw.toFixed(1)}%</span>
       </div>
       <div style="font-size:0.8rem;color:#8b949e;margin-bottom:10px">Every leg is backed by the analyst. Here's why:</div>
