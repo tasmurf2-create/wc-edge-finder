@@ -457,6 +457,9 @@ def _build_raw():
     try:
         events = _fetch_events()
     except Exception as e:
+        import traceback
+        print(f"[odds] fetch failed: {e}", flush=True)
+        traceback.print_exc()
         return {"error": str(e), "fetched_at": int(time.time()), "matches": [], "bets": {"singles": [], "parlays": [], "acca_pool": []}}
 
     try:
@@ -1044,6 +1047,19 @@ def get_raw(force=False):
 
 # ---------------------------------------------------------------------------
 # Routes
+
+@app.get("/api/status")
+def status():
+    """Quick health-check: shows whether odds are loading and any error message."""
+    key_set = bool(os.environ.get("ODDS_API_KEY"))
+    d = get_raw()
+    return JSONResponse({
+        "odds_api_key_set": key_set,
+        "sport_key":        _sport_key,
+        "fetched_at":       d.get("fetched_at"),
+        "match_count":      len(d.get("matches", [])),
+        "error":            d.get("error"),
+    })
 # ---------------------------------------------------------------------------
 
 @app.get("/api/divergence")
