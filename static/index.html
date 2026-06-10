@@ -357,6 +357,33 @@ tr:last-child td { border-bottom: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .empty { color: #484f58; font-size: 0.88rem; padding: 30px 0; text-align: center; }
+
+/* ---- mobile (owner checks on phone) ---- */
+.tab-bar {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;        /* keep the scrolling, hide the bar */
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+.tab-btn { white-space: nowrap; flex-shrink: 0; }
+
+@media (max-width: 760px) {
+  header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .tab-bar, .filter-bar, .legend { padding-left: 14px; padding-right: 14px; }
+  #matches { padding: 14px; grid-template-columns: 1fr; }
+  #bets-panel, #picks-panel, #sensible-panel, #today-panel, #mybets-panel, #injuries-panel {
+    padding-left: 14px !important; padding-right: 14px !important;
+  }
+  /* Acca Builder: stack the betslip under the fixture list instead of a
+     280px side column squeezing everything */
+  #tab-fixtures > div:not(.filter-bar) { flex-direction: column; }
+  #fix-sidebar {
+    width: 100% !important; position: static !important;
+    height: auto !important; border-left: none !important;
+    border-top: 1px solid #30363d;
+  }
+  #team-search { width: 150px !important; }
+}
 </style>
 </head>
 <body>
