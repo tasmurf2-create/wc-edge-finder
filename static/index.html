@@ -2303,7 +2303,7 @@ function sensibleCardHTML(s, sc, stake, grouped = false) {
     <div style="margin-top:6px;line-height:1.7">${tags}</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:6px">
       <span style="font-size:0.8rem;color:#8b949e">${evMoneyHTML(s.fair_prob, price, stake, '0.85rem')} <span style="color:#484f58">·</span> €${stake.toFixed(2)} returns €${ret.toFixed(2)} if it wins</span>
-      <button onclick="openBetModal('${s.match.replace(/'/g,"\\'")}','${s.outcome}','${s.market}',${price},'${(s.best_book||'').replace(/'/g,"\\'")}'); this.blur()"
+      <button onclick="openBetModal('${s.match.replace(/'/g,"\\'")}','${s.outcome}','${s.market}',${price},'${(s.best_book||'').replace(/'/g,"\\'")}',${s.fair_prob != null ? s.fair_prob : 'null'}); this.blur()"
         style="padding:3px 10px;font-size:0.75rem;border-radius:5px;cursor:pointer;font-family:inherit;
                background:#0d2818;color:#3fb950;border:1px solid #3fb95066">+ Log bet</button>
     </div>
@@ -2798,8 +2798,11 @@ function savePlacedBets(bets) { localStorage.setItem(_BETS_KEY, JSON.stringify(b
 
 let _betModalData = null;
 
-function openBetModal(match, outcome, market, defaultOdds, defaultBook) {
-  _betModalData = { match, outcome, market };
+// fairProb (0-1, may be null): the model's de-vigged fair probability at the
+// moment of logging — stored with the bet so the journal can later compare the
+// price you took against where the market moves (closing-line-value tracking).
+function openBetModal(match, outcome, market, defaultOdds, defaultBook, fairProb = null) {
+  _betModalData = { match, outcome, market, fairProb };
   document.getElementById('bm-desc').textContent = `${outcome.toUpperCase()} — ${match}`;
   document.getElementById('bm-odds').value  = defaultOdds  || '';
   document.getElementById('bm-stake').value = sensibleStake();
@@ -2819,10 +2822,14 @@ function confirmLogBet() {
   const stake = parseFloat(document.getElementById('bm-stake').value);
   const book  = document.getElementById('bm-book').value.trim();
   if (!odds || !stake) return;
+  const fairAtLog = _betModalData.fairProb;
   const bets = loadPlacedBets();
   bets.push({ id: Date.now().toString(), match: _betModalData.match,
     outcome: _betModalData.outcome, market: _betModalData.market,
-    odds, stake, bookmaker: book, placed_at: Math.floor(Date.now()/1000), result: 'pending' });
+    odds, stake, bookmaker: book, placed_at: Math.floor(Date.now()/1000), result: 'pending',
+    // CLV groundwork: the model's fair prob at log time + EV at the odds taken
+    fair_at_log: fairAtLog != null ? +fairAtLog : null,
+    ev_at_log:   fairAtLog != null ? +((fairAtLog * odds - 1) * 100).toFixed(2) : null });
   savePlacedBets(bets);
   closeBetModal();
   renderMyBets();
@@ -2839,6 +2846,19 @@ function deletePlacedBet(id) {
   if (!confirm('Remove this bet from your tracker?')) return;
   savePlacedBets(loadPlacedBets().filter(b => b.id !== id));
   renderMyBets();
+}
+
+// Latest model fair probability for a logged bet's outcome (h2h only) — used
+// to show how the market moved since you logged it (closing-line-value proxy:
+// if the fair prob of your pick ROSE after you bet, you beat the move).
+function currentFairFor(b) {
+  if (b.market !== 'h2h') return null;
+  const want = normalizeMatchLabel(b.match);
+  const m = allMatches.find(x => x.label === b.match || normalizeMatchLabel(x.label) === want);
+  if (!m) return null;
+  const oc = normalizeTeam(b.outcome) || (b.outcome || '').toLowerCase();
+  const o  = (m.outcomes || []).find(o => o.outcome === oc);
+  return o && o.book_fair != null ? o.book_fair / 100 : null;
 }
 
 function renderMyBets() {
@@ -2864,9 +2884,21 @@ function renderMyBets() {
   const potentialRet = pending.reduce((s, b) => s + b.stake * b.odds, 0);
   const pnlCol = actualPnl > 0 ? '#3fb950' : actualPnl < 0 ? '#f85149' : '#8b949e';
 
+  // Model-expected P/L: what the logged EVs predicted across every bet that
+  // captured a fair prob at log time. Over a real sample, actual P/L converging
+  // on this is the evidence the model works (and diverging is the evidence it
+  // doesn't) — that's the whole point of logging.
+  const evBets        = bets.filter(b => b.ev_at_log != null && b.result !== 'void');
+  const expectedPnl   = evBets.reduce((s, b) => s + b.stake * b.ev_at_log / 100, 0);
+  const expCol        = expectedPnl > 0 ? '#3fb950' : expectedPnl < 0 ? '#f85149' : '#8b949e';
+  const expCell = evBets.length
+    ? `<div><div class="help" style="font-size:0.75rem;color:#6e7681" title="Sum of (stake × EV at log time) over the ${evBets.length} bet(s) logged with a model fair price. Compare with actual P&L over a meaningful sample — convergence is the proof the model works.">Model-expected P&amp;L</div><strong style="color:${expCol}">${expectedPnl>=0?'+':''}€${expectedPnl.toFixed(2)}</strong></div>`
+    : '';
+
   const summary = `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap">
     <div><div style="font-size:0.75rem;color:#6e7681">Settled staked</div><strong>€${totalStaked.toFixed(2)}</strong></div>
     <div><div style="font-size:0.75rem;color:#6e7681">P&amp;L</div><strong style="color:${pnlCol}">${actualPnl>=0?'+':''}€${actualPnl.toFixed(2)}</strong></div>
+    ${expCell}
     ${pending.length ? `<div><div style="font-size:0.75rem;color:#6e7681">Pending return</div><strong style="color:#d29922">€${potentialRet.toFixed(2)}</strong></div>` : ''}
     <div><div style="font-size:0.75rem;color:#6e7681">Record</div>
       <strong style="color:#3fb950">${won.length}W</strong> <strong style="color:#f85149"> ${lost.length}L</strong> <strong style="color:#d29922"> ${pending.length}P</strong>
@@ -2876,6 +2908,23 @@ function renderMyBets() {
   const rows = [...bets].reverse().map(b => {
     const ret    = b.stake * b.odds;
     const placed = new Date(b.placed_at * 1000).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+
+    // EV at log + market movement since (CLV proxy)
+    let clvLine = '';
+    if (b.fair_at_log != null) {
+      const evCol = b.ev_at_log >= 0 ? '#3fb950' : '#f85149';
+      let movement = '';
+      const nowFair = b.result === 'pending' ? currentFairFor(b) : null;
+      if (nowFair != null && Math.abs(nowFair - b.fair_at_log) >= 0.001) {
+        const up  = nowFair > b.fair_at_log;
+        movement = ` · fair ${(b.fair_at_log*100).toFixed(1)}% → ${(nowFair*100).toFixed(1)}% now `
+          + (up ? `<span style="color:#3fb950" title="The market moved towards your pick after you logged it — you beat the move (positive closing-line value so far).">📈 you beat the move</span>`
+                : `<span style="color:#f85149" title="The market moved against your pick after you logged it.">📉 market moved against you</span>`);
+      }
+      clvLine = `<div style="font-size:0.75rem;color:#8b949e;margin-top:4px">
+        <span class="help" style="color:${evCol}" title="Expected value at the odds and model fair price when you logged this bet.">EV at log ${b.ev_at_log>=0?'+':''}${b.ev_at_log}%</span>${movement}
+      </div>`;
+    }
     const rBtns  = ['pending','won','lost','void'].map(r => {
       const on  = b.result === r;
       const col = r==='won'?'#3fb950':r==='lost'?'#f85149':r==='void'?'#8b949e':'#d29922';
@@ -2887,8 +2936,9 @@ function renderMyBets() {
     return `<div class="single-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div>
-          <div class="single-title">${b.outcome.toUpperCase()} — ${b.match}</div>
-          <div class="single-sub">${b.bookmaker||'—'} · ${b.odds.toFixed(2)} · ${placed}</div>
+          <div class="single-title">${esc(b.outcome.toUpperCase())} — ${fmtLabel(b.match)}</div>
+          <div class="single-sub">${esc(b.bookmaker||'—')} · ${b.odds.toFixed(2)} · ${placed}</div>
+          ${clvLine}
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:0.85rem;color:#f0f6fc">€${b.stake.toFixed(2)}</div>
@@ -2968,7 +3018,7 @@ function renderToday() {
           </div>
           ${rb.reasoning?`<div style="font-size:0.78rem;color:#6e7681;margin-top:3px;font-style:italic">${esc(rb.reasoning)}</div>`:''}
         </div>
-        <button ${isLogged?'disabled':''} onclick="openBetModal('${safeMatch}','${norm}','h2h',${pd.best_price},'${safeBook}'); this.blur()"
+        <button ${isLogged?'disabled':''} onclick="openBetModal('${safeMatch}','${norm}','h2h',${pd.best_price},'${safeBook}',${pd.book_fair != null ? (pd.book_fair / 100) : 'null'}); this.blur()"
           style="flex-shrink:0;padding:4px 12px;font-size:0.78rem;border-radius:5px;cursor:${isLogged?'default':'pointer'};
                  font-family:inherit;background:${isLogged?'#1a2f1a':'#0d2818'};
                  color:#3fb950;border:1px solid #3fb95066;opacity:${isLogged?0.6:1}">
