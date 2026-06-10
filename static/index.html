@@ -1275,12 +1275,10 @@ function renderBets() {
         </div>
       </div>
       ${recommendedAccaHTML(allParlays, book, stake)}
-      <div class="ev-banner warn">
-        ⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong>
-        Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small.
-        Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — and for one real slip, pick a single book above rather than "Best available".
-        The genuine edge is in <a onclick="switchBetsTab('singles')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">Value Singles →</a>
-      </div>
+      <div class="ev-banner" style="padding:0">${collapsibleBanner("acca-ev-warn",
+        "⚠ Accumulators are −EV — expected to lose money long-term.",
+        "⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong> Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than \"Best available\". The genuine edge is in <a onclick=\"switchBetsTab('singles')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">Value Singles →</a>"
+      )}</div>
       ${controls}
       ${accaMarketsNote()}
       ${accaLegendHTML()}
@@ -1303,10 +1301,10 @@ function renderBets() {
           <small>${ranked.length} where the price beats fair (${solid} solid, ${ranked.length - solid} speculative) · ${book === 'best' ? 'best available price' : book}</small>
         </div>
       </div>
-      <div class="ev-banner good">
-        ✅ <strong>What the numbers say — candidates, not endorsements.</strong>
-        Each one's best price beats the de-vigged fair probability (positive edge). Small edges on long-odds outcomes are greyed out as <em>speculative</em> (within the model's margin of error). For the football view, see <a onclick="switchTab('picks')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">Bettor's Analysis →</a>; bets marked <span style="color:#3fb950">★ Both agree</span> are the strongest.
-      </div>
+      <div class="ev-banner" style="padding:0">${collapsibleBanner("singles-maths-info",
+        "✅ What the numbers say — candidates, not endorsements.",
+        "✅ <strong>What the numbers say — candidates, not endorsements.</strong> Each one's best price beats the de-vigged fair probability (positive edge). Small edges on long-odds outcomes are greyed out as <em>speculative</em> (within the model's margin of error). For the football view, see <a onclick=\"switchTab('picks')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">Bettor's Analysis →</a>; bets marked <span style=\"color:#3fb950\">★ Both agree</span> are the strongest."
+      )}</div>
       <div class="singles-list" style="padding:0 24px 24px">
         ${ranked.map(s => singleHTML(s, book, stake)).join('')}
       </div>`;
@@ -1791,20 +1789,24 @@ function parlayHTML(p, book, stake) {
     ? `<span class="badge badge-neutral help" title="The single bookmaker that prices every leg at the best combined odds — place the whole acca here.">@ ${p.acca_book}</span>`
     : '';
 
+  const evAmt     = Math.abs(edgeRaw / 100 * stake);
+  const evLine    = edgeRaw >= 0
+    ? `<span style="font-size:1rem;font-weight:700;color:#3fb950">Expected gain: +€${evAmt.toFixed(2)} per €${stake} staked</span>`
+    : `<span style="font-size:1rem;font-weight:700;color:#f85149">Expected cost: −€${evAmt.toFixed(2)} per €${stake} staked</span>`;
+
   return `<div class="parlay-card conf-${p.confidence}">
     <div class="parlay-header">
       <div style="flex:1">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span class="parlay-chance help" title="Our model's estimate that ALL legs win together, using the de-vigged (margin-removed) consensus of your bookmakers. It falls fast as you add legs — that's the trade-off for bigger odds.">${p.combined_fair.toFixed(1)}% chance it lands</span>
-          <span class="badge badge-neutral help" title="Accumulator (a.k.a. parlay): all ${p.legs.length} selections must win. The odds multiply together for a bigger payout, but a single losing leg loses the whole bet.">${p.legs.length}-leg acca</span>
+          ${evLine}
+          <span class="badge badge-neutral help" title="Accumulator: all ${p.legs.length} selections must win.">${p.legs.length}-leg acca</span>
           ${slipBookBadge}
-          ${p.round_label ? `<span class="badge badge-neutral" style="color:#88c0d0;border-color:#88c0d044" title="${p.round_span === 'multi' ? 'Legs span more than one round' : 'All legs in the same round'}">${p.round_label}</span>` : ''}
-          <span class="badge badge-neutral help" style="color:${edgeRaw >= 0 ? '#3fb950' : '#f85149'};border-color:${edgeRaw >= 0 ? '#3fb95044' : '#f8514944'}" title="Expected value — long-run return per €1 staked. Positive = the price is in your favour; negative = the bookmaker's margin is against you (normal for favourite accas).">EV ${edgeRaw >= 0 ? '+' : ''}${combinedEdge}%</span>
+          ${p.round_label ? `<span class="badge badge-neutral" style="color:#88c0d0;border-color:#88c0d044">${p.round_label}</span>` : ''}
         </div>
         <div style="font-size:0.75rem;color:#8b949e;margin-top:5px">
-          <span class="help" title="Same as 'chance it lands' — the model's probability that every leg wins.">Fair chance all legs win:</span> <strong style="color:#c9d1d9">${p.combined_fair.toFixed(1)}%</strong>
-          &nbsp;&middot;&nbsp; <span class="help" title="The chance implied by the combined odds alone (= 1 ÷ combined price). If this is lower than the fair chance, the price is in your favour.">Price implies:</span> <strong style="color:#c9d1d9">${(impliedProb*100).toFixed(1)}%</strong>
-          &nbsp;&middot;&nbsp; ${edgeRaw >= 0 ? `You're getting overpaid by <strong style="color:#3fb950">+${combinedEdge}%</strong>` : `Bookmaker margin against you <strong style="color:#f85149">${combinedEdge}%</strong>`}
+          <span class="help" title="The model's probability that every leg wins.">Model: ${p.combined_fair.toFixed(1)}% to land</span>
+          &nbsp;&middot;&nbsp; <span class="help" title="= 1 ÷ combined price">Price implies: ${(impliedProb*100).toFixed(1)}%</span>
+          &nbsp;&middot;&nbsp; EV ${edgeRaw >= 0 ? '+' : ''}${combinedEdge}%
         </div>
         <div style="display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap">
           <div>
@@ -1924,10 +1926,10 @@ function renderTopPicks() {
   const panel = document.getElementById('picks-panel');
   if (!panel) return;
 
-  const intro = `<div class="ev-banner" style="background:#161b22;border:1px solid #30363d;color:#8b949e">
-      ⚖️ <strong style="color:#f0f6fc">The football view — a professional second opinion, not fact.</strong>
-      The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths</a> — agreement between the two is the strongest signal.
-    </div>`;
+  const intro = `<div class="ev-banner" style="padding:0">${collapsibleBanner("btrs-analysis-intro",
+    "⚖️ Bettor&#39;s Analysis — analyst read on squad, form &amp; injuries.",
+    "<span style=\"color:#8b949e\">⚖️ <strong style=\"color:#f0f6fc\">The football view — a professional second opinion, not fact.</strong> The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <a onclick=\"switchTab('bets')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">The Maths</a> — agreement between the two is the strongest signal.</span>"
+  )}</div>`;
 
   const labels = Object.keys(allIntel || {});
   if (!labels.length) {
@@ -2010,6 +2012,42 @@ function sensibleScore(s) {
 
 function sensibleStake() { return parseFloat(document.getElementById('sensible-stake-input')?.value) || 10; }
 
+// ---- Banner seen-state (localStorage) ----
+function hasSeen(key) {
+  try { return !!JSON.parse(localStorage.getItem('wc26_seen')||'{}')[key]; } catch { return false; }
+}
+function markSeen(key) {
+  try {
+    const s = JSON.parse(localStorage.getItem('wc26_seen')||'{}');
+    s[key] = true;
+    localStorage.setItem('wc26_seen', JSON.stringify(s));
+  } catch {}
+}
+function collapsibleBanner(key, shortText, fullHTML) {
+  if (hasSeen(key)) {
+    return `<div style="font-size:0.8rem;color:#6e7681;padding:8px 0;display:flex;align-items:center;gap:8px">
+      ${shortText}
+      <button onclick="localStorage.removeItem('wc26_seen');location.reload()"
+        style="background:none;border:none;color:#484f58;font-size:0.75rem;cursor:pointer;padding:0">ℹ️</button>
+    </div>`;
+  }
+  return `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;position:relative;margin-bottom:4px">
+    ${fullHTML}
+    <button onclick="markSeen('${key}');this.closest('div').outerHTML='<div style=\\"font-size:0.8rem;color:#6e7681;padding:8px 0\\">${shortText.replace(/"/g,"'")}</div>'"
+      style="position:absolute;top:8px;right:10px;background:none;border:none;color:#6e7681;font-size:1rem;cursor:pointer;line-height:1"
+      title="Got it — hide this explanation">×</button>
+  </div>`;
+}
+
+// ---- Verdict badge (single dominant signal per bet card) ----
+function verdictBadge(edge) {
+  if (edge == null) return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#1c2128;color:#6e7681;border:1px solid #30363d">No price</span>`;
+  if (edge >= 1.5)  return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#0d2818;color:#3fb950;border:1px solid #3fb950aa">✅ Value Bet</span>`;
+  if (edge >= 0)    return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2d2005;color:#d29922;border:1px solid #d29922aa">→ Lean Only</span>`;
+  if (edge >= -2)   return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#1c2128;color:#8b949e;border:1px solid #484f5888">≈ Fair Price</span>`;
+  return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2a1010;color:#f85149;border:1px solid #f8514988">⚠ Avoid at Price</span>`;
+}
+
 function intelAge(intel) {
   const ca = intel?.cached_at;
   if (!ca) return '';
@@ -2072,12 +2110,8 @@ function sensibleTimeFilter(s) {
 function sensibleCardHTML(s, sc, stake, grouped = false) {
   const price = s.best_price, ret = stake*price, profit = ret-stake;
   const mkt = s.market==='totals'?'Over/Under':s.market==='spreads'?'Handicap':'1X2';
-  const tierBadge = sc.tier==='strong'
-    ? `<span class="badge" style="background:#0d2818;color:#3fb950;border:1px solid #3fb95088">★ Strong</span>`
-    : sc.tier==='solid'
-    ? `<span class="badge" style="background:#1c2128;color:#c9d1d9;border:1px solid #30363d">Solid</span>`
-    : `<span class="badge badge-muted">Speculative</span>`;
-  const rbConf = s.rb_confidence;
+  const vBadge  = verdictBadge(s.edge);
+  const rbConf  = s.rb_confidence;
   const rbBadge = rbConf
     ? `<span style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid ${rbConf==='high'?'#3fb95066':rbConf==='medium'?'#d2992266':'#6e767166'};color:${rbConf==='high'?'#3fb950':rbConf==='medium'?'#d29922':'#6e7681'}">${rbConf}${s.rb_strength?' · '+s.rb_strength:''}</span>`
     : '';
@@ -2100,7 +2134,7 @@ function sensibleCardHTML(s, sc, stake, grouped = false) {
         <div>${titleLine}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        ${tierBadge}
+        ${vBadge}
         ${rbBadge}
         <span style="font-size:0.78rem;color:#8b949e">@ <strong style="color:#f0f6fc">${price.toFixed(2)}</strong> ${s.best_book}</span>
       </div>
@@ -2200,20 +2234,11 @@ function renderSensible() {
   const nTotal   = scored.length;
   const intelCoverage = Object.keys(allIntel).length;
 
-  const intro = `<div class="ev-banner good" style="flex-direction:column;align-items:flex-start;gap:10px">
-    <div>
-      🎯 <strong>Sensible Bets — analyst-recommended picks with odds quality scored.</strong>
-    </div>
-    <div style="font-size:0.83rem;color:#c9d1d9;line-height:1.6">
-      Every bet here passed two gates:<br>
-      <span style="color:#3fb950">①</span> The <strong>AI analyst</strong> studied the match — squad, form, injuries, conditions — and explicitly recommended this outcome.<br>
-      <span style="color:#3fb950">②</span> The <strong>bookmaker odds</strong> were checked: are you getting fair or better value for that pick?<br>
-      Tiers show how well the odds stack up: <strong style="color:#3fb950">★ Strong</strong> = great price + Kalshi agrees · <strong>Solid</strong> = fair price · <em style="color:#6e7681">Speculative</em> = analyst backed it but odds are tight.
-    </div>
-    <div style="font-size:0.75rem;color:#6e7681;border-top:1px solid #21262d;padding-top:8px;width:100%">
-      ${intelCoverage} matches analysed · ${nTotal} analyst-backed bet${nTotal !== 1 ? 's' : ''} found${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''} · Prediction markets: Kalshi (72 WC matches) · <em>Analyst runs in background — more bets appear as analysis completes</em>
-    </div>
-  </div>`;
+  const sensibleStatsLine = `<div style="font-size:0.75rem;color:#6e7681;padding:6px 0 0">${intelCoverage} matches analysed · ${nTotal} analyst-backed bet${nTotal !== 1 ? 's' : ''} found${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''} · Kalshi (72 WC matches) · <em>Analyst runs in background — more bets appear as analysis completes</em></div>`;
+  const intro = `<div class="ev-banner" style="padding:0">${collapsibleBanner("sensible-bets-intro",
+    "🎯 Sensible Bets — analyst picks, odds quality scored.",
+    "🎯 <strong>Sensible Bets — analyst-recommended picks with odds quality scored.</strong><div style=\"margin-top:8px;font-size:0.83rem;color:#c9d1d9;line-height:1.6\">Every bet here passed two gates:<br><span style=\"color:#3fb950\">①</span> The <strong>AI analyst</strong> studied the match — squad, form, injuries, conditions — and explicitly recommended this outcome.<br><span style=\"color:#3fb950\">②</span> The <strong>bookmaker odds</strong> were checked: are you getting fair or better value for that pick?<br>Tiers: <strong style=\"color:#3fb950\">★ Strong</strong> = great price + Kalshi agrees · <strong>Solid</strong> = fair price · <em style=\"color:#6e7681\">Speculative</em> = analyst backed it but odds tight.</div>"
+  )}${sensibleStatsLine}</div>`;
 
   if (!hasIntel) {
     panel.innerHTML = intro + `<div class="empty" style="padding:24px;color:#8b949e">
@@ -2401,6 +2426,12 @@ function renderFixtures() {
       const price   = od?.best_price ? od.best_price.toFixed(2) : '—';
       const isSel   = sel?.ocKey === ocKey;
       const noOdds  = !od?.best_price;
+      if (noOdds) {
+        return `<div style="min-width:58px;padding:7px 10px;text-align:center;opacity:0.35">
+          <span style="display:block;font-size:0.68rem;color:#8b949e">${label}</span>
+          <span style="display:block;font-size:0.72rem;color:#484f58">No market</span>
+        </div>`;
+      }
       const single  = {
         match: matchId, outcome: label,
         fair_prob: od ? (od.book_fair || 0) / 100 : 0,
@@ -2409,8 +2440,8 @@ function renderFixtures() {
         per_book:   od?.per_book   ?? {},
       };
       const enc = JSON.stringify(single).replace(/"/g, '&quot;');
-      const click = (isPast || noOdds) ? '' : ` onclick="toggleFixtureLeg('${matchId.replace(/'/g,"\\'")}','${ocKey}',${enc})"`;
-      return `<button class="fix-outcome-btn${isSel ? ' selected' : ''}"${(isPast || noOdds) ? ' disabled' : ''}${click}>
+      const click = isPast ? '' : ` onclick="toggleFixtureLeg('${matchId.replace(/'/g,"\\'")}','${ocKey}',${enc})"`;
+      return `<button class="fix-outcome-btn${isSel ? ' selected' : ''}"${isPast ? ' disabled' : ''}${click}>
         <span class="fix-label">${label}</span>
         <span class="fix-price">${price}</span>
       </button>`;
