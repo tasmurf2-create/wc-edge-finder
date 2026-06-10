@@ -777,12 +777,22 @@ function clearTeamSearch() {
 }
 
 // ---- injuries (manual refresh only — never auto-polls, to control cost) ----
+function fmtLabel(label) {
+  // Title-case each word, but keep 'vs' lowercase
+  return (label || '').split(' ').map(w => w === 'vs' ? 'vs' : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 function fmtInjuryDigest(text) {
   if (!text) return '<div class="empty">No injury data yet — hit "Refresh injuries".</div>';
-  // Strip AI preamble lines before the actual data starts
+  // Strip AI preamble lines — keep stripping while the line is blank or starts with
+  // a known AI phrase. Stop at the first real content line.
+  const preambleRe = /^(i'?ll\s|i will\s|based on\s|here is\s|here'?s\s|let me\s|searching\s|i('ve| have)\s)/i;
   const lines = text.split('\n');
-  const startIdx = lines.findIndex(l => /^#+\s|^\*\*[A-Z]|\binjur|\bout\b|\bdoubtful\b/i.test(l));
-  if (startIdx > 0) text = lines.slice(startIdx).join('\n');
+  while (lines.length > 0 && (lines[0].trim() === '' || preambleRe.test(lines[0].trim()))) {
+    lines.shift();
+  }
+  text = lines.join('\n').trim();
+  if (!text) return '<div class="empty">Injury data is empty — try refreshing.</div>';
   // Light markdown: ## TEAM headers, **bold**, line breaks.
   const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc(text)
@@ -1446,7 +1456,7 @@ function singleHTML(s, book, stake, opts = {}) {
   return `<div class="single-card conf-${s.confidence}${speculative && context !== 'analyst' ? ' demoted' : ''}">
     <div class="single-top">
       <div>
-        <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
+        <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${fmtLabel(s.match)}</div>
         <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mktLabel}${s.round ? ' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">' + s.round.label + '</span>' : ''}</div>
         ${weatherFlagHTML(s)}
       </div>
@@ -1918,7 +1928,7 @@ function analystMatchHTML(label, intel) {
     : '';
   const ageNote = intelAge(intel) ? `<span style="color:#484f58;font-size:0.74rem;margin-left:8px">${intelAge(intel)}</span>` : '';
   return `<div class="single-card">
-    <div class="single-title">${label}${ageNote}</div>
+    <div class="single-title">${fmtLabel(label)}${ageNote}</div>
     ${updatingBanner}
     ${condNote}
     ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${intel.overall_summary}</div>` : ''}
@@ -1932,7 +1942,7 @@ function renderTopPicks() {
 
   const intro = `<div class="ev-banner" style="padding:0">${collapsibleBanner("btrs-analysis-intro",
     "⚖️ Bettor&#39;s Analysis — analyst read on squad, form &amp; injuries.",
-    "<span style=\"color:#8b949e\">⚖️ <strong style=\"color:#f0f6fc\">The football view — a professional second opinion, not fact.</strong> The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <a onclick=\"switchTab('bets')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">The Maths</a> — agreement between the two is the strongest signal.</span>"
+    "<span style=\"color:#8b949e\">⚖️ <strong style=\"color:#f0f6fc\">The football view — a professional second opinion, not fact.</strong> The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <a onclick=\"switchTab('bets')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">Prices &amp; EV</a> — agreement between the two is the strongest signal.</span>"
   )}</div>`;
 
   const labels = Object.keys(allIntel || {});
@@ -1940,7 +1950,7 @@ function renderTopPicks() {
     const loading = document.querySelector('.intel-loading') || _intelPollTimer;
     panel.innerHTML = intro + `<div class="empty" style="padding:24px">
       ${loading ? 'Analyst is still researching matches…' : 'No analyst coverage yet.'}<br>
-      <small style="color:#6e7681">Analysis is rate-limited (only a few matches per refresh) — coverage grows as it runs. Meanwhile see <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">The Maths →</a></small>
+      <small style="color:#6e7681">Analysis is rate-limited (only a few matches per refresh) — coverage grows as it runs. Meanwhile see <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">Prices &amp; EV →</a></small>
     </div>`;
     return;
   }
@@ -2282,7 +2292,7 @@ function renderSensible() {
     const ageBadge = age ? `<span style="color:#484f58;font-size:0.75rem">${age}</span>` : '';
     return `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;overflow:hidden;margin-bottom:4px">
       <div style="padding:9px 14px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <strong style="color:#f0f6fc;flex:1">${label}</strong>
+        <strong style="color:#f0f6fc;flex:1">${fmtLabel(label)}</strong>
         <span style="color:#8b949e;font-size:0.8rem">${kickoffCountdown(s0.commence)}</span>
         ${roundBadge} ${ageBadge}
       </div>
@@ -2830,8 +2840,9 @@ function renderToday() {
       </div>`;
     }).filter(Boolean).join('');
 
+    const wHeadline = (match.weather?.headline || '').replace(/\b(\d+)\.0m\b/g, (_, n) => parseInt(n).toLocaleString() + 'm');
     const wBadge = match.weather
-      ? `<span style="color:#d29922;font-size:0.78rem" title="${match.weather.detail}">${match.weather.emoji} ${match.weather.headline}</span>` : '';
+      ? `<span style="color:#d29922;font-size:0.78rem" title="${match.weather.detail}">${match.weather.emoji} ${wHeadline}</span>` : '';
     const rBadge = match.round ? `<span style="color:#88c0d0;font-size:0.78rem">${match.round.label}</span>` : '';
     const age = intelAge(intel);
 
@@ -2850,7 +2861,7 @@ function renderToday() {
     return `<div class="single-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <div>
-          <div class="single-title">${label}</div>
+          <div class="single-title">${fmtLabel(label)}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:3px;font-size:0.8rem;color:#8b949e">
             ${kickoffCountdown(match.commence)} ${rBadge} ${wBadge}
           </div>
