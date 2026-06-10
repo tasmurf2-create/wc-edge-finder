@@ -484,12 +484,76 @@ def _web_search_text(prompt, max_uses=2, max_tokens=500, allowed_domains=None):
 def _injury_digest_query():
     today = datetime.now().strftime("%-d %B %Y") if os.name != "nt" else datetime.now().strftime("%d %B %Y")
     return (
-        f"As of {today}, summarise the latest confirmed injury and suspension news "
-        f"for the 2026 FIFA World Cup. For each affected national team, list the player "
-        f"name, their team, and the injury/suspension and expected availability. "
-        f"Group by national team. Focus on the most recent news. If a major team has no "
-        f"reported absences, you may note that."
+        f"As of {today}, find the latest confirmed injury and suspension news for "
+        f"the 2026 FIFA World Cup.\n\n"
+        f"Output ONLY a JSON object, no prose before or after, in exactly this shape:\n"
+        f'{{"items": [{{"team": "France", "player": "Player Name", '
+        f'"status": "out", "detail": "hamstring tear, ruled out of the tournament"}}]}}\n\n'
+        f"Rules:\n"
+        f"- status must be one of: out, doubtful, suspended, fit_again\n"
+        f"- detail: one short phrase — the injury/ban and expected availability\n"
+        f"- one item per affected player; only include players with REPORTED news "
+        f"(do not invent or pad)\n"
+        f"- use the squad's national team name for team\n"
+        f"- if you find no reported absences, return {{\"items\": []}}"
     )
+
+
+def _parse_digest_json(text):
+    """Extract the {"items": [...]} object from a search-model response.
+    Returns a cleaned list of item dicts, or None if not parseable."""
+    if not text:
+        return None
+    s = text.strip()
+    if s.startswith("```"):
+        s = s.split("```")[1]
+        if s.startswith("json"):
+            s = s[4:]
+    start, end = s.find("{"), s.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(s[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+    items = data.get("items")
+    if not isinstance(items, list):
+        return None
+    valid_status = {"out", "doubtful", "suspended", "fit_again"}
+    cleaned = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        team   = str(it.get("team", "")).strip()
+        player = str(it.get("player", "")).strip()
+        status = str(it.get("status", "")).strip().lower().replace(" ", "_")
+        detail = str(it.get("detail", "")).strip()
+        if not team or not player:
+            continue
+        if status not in valid_status:
+            status = "unknown"
+        cleaned.append({"team": team, "player": player, "status": status, "detail": detail})
+    return cleaned
+
+
+def _digest_text_from_items(items):
+    """Render structured injury items as the plain-text digest consumed by the
+    analyst prompt and by the team-name cache-invalidation matching."""
+    if not items:
+        return "No confirmed injury or suspension news reported for any squad."
+    by_team = {}
+    for it in items:
+        by_team.setdefault(it["team"], []).append(it)
+    lines = []
+    label = {"out": "OUT", "doubtful": "Doubtful", "suspended": "Suspended",
+             "fit_again": "Fit again", "unknown": "Status unclear"}
+    for team in sorted(by_team):
+        lines.append(f"## {team}")
+        for it in by_team[team]:
+            d = f" — {it['detail']}" if it.get("detail") else ""
+            lines.append(f"- {it['player']}: {label.get(it['status'], it['status'])}{d}")
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def fetch_wc_injury_digest(force=False):
@@ -507,14 +571,22 @@ def fetch_wc_injury_digest(force=False):
     try:
         text = _web_search_text(
             _injury_digest_query(),
-            max_uses=3, max_tokens=900, allowed_domains=INJURY_DOMAINS,
+            max_uses=3, max_tokens=1400, allowed_domains=INJURY_DOMAINS,
         )
         if text:
+            # Structured path: parse the JSON items, derive the plain-text digest
+            # from them (the analyst prompt + invalidation matching consume text).
+            # If the model ignored the format, fall back to storing the raw text.
+            items  = _parse_digest_json(text)
+            digest = _digest_text_from_items(items) if items is not None else text
             with _io_lock:
                 _save_json(INJURY_DIGEST_FILE,
-                           {"digest": text, "fetched_at": int(time.time())})
-            print(f"[injuries] WC digest refreshed ({len(text)} chars)")
-            return text
+                           {"digest": digest,
+                            "items": items,   # None when unparseable (legacy text mode)
+                            "fetched_at": int(time.time())})
+            n = f"{len(items)} structured items" if items is not None else "unstructured text"
+            print(f"[injuries] WC digest refreshed ({n}, {len(digest)} chars)")
+            return digest
     except Exception as e:
         print(f"[injuries] digest fetch failed: {e}")
 
@@ -527,9 +599,11 @@ def peek_injury_digest():
 
 
 def injury_digest_info():
-    """Cached digest text + fetch timestamp for the Injuries tab — no network."""
+    """Cached digest (text + structured items when available) + fetch timestamp
+    for the Injuries tab — no network. items is None for legacy text digests."""
     d = _load_json(INJURY_DIGEST_FILE) or {}
-    return {"digest": d.get("digest"), "fetched_at": d.get("fetched_at")}
+    return {"digest": d.get("digest"), "items": d.get("items"),
+            "fetched_at": d.get("fetched_at")}
 
 
 def _team_context(team):

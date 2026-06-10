@@ -902,10 +902,73 @@ function fmtInjuryDigest(text) {
     .replace(/\n/g, '<br>');
 }
 
+// ---- structured injuries table ----
+let _injuryInfo = null;   // last /api/injuries payload (items may be null = legacy text)
+
+const INJURY_STATUS_META = {
+  out:       { label: 'Out',          col: '#f85149' },
+  doubtful:  { label: 'Doubtful',     col: '#d29922' },
+  suspended: { label: 'Suspended',    col: '#bc8cff' },
+  fit_again: { label: 'Fit Again',    col: '#3fb950' },
+  unknown:   { label: 'Unclear',      col: '#8b949e' },
+};
+
+function renderInjuryTable() {
+  const panel = document.getElementById('injuries-panel');
+  const items = _injuryInfo?.items || [];
+  const teamFilter   = document.getElementById('inj-team-filter')?.value || '';
+  const statusFilter = document.getElementById('inj-status-filter')?.value || '';
+
+  const teams    = [...new Set(items.map(i => i.team))].sort();
+  const statuses = [...new Set(items.map(i => i.status))];
+  const list = items.filter(i =>
+    (!teamFilter || i.team === teamFilter) && (!statusFilter || i.status === statusFilter));
+
+  const filterBar = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <label style="font-size:0.8rem;color:#8b949e">Team:</label>
+    <select id="inj-team-filter" onchange="renderInjuryTable()">
+      <option value="">All teams (${teams.length})</option>
+      ${teams.map(t => `<option value="${esc(t)}"${t === teamFilter ? ' selected' : ''}>${esc(t)}</option>`).join('')}
+    </select>
+    <label style="font-size:0.8rem;color:#8b949e">Status:</label>
+    <select id="inj-status-filter" onchange="renderInjuryTable()">
+      <option value="">All statuses</option>
+      ${statuses.map(st => `<option value="${esc(st)}"${st === statusFilter ? ' selected' : ''}>${esc(INJURY_STATUS_META[st]?.label || st)}</option>`).join('')}
+    </select>
+    <span style="font-size:0.78rem;color:#6e7681">${list.length} player${list.length !== 1 ? 's' : ''}</span>
+  </div>`;
+
+  const rows = list.map(i => {
+    const meta = INJURY_STATUS_META[i.status] || INJURY_STATUS_META.unknown;
+    return `<tr>
+      <td style="font-weight:600">${esc(i.team)}</td>
+      <td style="text-align:left">${esc(i.player)}</td>
+      <td style="text-align:left"><span class="badge" style="background:${meta.col}18;color:${meta.col};border:1px solid ${meta.col}55">${meta.label}</span></td>
+      <td style="text-align:left;color:#8b949e">${esc(i.detail || '—')}</td>
+    </tr>`;
+  }).join('');
+
+  const table = list.length
+    ? `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;overflow-x:auto">
+        <table style="min-width:560px"><thead><tr>
+          <th>Team</th><th style="text-align:left">Player</th><th style="text-align:left">Status</th><th style="text-align:left">Detail</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </div>`
+    : `<div class="empty">No injury or suspension news matches the current filters.</div>`;
+
+  panel.innerHTML = filterBar + table;
+}
+
 function renderInjuries(info) {
   const panel = document.getElementById('injuries-panel');
   const upd   = document.getElementById('injuries-updated');
-  panel.innerHTML = `<div style="line-height:1.6;font-size:0.86rem;color:#c9d1d9">${fmtInjuryDigest(info.digest)}</div>`;
+  _injuryInfo = info;
+  if (Array.isArray(info.items)) {
+    renderInjuryTable();   // structured digest → table with team/status filters
+  } else {
+    // legacy text digest (pre-structured cache) → formatted text fallback
+    panel.innerHTML = `<div style="line-height:1.6;font-size:0.86rem;color:#c9d1d9">${fmtInjuryDigest(info.digest)}</div>`;
+  }
   if (info.fetched_at) {
     const d = new Date(info.fetched_at * 1000);
     upd.textContent = 'Last refreshed: ' + d.toLocaleString();
@@ -931,7 +994,14 @@ async function refreshInjuriesDigest() {
   const panel = document.getElementById('injuries-panel');
   btn.disabled = true; btn.textContent = 'Refreshing…';
   try {
-    await fetch('/api/refresh-injuries');
+    const r = await (await fetch('/api/refresh-injuries')).json();
+    if (r.status === 'cooldown') {
+      // Server-side cooldown (protects the search budget) — cached digest is current.
+      btn.disabled = false; btn.textContent = 'Refresh injuries';
+      const upd = document.getElementById('injuries-updated');
+      if (upd) upd.textContent = `Refreshed recently — try again in ~${Math.ceil((r.retry_in_s || 60) / 60)} min`;
+      return;
+    }
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Refresh injuries';
     return;
