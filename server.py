@@ -1084,6 +1084,42 @@ def status():
         "match_count":      len(d.get("matches", [])),
         "error":            d.get("error"),
     })
+
+
+@app.get("/api/debug/sensible")
+def debug_sensible():
+    """Shows why each single does or doesn't reach sensible bets."""
+    d = get_raw()
+    with _intel_lock:
+        cached_intel = dict(_intel_cache)
+
+    singles = d.get("bets", {}).get("singles", [])
+    intel_keys = list(cached_intel.keys())
+
+    rows = []
+    for s in singles:
+        intel = _intel_get(cached_intel, s["match"])
+        confirmed = _analyst_confirms(s) if intel else None
+        rows.append({
+            "match":     s["match"],
+            "market":    s["market"],
+            "outcome":   s["outcome"],
+            "edge":      s.get("edge"),
+            "has_intel": intel is not None,
+            "confirmed": confirmed,
+        })
+
+    by_match = {}
+    for r in rows:
+        by_match.setdefault(r["match"], []).append(r)
+
+    return JSONResponse({
+        "intel_cache_keys": intel_keys,
+        "total_singles":    len(singles),
+        "singles_with_intel":   sum(1 for r in rows if r["has_intel"]),
+        "singles_confirmed":    sum(1 for r in rows if r["confirmed"] is True),
+        "per_match": by_match,
+    })
 # ---------------------------------------------------------------------------
 
 @app.get("/api/divergence")
