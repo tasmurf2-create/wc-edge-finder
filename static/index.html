@@ -381,12 +381,14 @@ tr:last-child td { border-bottom: none; }
 <div id="team-search-results" style="display:none;padding:18px 24px;display:none;flex-direction:column;gap:20px"></div>
 
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
+  <button class="tab-btn active" data-tab="today" onclick="switchTab('today'); renderToday()">📅 Today</button>
+  <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
   <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
   <button class="tab-btn" data-tab="injuries" onclick="switchTab('injuries')">🩹 Injuries</button>
   <button class="tab-btn" data-tab="fixtures" onclick="switchTab('fixtures'); renderFixtures()">🎰 Acca Builder</button>
   <button class="tab-btn" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
+  <button class="tab-btn" data-tab="mybets" onclick="switchTab('mybets'); renderMyBets()">📋 My Bets</button>
 </div>
 
 <!-- ===================== DIVERGENCE TAB ===================== -->
@@ -486,8 +488,15 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- ===================== TODAY TAB ===================== -->
+<div id="tab-today" class="tab-panel active">
+  <div id="today-panel" style="padding:18px 24px 80px;display:flex;flex-direction:column;gap:10px">
+    <div class="loading-inner"><div class="spinner"></div><span>Loading today's matches...</span></div>
+  </div>
+</div>
+
 <!-- ===================== SENSIBLE BETS TAB ===================== -->
-<div id="tab-sensible" class="tab-panel active">
+<div id="tab-sensible" class="tab-panel">
   <div class="filter-bar">
     <label>Stake:</label>
     <span style="display:flex;align-items:center;gap:4px">
@@ -593,6 +602,13 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- ===================== MY BETS TAB ===================== -->
+<div id="tab-mybets" class="tab-panel">
+  <div id="mybets-panel" style="padding:18px 24px 80px;display:flex;flex-direction:column;gap:8px">
+    <div class="loading-inner"><div class="spinner"></div><span>Loading...</span></div>
+  </div>
+</div>
+
 <!-- ===================== INJURIES TAB ===================== -->
 <div id="tab-injuries" class="tab-panel">
   <div class="filter-bar">
@@ -637,7 +653,9 @@ function switchTab(tab) {
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-  if (tab === 'picks') renderTopPicks();
+  if (tab === 'today')   renderToday();
+  if (tab === 'picks')   renderTopPicks();
+  if (tab === 'mybets')  renderMyBets();
   if (tab === 'injuries' && !_injuriesLoaded) loadInjuries();
 }
 
@@ -883,6 +901,7 @@ async function loadData(force = false) {
     renderBets();
     renderTopPicks();
     renderSensible();
+    renderToday();
     renderFixtures();
 
     // If intel is still loading in background, poll for it every 8s
@@ -945,7 +964,7 @@ async function pollIntel() {
                            || [..._reanalysing].some(l => !newReanalysing.has(l));
     _reanalysing = newReanalysing;
 
-    if (changed || reanalysisChanged) { renderBets(); renderTopPicks(); renderFixtures(); renderSensible(); }
+    if (changed || reanalysisChanged) { renderBets(); renderTopPicks(); renderFixtures(); renderSensible(); renderToday(); }
 
     // Stop polling once intel is done loading AND no re-analysis in flight
     if (!data.intel_loading && !_reanalysing.size) {
@@ -2088,7 +2107,12 @@ function sensibleCardHTML(s, sc, stake, grouped = false) {
     </div>
     ${reasoning}
     <div style="margin-top:6px;line-height:1.7">${tags}</div>
-    <div style="margin-top:8px;font-size:0.8rem;color:#8b949e">€${stake.toFixed(2)} → <strong style="color:#3fb950">€${ret.toFixed(2)}</strong> (profit +€${profit.toFixed(2)})</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+      <span style="font-size:0.8rem;color:#8b949e">€${stake.toFixed(2)} → <strong style="color:#3fb950">€${ret.toFixed(2)}</strong> (profit +€${profit.toFixed(2)})</span>
+      <button onclick="openBetModal('${s.match.replace(/'/g,"\\'")}','${s.outcome}','${s.market}',${price},'${(s.best_book||'').replace(/'/g,"\\'")}'); this.blur()"
+        style="padding:3px 10px;font-size:0.75rem;border-radius:5px;cursor:pointer;font-family:inherit;
+               background:#0d2818;color:#3fb950;border:1px solid #3fb95066">+ Log bet</button>
+    </div>
   </div>`;
 }
 
@@ -2571,8 +2595,274 @@ function renderFixtureAcca() {
   }
 }
 
+// ============================================================
+// PLACED BETS TRACKER (localStorage — no backend)
+// ============================================================
+const _BETS_KEY = 'wc26_placed_bets';
+function loadPlacedBets() {
+  try { return JSON.parse(localStorage.getItem(_BETS_KEY) || '[]'); } catch { return []; }
+}
+function savePlacedBets(bets) { localStorage.setItem(_BETS_KEY, JSON.stringify(bets)); }
+
+let _betModalData = null;
+
+function openBetModal(match, outcome, market, defaultOdds, defaultBook) {
+  _betModalData = { match, outcome, market };
+  document.getElementById('bm-desc').textContent = `${outcome.toUpperCase()} — ${match}`;
+  document.getElementById('bm-odds').value  = defaultOdds  || '';
+  document.getElementById('bm-stake').value = sensibleStake();
+  document.getElementById('bm-book').value  = defaultBook  || '';
+  document.getElementById('bet-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('bm-odds').focus(), 50);
+}
+
+function closeBetModal() {
+  document.getElementById('bet-modal').style.display = 'none';
+  _betModalData = null;
+}
+
+function confirmLogBet() {
+  if (!_betModalData) return;
+  const odds  = parseFloat(document.getElementById('bm-odds').value);
+  const stake = parseFloat(document.getElementById('bm-stake').value);
+  const book  = document.getElementById('bm-book').value.trim();
+  if (!odds || !stake) return;
+  const bets = loadPlacedBets();
+  bets.push({ id: Date.now().toString(), match: _betModalData.match,
+    outcome: _betModalData.outcome, market: _betModalData.market,
+    odds, stake, bookmaker: book, placed_at: Math.floor(Date.now()/1000), result: 'pending' });
+  savePlacedBets(bets);
+  closeBetModal();
+  renderMyBets();
+  renderToday();   // refresh "Log bet" buttons to show ✓ Logged
+}
+
+function setPlacedBetResult(id, result) {
+  const bets = loadPlacedBets();
+  const b = bets.find(b => b.id === id);
+  if (b) { b.result = result; savePlacedBets(bets); renderMyBets(); }
+}
+
+function deletePlacedBet(id) {
+  if (!confirm('Remove this bet from your tracker?')) return;
+  savePlacedBets(loadPlacedBets().filter(b => b.id !== id));
+  renderMyBets();
+}
+
+function renderMyBets() {
+  const panel = document.getElementById('mybets-panel');
+  if (!panel) return;
+  const bets = loadPlacedBets();
+
+  if (!bets.length) {
+    panel.innerHTML = `<div style="padding:40px 0;text-align:center;color:#6e7681">
+      No bets logged yet.<br><br>
+      <small>Hit <strong style="color:#3fb950">+ Log bet</strong> on any card in Today or Sensible Bets to track it here.</small>
+    </div>`;
+    return;
+  }
+
+  const won     = bets.filter(b => b.result === 'won');
+  const lost    = bets.filter(b => b.result === 'lost');
+  const pending = bets.filter(b => b.result === 'pending');
+  const settled = bets.filter(b => b.result !== 'pending' && b.result !== 'void');
+  const totalStaked  = settled.reduce((s, b) => s + b.stake, 0);
+  const actualPnl    = won.reduce((s, b) => s + b.stake * (b.odds - 1), 0)
+                     - lost.reduce((s, b) => s + b.stake, 0);
+  const potentialRet = pending.reduce((s, b) => s + b.stake * b.odds, 0);
+  const pnlCol = actualPnl > 0 ? '#3fb950' : actualPnl < 0 ? '#f85149' : '#8b949e';
+
+  const summary = `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap">
+    <div><div style="font-size:0.75rem;color:#6e7681">Settled staked</div><strong>€${totalStaked.toFixed(2)}</strong></div>
+    <div><div style="font-size:0.75rem;color:#6e7681">P&amp;L</div><strong style="color:${pnlCol}">${actualPnl>=0?'+':''}€${actualPnl.toFixed(2)}</strong></div>
+    ${pending.length ? `<div><div style="font-size:0.75rem;color:#6e7681">Pending return</div><strong style="color:#d29922">€${potentialRet.toFixed(2)}</strong></div>` : ''}
+    <div><div style="font-size:0.75rem;color:#6e7681">Record</div>
+      <strong style="color:#3fb950">${won.length}W</strong> <strong style="color:#f85149"> ${lost.length}L</strong> <strong style="color:#d29922"> ${pending.length}P</strong>
+    </div>
+  </div>`;
+
+  const rows = [...bets].reverse().map(b => {
+    const ret    = b.stake * b.odds;
+    const placed = new Date(b.placed_at * 1000).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+    const rBtns  = ['pending','won','lost','void'].map(r => {
+      const on  = b.result === r;
+      const col = r==='won'?'#3fb950':r==='lost'?'#f85149':r==='void'?'#8b949e':'#d29922';
+      const lbl = r==='pending'?'Pending':r==='won'?'✓ Won':r==='lost'?'✗ Lost':'Void';
+      return `<button onclick="setPlacedBetResult('${b.id}','${r}')"
+        style="padding:3px 9px;font-size:0.75rem;border-radius:4px;cursor:pointer;font-family:inherit;
+               background:${on?col+'22':'#21262d'};color:${on?col:'#8b949e'};border:1px solid ${on?col+'88':'#30363d'}">${lbl}</button>`;
+    }).join('');
+    return `<div class="single-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div>
+          <div class="single-title">${b.outcome.toUpperCase()} — ${b.match}</div>
+          <div class="single-sub">${b.bookmaker||'—'} · ${b.odds.toFixed(2)} · ${placed}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:0.85rem;color:#f0f6fc">€${b.stake.toFixed(2)}</div>
+          <div style="font-size:0.78rem;color:#3fb950">→ €${ret.toFixed(2)}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        ${rBtns}
+        <button onclick="deletePlacedBet('${b.id}')"
+          style="margin-left:auto;padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;
+                 font-family:inherit;background:#21262d;color:#6e7681;border:1px solid #30363d">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  panel.innerHTML = summary + `<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">${rows}</div>`;
+}
+
+// ============================================================
+// TODAY TAB
+// ============================================================
+function renderToday() {
+  const panel = document.getElementById('today-panel');
+  if (!panel) return;
+
+  const now = new Date();
+  let dayMatches = [], dayLabel = '';
+
+  for (let d = 0; d <= 6; d++) {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 0, 0, 0);
+    const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 23, 59, 59);
+    const from  = d === 0 ? now : start;   // today: from now, not midnight
+    dayMatches = allMatches.filter(m => { const k = new Date(m.commence); return k >= from && k <= end; });
+    if (dayMatches.length) {
+      dayLabel = d === 0 ? 'Today' : d === 1 ? 'Tomorrow'
+               : start.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
+      break;
+    }
+  }
+
+  if (!dayMatches.length) {
+    panel.innerHTML = `<div class="empty">No upcoming matches in the next 7 days.</div>`;
+    return;
+  }
+
+  dayMatches.sort((a, b) => (a.commence||'').localeCompare(b.commence||''));
+  const logged = new Set(loadPlacedBets().map(b => b.match + '|' + b.outcome));
+
+  const cards = dayMatches.map(match => {
+    const label = match.label;
+    const intel = allIntel[label] || allIntel[normalizeMatchLabel(label)];
+    const recs  = intel?.recommended_bets || [];
+    const parts = label.split(' vs ');
+    const homeN = normalizeTeam(parts[0]||''), awayN = normalizeTeam(parts[1]||'');
+
+    // Build one row per recommendation (up to 3)
+    const recRows = recs.map(rb => {
+      const ao = (rb.outcome||'').toLowerCase().replace(/ /g,'_');
+      let norm = ao==='home_win' ? homeN : ao==='away_win' ? awayN : ao==='draw' ? 'draw' : null;
+      if (!norm) return '';
+      const pd = (match.outcomes||[]).find(o => o.outcome === norm);
+      if (!pd || !pd.best_price) return '';
+      const edgeCol = (pd.edge||0)>1.5 ? '#3fb950' : (pd.edge||0)>0 ? '#d29922' : '#8b949e';
+      const cCol    = rb.confidence==='high'?'#3fb950':rb.confidence==='medium'?'#d29922':'#8b949e';
+      const betKey  = label + '|' + norm;
+      const isLogged = logged.has(betKey);
+      const safeMatch = label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const safeBook  = (pd.best_book||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;
+                          padding:8px 10px;background:#0d1117;border-radius:6px;margin-top:6px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <strong style="color:#f0f6fc">${norm.toUpperCase()}</strong>
+            <span style="color:${cCol};font-size:0.78rem">${rb.confidence||''}${rb.strength?' · '+rb.strength:''}</span>
+            <span style="font-size:0.82rem;color:#c9d1d9">${pd.best_price.toFixed(2)} @ ${pd.best_book}</span>
+            ${pd.edge!=null?`<span style="font-size:0.78rem;color:${edgeCol}">${pd.edge>0?'+':''}${pd.edge.toFixed(1)}%</span>`:''}
+          </div>
+          ${rb.reasoning?`<div style="font-size:0.78rem;color:#6e7681;margin-top:3px;font-style:italic">${rb.reasoning}</div>`:''}
+        </div>
+        <button ${isLogged?'disabled':''} onclick="openBetModal('${safeMatch}','${norm}','h2h',${pd.best_price},'${safeBook}'); this.blur()"
+          style="flex-shrink:0;padding:4px 12px;font-size:0.78rem;border-radius:5px;cursor:${isLogged?'default':'pointer'};
+                 font-family:inherit;background:${isLogged?'#1a2f1a':'#0d2818'};
+                 color:#3fb950;border:1px solid #3fb95066;opacity:${isLogged?0.6:1}">
+          ${isLogged?'✓ Logged':'+ Log bet'}
+        </button>
+      </div>`;
+    }).filter(Boolean).join('');
+
+    const wBadge = match.weather
+      ? `<span style="color:#d29922;font-size:0.78rem" title="${match.weather.detail}">${match.weather.emoji} ${match.weather.headline}</span>` : '';
+    const rBadge = match.round ? `<span style="color:#88c0d0;font-size:0.78rem">${match.round.label}</span>` : '';
+    const age = intelAge(intel);
+
+    let bodyHTML = '';
+    if (recRows) {
+      bodyHTML = recRows;
+    } else if (intel) {
+      bodyHTML = `<div style="margin-top:6px;font-size:0.82rem;color:#6e7681">Analyst sees no clear edge — no bet recommended.</div>`;
+    } else {
+      bodyHTML = `<div style="margin-top:6px;font-size:0.82rem;color:#484f58;display:flex;align-items:center;gap:6px">
+        <div class="spinner" style="width:10px;height:10px;border-width:2px;margin:0;border-color:#484f58;border-top-color:transparent"></div>
+        Analyst not yet run for this match
+      </div>`;
+    }
+
+    return `<div class="single-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div>
+          <div class="single-title">${label}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:3px;font-size:0.8rem;color:#8b949e">
+            ${kickoffCountdown(match.commence)} ${rBadge} ${wBadge}
+          </div>
+        </div>
+        ${age?`<span style="color:#484f58;font-size:0.74rem">${age}</span>`:''}
+      </div>
+      ${bodyHTML}
+    </div>`;
+  }).join('');
+
+  const analysed = dayMatches.filter(m => allIntel[m.label]||allIntel[normalizeMatchLabel(m.label)]).length;
+  panel.innerHTML = `
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 16px;margin-bottom:4px;
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <span style="font-size:1rem;font-weight:700;color:#f0f6fc">📅 ${dayLabel} — ${dayMatches.length} match${dayMatches.length>1?'es':''}</span>
+        <span style="font-size:0.78rem;color:#6e7681;margin-left:10px">${analysed}/${dayMatches.length} analysed · kickoffs UTC</span>
+      </div>
+    </div>
+    ${cards}`;
+}
+
 // ---- boot ----
 loadData();
 </script>
+
+<!-- Bet logger modal -->
+<div id="bet-modal" onclick="if(event.target===this)closeBetModal()"
+  style="display:none;position:fixed;inset:0;background:#000a;z-index:200;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px 24px;width:320px;max-width:90vw">
+    <div style="font-size:1rem;font-weight:700;color:#f0f6fc;margin-bottom:4px">Log bet</div>
+    <div id="bm-desc" style="font-size:0.84rem;color:#8b949e;margin-bottom:14px"></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label style="font-size:0.82rem;color:#8b949e">Odds taken
+        <input id="bm-odds" type="number" step="0.01" min="1"
+          style="display:block;margin-top:3px;width:100%;padding:6px 8px;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;font-size:0.9rem">
+      </label>
+      <label style="font-size:0.82rem;color:#8b949e">Stake (€)
+        <input id="bm-stake" type="number" step="1" min="1"
+          style="display:block;margin-top:3px;width:100%;padding:6px 8px;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;font-size:0.9rem">
+      </label>
+      <label style="font-size:0.82rem;color:#8b949e">Bookmaker
+        <input id="bm-book" type="text" placeholder="e.g. Paddy Power"
+          style="display:block;margin-top:3px;width:100%;padding:6px 8px;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;font-size:0.9rem">
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="confirmLogBet()"
+        style="flex:1;padding:8px;background:#0d2818;color:#3fb950;border:1px solid #3fb950aa;border-radius:6px;font-size:0.9rem;cursor:pointer;font-family:inherit;font-weight:600">
+        Log bet
+      </button>
+      <button onclick="closeBetModal()"
+        style="padding:8px 16px;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;font-size:0.9rem;cursor:pointer;font-family:inherit">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
