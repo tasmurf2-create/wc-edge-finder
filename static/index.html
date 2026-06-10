@@ -684,8 +684,8 @@ function onTeamSearch(q) {
   // --- Accas ---
   const accas = allParlays.filter(p => p.legs && p.legs.some(l => matchesTeam(l.match || '') || matchesTeam(l.outcome || '')));
 
-  // --- Divergence matches ---
-  const divMatches = allMatches.filter(m => matchesTeam(m.home || '') || matchesTeam(m.away || ''));
+  // --- Divergence matches (matches carry a 'label', not home/away fields) ---
+  const divMatches = allMatches.filter(m => matchesTeam(m.label || ''));
 
   // --- Bettor's Analysis intel ---
   const intelMatches = Object.entries(allIntel).filter(([label]) => matchesTeam(label));
@@ -698,12 +698,12 @@ function onTeamSearch(q) {
   if (divMatches.length) {
     html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Market Divergence (${divMatches.length})</div>`;
     divMatches.forEach(m => {
-      const pmHome = m.pm_prob ? (m.pm_prob[m.home] * 100).toFixed(0) : '—';
-      const pmAway = m.pm_prob ? (m.pm_prob[m.away] * 100).toFixed(0) : '—';
+      const probs = (m.outcomes || []).map(o =>
+        `${fmtLabel(o.outcome)} ${o.book_fair != null ? o.book_fair.toFixed(0) + '%' : '—'}`).join(' · ');
       html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
-        <strong style="color:#c9d1d9">${m.home} vs ${m.away}</strong>
-        <span style="color:#6e7681;margin-left:8px">${m.round?.label || ''}</span>
-        <div style="color:#8b949e;margin-top:4px">PM: ${m.home} ${pmHome}% · Draw — · ${m.away} ${pmAway}%</div>
+        <strong style="color:#c9d1d9">${fmtLabel(m.label)}</strong>
+        <span style="color:#6e7681;margin-left:8px">${esc(m.round?.label || '')}</span>
+        <div style="color:#8b949e;margin-top:4px">Book fair: ${probs || '—'}${m.has_pm_data ? ` · PM gap ${m.max_gap > 0 ? '+' : ''}${m.max_gap}%` : ''}</div>
       </div>`;
     });
     html += '</div>';
@@ -747,13 +747,13 @@ function onTeamSearch(q) {
       const confColor = conf === 'high' ? '#3fb950' : conf === 'medium' ? '#d29922' : '#6e7681';
       const summary = intel.overall_summary || '—';
       const recs = intel.recommended_bets || [];
-      const recsHtml = recs.length ? recs.map(r => `<div style="color:#c9d1d9;margin-top:3px">→ ${r.bet} <span style="color:#8b949e">(${r.reasoning})</span></div>`).join('') : '';
+      const recsHtml = recs.length ? recs.map(r => `<div style="color:#c9d1d9;margin-top:3px">→ ${esc((r.outcome || '').replace(/_/g, ' '))} <span style="color:#8b949e">(${esc(r.reasoning || '')})</span></div>`).join('') : '';
       html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="color:#c9d1d9">${label}</strong>
-          <span style="font-size:0.75rem;color:${confColor};text-transform:uppercase">${conf} confidence</span>
+          <strong style="color:#c9d1d9">${fmtLabel(label)}</strong>
+          <span style="font-size:0.75rem;color:${confColor};text-transform:uppercase">${esc(conf)} confidence</span>
         </div>
-        <div style="color:#8b949e;line-height:1.5">${summary}</div>
+        <div style="color:#8b949e;line-height:1.5">${esc(summary)}</div>
         ${recsHtml}
       </div>`;
     });
@@ -778,8 +778,10 @@ function clearTeamSearch() {
 
 // ---- injuries (manual refresh only — never auto-polls, to control cost) ----
 function fmtLabel(label) {
-  // Title-case each word, but keep 'vs' lowercase
-  return (label || '').split(' ').map(w => w === 'vs' ? 'vs' : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  // Title-case each word, but keep 'vs' lowercase. HTML-escaped (team names
+  // arrive from a third-party odds feed) — safe to drop into innerHTML.
+  const t = (label || '').split(' ').map(w => w === 'vs' ? 'vs' : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return esc(t);
 }
 
 function fmtInjuryDigest(text) {
@@ -1550,7 +1552,7 @@ function intelHTML(intel) {
   const altWarn = cond.altitude_m > 800
     ? `<span style="color:#f85149;font-weight:700"> ALTITUDE ${Math.round(cond.altitude_m).toLocaleString()}m</span>` : '';
   const condLine = cond.city
-    ? `<div style="margin-bottom:6px"><span style="color:#6e7681">Venue:</span> <strong>${cond.city}</strong>${altWarn} &nbsp;·&nbsp; <span style="color:#6e7681">Local KO:</span> <strong>${cond.local_kickoff}</strong> &nbsp;·&nbsp; ${cond.avg_high_c}°C feels ${cond.feels_like_c}°C, ${cond.humidity_pct}% humidity</div>`
+    ? `<div style="margin-bottom:6px"><span style="color:#6e7681">Venue:</span> <strong>${esc(cond.city)}</strong>${altWarn} &nbsp;·&nbsp; <span style="color:#6e7681">Local KO:</span> <strong>${esc(cond.local_kickoff)}</strong> &nbsp;·&nbsp; ${esc(cond.avg_high_c)}°C feels ${esc(cond.feels_like_c)}°C, ${esc(cond.humidity_pct)}% humidity</div>`
     : '';
 
   const strengthColour = rec.strength === 'strong' ? '#3fb950' : rec.strength === 'moderate' ? '#d29922' : '#8b949e';
@@ -1558,25 +1560,25 @@ function intelHTML(intel) {
   return `<div style="margin-top:10px;border:1px solid #30363d;border-radius:8px;overflow:hidden">
     <div style="background:#1c2128;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:0.78rem;font-weight:700;color:#c9d1d9;letter-spacing:0.04em">ANALYST RESEARCH</span>
-      <span style="font-size:0.72rem;color:${confColour}">analyst confidence: ${conf}</span>
+      <span style="font-size:0.72rem;color:${confColour}">analyst confidence: ${esc(conf)}</span>
     </div>
     <div style="padding:12px 14px;font-size:0.82rem;display:flex;flex-direction:column;gap:8px">
       ${condLine}
-      <div><span style="color:#6e7681">Conditions impact:</span> ${intel.conditions_impact || '—'}</div>
-      <div><span style="color:#6e7681">Home form:</span> ${intel.home_form || '—'}</div>
-      <div><span style="color:#6e7681">Away form:</span> ${intel.away_form || '—'}</div>
-      <div><span style="color:#6e7681">Tactical matchup:</span> ${intel.tactical_matchup || '—'}</div>
-      <div><span style="color:#6e7681">Goals:</span> ${intel.goals_assessment || '—'}</div>
-      <div><span style="color:#6e7681">Market read:</span> ${intel.market_read || '—'}</div>
-      ${intel.key_absences ? `<div><span style="color:#6e7681">Absences:</span> ${intel.key_absences}</div>` : ''}
+      <div><span style="color:#6e7681">Conditions impact:</span> ${esc(intel.conditions_impact || '—')}</div>
+      <div><span style="color:#6e7681">Home form:</span> ${esc(intel.home_form || '—')}</div>
+      <div><span style="color:#6e7681">Away form:</span> ${esc(intel.away_form || '—')}</div>
+      <div><span style="color:#6e7681">Tactical matchup:</span> ${esc(intel.tactical_matchup || '—')}</div>
+      <div><span style="color:#6e7681">Goals:</span> ${esc(intel.goals_assessment || '—')}</div>
+      <div><span style="color:#6e7681">Market read:</span> ${esc(intel.market_read || '—')}</div>
+      ${intel.key_absences ? `<div><span style="color:#6e7681">Absences:</span> ${esc(intel.key_absences)}</div>` : ''}
       <div style="background:#0d1117;border-radius:6px;padding:10px 12px;margin-top:2px">
         <div style="font-size:0.72rem;color:#6e7681;margin-bottom:4px">ANALYST RECOMMENDATION</div>
-        <div style="font-weight:700;color:${strengthColour};margin-bottom:4px">${recOutcome.replace(/_/g,' ').toUpperCase()} &nbsp;<span style="font-weight:400;font-size:0.78rem">(${rec.strength || '—'})</span></div>
-        <div style="color:#c9d1d9;line-height:1.5">${rec.reasoning || '—'}</div>
-        ${rec.watch_out ? `<div style="margin-top:6px;color:#d29922;font-size:0.78rem">Watch out: ${rec.watch_out}</div>` : ''}
+        <div style="font-weight:700;color:${strengthColour};margin-bottom:4px">${esc(recOutcome.replace(/_/g,' ').toUpperCase())} &nbsp;<span style="font-weight:400;font-size:0.78rem">(${esc(rec.strength || '—')})</span></div>
+        <div style="color:#c9d1d9;line-height:1.5">${esc(rec.reasoning || '—')}</div>
+        ${rec.watch_out ? `<div style="margin-top:6px;color:#d29922;font-size:0.78rem">Watch out: ${esc(rec.watch_out)}</div>` : ''}
       </div>
-      <div style="color:#c9d1d9;line-height:1.6;font-style:italic">${intel.overall_summary || ''}</div>
-      ${intel.knowledge_caveat ? `<div style="font-size:0.73rem;color:#6e7681;border-top:1px solid #21262d;padding-top:6px">Data caveat: ${intel.knowledge_caveat}</div>` : ''}
+      <div style="color:#c9d1d9;line-height:1.6;font-style:italic">${esc(intel.overall_summary || '')}</div>
+      ${intel.knowledge_caveat ? `<div style="font-size:0.73rem;color:#6e7681;border-top:1px solid #21262d;padding-top:6px">Data caveat: ${esc(intel.knowledge_caveat)}</div>` : ''}
     </div>
   </div>`;
 }
@@ -1704,7 +1706,7 @@ function recommendedAccaHTML(parlays, book, stake) {
     });
     const reason = matchingRec?.rationale || intel.overall_summary || '';
     const shortReason = reason.split('.')[0];
-    return `<strong>${outcome}</strong> (${l.match}): ${shortReason}.`;
+    return `<strong>${esc(outcome)}</strong> (${esc(l.match)}): ${esc(shortReason)}.`;
   });
 
   const whyHTML = whyParts.map(w => `<div style="margin-bottom:4px;color:#c9d1d9;font-size:0.82rem">★ ${w}</div>`).join('');
@@ -1943,24 +1945,24 @@ function analystMatchHTML(label, intel) {
         return `
         <div style="border-left:3px solid ${cc(rb.confidence)};padding:8px 12px;margin-top:8px;background:#0d1117;border-radius:0 6px 6px 0">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <strong style="color:#f0f6fc">${fmtAnalystOutcome(rb, home, away)}</strong>
-            <span class="badge" style="color:${cc(rb.confidence)};border-color:${cc(rb.confidence)}44">${rb.confidence || ''}${rb.strength ? ' · ' + rb.strength : ''}</span>
+            <strong style="color:#f0f6fc">${esc(fmtAnalystOutcome(rb, home, away))}</strong>
+            <span class="badge" style="color:${cc(rb.confidence)};border-color:${cc(rb.confidence)}44">${esc(rb.confidence || '')}${rb.strength ? ' · ' + esc(rb.strength) : ''}</span>
             ${oddsHTML}
           </div>
-          <div style="font-size:0.82rem;color:#8b949e;margin-top:4px;line-height:1.45">${rb.reasoning || ''}</div>
+          <div style="font-size:0.82rem;color:#8b949e;margin-top:4px;line-height:1.45">${esc(rb.reasoning || '')}</div>
         </div>`;
       }).join('')
     : `<div style="color:#8b949e;font-size:0.85rem;margin-top:6px">Analyst sees no clear edge — no bet recommended.</div>`;
   const cond = intel.conditions;
   const condNote = cond && cond.stadium
-    ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${cond.stadium}${cond.altitude_m > 800 ? ' · ' + Math.round(cond.altitude_m).toLocaleString() + 'm venue altitude' : ''}</div>`
+    ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${esc(cond.stadium)}${cond.altitude_m > 800 ? ' · ' + Math.round(cond.altitude_m).toLocaleString() + 'm venue altitude' : ''}</div>`
     : '';
   const ageNote = intelAge(intel) ? `<span style="color:#484f58;font-size:0.74rem;margin-left:8px">${intelAge(intel)}</span>` : '';
   return `<div class="single-card">
     <div class="single-title">${fmtLabel(label)}${ageNote}</div>
     ${updatingBanner}
     ${condNote}
-    ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${intel.overall_summary}</div>` : ''}
+    ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${esc(intel.overall_summary)}</div>` : ''}
     ${recsHTML}
   </div>`;
 }
@@ -2175,7 +2177,7 @@ function sensibleCardHTML(s, sc, stake, grouped = false) {
   const tags = sc.reasons.map(r =>
     `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':r.t==='muted'?'#484f58':'#d29922'}">${r.x}</span>`).join('');
   const reasoning = s.rb_reasoning
-    ? `<div style="margin-top:6px;font-size:0.81rem;color:#8b949e;line-height:1.5;border-left:2px solid #30363d;padding-left:8px">${s.rb_reasoning}</div>`
+    ? `<div style="margin-top:6px;font-size:0.81rem;color:#8b949e;line-height:1.5;border-left:2px solid #30363d;padding-left:8px">${esc(s.rb_reasoning)}</div>`
     : '';
   const legId = `leg_${s.match.replace(/\W/g,'_')}_${s.outcome.replace(/\W/g,'_')}`;
   const checked = _accaLegs.has(legId) ? 'checked' : '';
@@ -2560,15 +2562,15 @@ function renderFixtureAcca() {
       analystLine = `<div style="font-size:0.7rem;color:#484f58;margin-top:4px">⏳ Analyst not yet run for this match</div>`;
     } else if (confirms === true) {
       const snippet = intel.overall_summary ? intel.overall_summary.split('.')[0] + '.' : '';
-      analystLine = `<div style="font-size:0.7rem;color:#3fb950;margin-top:4px">★ Analyst backs this pick${snippet ? ' — ' + snippet : ''}</div>`;
+      analystLine = `<div style="font-size:0.7rem;color:#3fb950;margin-top:4px">★ Analyst backs this pick${snippet ? ' — ' + esc(snippet) : ''}</div>`;
     } else if (confirms === false) {
       // Find what the analyst actually recommended in the same market
       const recs = (intel.recommended_bets || []).map(r => r.outcome).filter(Boolean).join(', ');
-      analystLine = `<div style="font-size:0.7rem;color:#d29922;margin-top:4px">⚠ Analyst prefers: ${recs || 'a different outcome'}</div>`;
+      analystLine = `<div style="font-size:0.7rem;color:#d29922;margin-top:4px">⚠ Analyst prefers: ${esc(recs) || 'a different outcome'}</div>`;
     } else {
       // null = analyst ran but no same-market rec
       const snippet = intel.overall_summary ? intel.overall_summary.split('.')[0] + '.' : '';
-      analystLine = `<div style="font-size:0.7rem;color:#6e7681;margin-top:4px">${snippet || 'Analyst has no 1X2 recommendation for this match'}</div>`;
+      analystLine = `<div style="font-size:0.7rem;color:#6e7681;margin-top:4px">${esc(snippet) || 'Analyst has no 1X2 recommendation for this match'}</div>`;
     }
 
     return `<div style="border-bottom:1px solid #21262d;padding:10px 14px">
@@ -2866,7 +2868,7 @@ function renderToday() {
             <span style="font-size:0.82rem;color:#c9d1d9">${pd.best_price.toFixed(2)} @ ${pd.best_book}</span>
             ${pd.edge!=null?`<span style="font-size:0.78rem;color:${edgeCol}">${pd.edge>0?'+':''}${pd.edge.toFixed(1)}%</span>`:''}
           </div>
-          ${rb.reasoning?`<div style="font-size:0.78rem;color:#6e7681;margin-top:3px;font-style:italic">${rb.reasoning}</div>`:''}
+          ${rb.reasoning?`<div style="font-size:0.78rem;color:#6e7681;margin-top:3px;font-style:italic">${esc(rb.reasoning)}</div>`:''}
         </div>
         <button ${isLogged?'disabled':''} onclick="openBetModal('${safeMatch}','${norm}','h2h',${pd.best_price},'${safeBook}'); this.blur()"
           style="flex-shrink:0;padding:4px 12px;font-size:0.78rem;border-radius:5px;cursor:${isLogged?'default':'pointer'};
