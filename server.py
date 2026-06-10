@@ -129,6 +129,14 @@ if _disk_intel:
     _intel_cache.update(_disk_intel)
     print(f"[startup] loaded {len(_disk_intel)} intel entries from disk")
 
+# Pre-fetch injury digest in background at startup if stale/missing
+def _startup_injury_fetch():
+    if not fintel.peek_injury_digest():
+        print("[startup] no injury digest on disk — fetching in background...")
+        fintel.fetch_wc_injury_digest()
+
+threading.Thread(target=_startup_injury_fetch, daemon=True).start()
+
 
 # ---------------------------------------------------------------------------
 # Bookmaker data helpers

@@ -798,18 +798,37 @@ async function loadInjuries() {
 }
 
 async function refreshInjuriesDigest() {
-  const btn = document.getElementById('injuries-refresh-btn');
-  btn.disabled = true; btn.textContent = 'Refreshing (~30s)…';
+  const btn   = document.getElementById('injuries-refresh-btn');
+  const panel = document.getElementById('injuries-panel');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
   try {
-    await fetch('/api/refresh-injuries');   // one web search; also re-analyses affected matches
-    // Give the digest fetch time to land, then reload the cached copy.
-    setTimeout(async () => {
-      await loadInjuries();
-      btn.disabled = false; btn.textContent = 'Refresh injuries';
-    }, 30000);
+    await fetch('/api/refresh-injuries');
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Refresh injuries';
+    return;
   }
+  // Poll every 5s for up to 90s — web search + retries can take well over 30s
+  let elapsed = 0;
+  const pollId = setInterval(async () => {
+    elapsed += 5;
+    btn.textContent = `Refreshing… (${elapsed}s)`;
+    try {
+      const res  = await fetch('/api/injuries');
+      const info = await res.json();
+      if (info.digest) {
+        clearInterval(pollId);
+        _injuriesLoaded = true;
+        renderInjuries(info);
+        btn.disabled = false; btn.textContent = 'Refresh injuries';
+        return;
+      }
+    } catch (e) { /* keep polling */ }
+    if (elapsed >= 90) {
+      clearInterval(pollId);
+      panel.innerHTML = `<div class="empty">Injury refresh is taking longer than expected — check back in a moment or try again.</div>`;
+      btn.disabled = false; btn.textContent = 'Refresh injuries';
+    }
+  }, 5000);
 }
 
 // ---- data loading ----
