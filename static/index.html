@@ -389,6 +389,7 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn" data-tab="fixtures" onclick="switchTab('fixtures'); renderFixtures()">🎰 Acca Builder</button>
   <button class="tab-btn" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
   <button class="tab-btn" data-tab="mybets" onclick="switchTab('mybets'); renderMyBets()">📋 My Bets</button>
+  <button class="tab-btn" data-tab="method" onclick="switchTab('method')">📖 Methodology</button>
 </div>
 
 <!-- ===================== DIVERGENCE TAB ===================== -->
@@ -609,6 +610,75 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+
+<!-- ===================== METHODOLOGY TAB ===================== -->
+<div id="tab-method" class="tab-panel">
+  <div style="max-width:780px;margin:0 auto;padding:24px;font-size:0.88rem;line-height:1.65;color:#c9d1d9">
+    <h2 style="color:#f0f6fc;font-size:1.2rem;margin-bottom:4px">How this works — and what it can't do</h2>
+    <p style="color:#8b949e;font-size:0.8rem;margin-bottom:18px">Plain-English methodology. If anything here sounds like a guarantee of profit, re-read it — it isn't.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">1. Where the prices come from</h3>
+    <p>Live decimal odds for every World Cup match from The Odds API, covering the Irish-accessible bookmakers
+    (Paddy Power, Betfair, Bet365, BoyleSports, Ladbrokes, William Hill). Odds refresh roughly every 2 hours —
+    the timestamp in the header is the truth. Prediction-market prices (Kalshi, Polymarket) are pulled alongside
+    as an independent cross-check.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">2. "Fair" probability — de-vigging</h3>
+    <p>Bookmaker odds include a built-in margin (the "vig"): the implied probabilities of Home/Draw/Away sum to
+    more than 100%. We remove it proportionally for each bookmaker, then average across books to get a consensus
+    <strong>fair probability</strong> for each outcome. Two honest limits:</p>
+    <ul style="margin:6px 0 6px 20px">
+      <li><strong>"Fair" means the market average, not the truth.</strong> Beating it means you got a better price
+      than the consensus — it does not prove the consensus is right.</li>
+      <li><strong>Proportional de-vigging slightly flatters longshots</strong> (the favourite–longshot bias).
+      Small edges on big prices are therefore treated as noise and labelled <em>speculative</em>, not value.</li>
+    </ul>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">3. Edge and EV</h3>
+    <p><strong>Edge</strong> = fair probability − the probability implied by the best price (in percentage points).
+    It's a model diagnostic. The money number is <strong>EV (expected value)</strong>:
+    <code style="background:#161b22;padding:1px 6px;border-radius:4px">EV = fair probability × price − 1</code>.
+    "EV +€0.30 per €10" means that if this exact bet were repeated many times and the fair probability is correct,
+    you'd average +€0.30 profit per €10 staked. Any single bet still just wins or loses — EV only shows up over
+    dozens of bets. Variance dominates small samples.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">4. The prediction-market cross-check</h3>
+    <p>Kalshi and Polymarket are real-money exchanges with low margins. Their prices are normalised to sum to 100%
+    and compared against the book consensus. When they disagree with the books in your favour, that's confirmation;
+    when they disagree against you, the "edge" is probably the model being wrong, and the card says so.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">5. The AI analyst</h3>
+    <p>A language-model analyst writes a football read for each match using only sourced inputs: the official FIFA
+    squad lists, FIFA rankings, sourced recent form, one tournament-wide injury digest from a web search, and venue
+    conditions (live forecast inside 16 days, otherwise climate normals — always labelled which). It is explicitly
+    forbidden from inventing stats, records, managers or formations, and it never sees enough to judge value — it
+    supplies football reasons; the price layer judges the odds. It is a second opinion, not a fact, and it can be wrong.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">6. Sensible Bets — the two gates</h3>
+    <p>A bet appears only when (1) the analyst explicitly recommended that outcome for football reasons, and
+    (2) the current price is fair or better for that pick. Verdicts: <strong style="color:#3fb950">Bet Now</strong>
+    (EV ≥ +2% and outside the longshot-noise band), <strong style="color:#d29922">Lean</strong> (roughly fair price),
+    <strong style="color:#58a6ff">Track Price</strong> (analyst likes it, price short), <strong style="color:#f85149">
+    Avoid at Price</strong>.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">7. Accumulators are −EV. Full stop.</h3>
+    <p>Multiplying legs multiplies the bookmaker's margin. The acca tools here exist because people enjoy accas:
+    they find the least-bad version (single-book pricing, high-probability legs, honest EV in red). The long-term
+    expectation of every acca on this site is negative and the cards say exactly how negative. The genuine edge,
+    where it exists, is in singles.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">8. What would prove this works</h3>
+    <p>A logged record. The My Bets journal records the model's fair probability and EV at the moment you log a bet,
+    so over time you can compare expected P/L with actual P/L and check whether prices you took beat the market's
+    later prices (closing line value). Until that record exists over a meaningful sample, treat every number here as
+    a hypothesis, not a promise.</p>
+
+    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">9. Bankroll</h3>
+    <p>Flat, small stakes — 1–2% of a bankroll you can afford to lose — survive variance. Chasing losses and
+    increasing stakes after wins are both how positive-EV bettors go broke. If betting stops being fun, stop.</p>
+  </div>
+</div>
+
 <!-- ===================== INJURIES TAB ===================== -->
 <div id="tab-injuries" class="tab-panel">
   <div class="filter-bar">
@@ -626,6 +696,34 @@ tr:last-child td { border-bottom: none; }
     <div class="loading-inner"><div class="spinner"></div><span>Loading injuries...</span></div>
   </div>
 </div>
+
+<!-- ===================== RESPONSIBLE GAMBLING FOOTER (all tabs) ===================== -->
+<footer style="border-top:1px solid #30363d;background:#161b22;padding:16px 24px;margin-top:30px;
+               font-size:0.74rem;color:#8b949e;line-height:1.7">
+  <div style="max-width:900px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;
+                   border:2px solid #f85149;color:#f85149;font-weight:700;font-size:0.72rem;flex-shrink:0">18+</span>
+      <strong style="color:#c9d1d9">Gamble responsibly.</strong>
+    </div>
+    <div>
+      This site shows information and statistical estimates — it is <strong>not betting or financial advice</strong>,
+      and nothing here guarantees a profit. Expected value is a long-run average; any individual bet can lose.
+      Only bet money you can afford to lose, set limits before you start, and never chase losses.
+    </div>
+    <div style="margin-top:6px">
+      Help and support:
+      <a href="https://www.begambleaware.org" target="_blank" rel="noopener" style="color:#58a6ff">BeGambleAware.org</a> ·
+      <a href="https://www.gamblingcare.ie" target="_blank" rel="noopener" style="color:#58a6ff">GamblingCare.ie</a> ·
+      <a href="https://www.gamblersanonymous.ie" target="_blank" rel="noopener" style="color:#58a6ff">Gamblers Anonymous Ireland</a>
+      — free, confidential, 24/7.
+    </div>
+    <div style="margin-top:6px;color:#6e7681">
+      Odds can change after they're displayed; always confirm the price on your betslip.
+      See the <a onclick="switchTab('method')" style="color:#58a6ff;cursor:pointer">Methodology</a> tab for how every number is computed.
+    </div>
+  </div>
+</footer>
 
 <script>
 // ---- state ----
