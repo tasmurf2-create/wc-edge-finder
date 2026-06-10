@@ -2,3207 +2,386 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f15">
 <title>WC 2026 Edge Finder</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: #0d1117;
-  color: #e6edf3;
-  min-height: 100vh;
-}
-
-/* ---- header ---- */
-header {
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
-  padding: 14px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-header h1 { font-size: 1.15rem; font-weight: 700; color: #f0f6fc; }
-header h1 span { color: #3fb950; }
-#meta { font-size: 0.78rem; color: #8b949e; display: flex; align-items: center; gap: 14px; }
-#refresh-btn {
-  background: #21262d; color: #c9d1d9;
-  border: 1px solid #30363d; border-radius: 6px;
-  padding: 5px 12px; font-size: 0.8rem; cursor: pointer; transition: background 0.15s;
-}
-#refresh-btn:hover { background: #30363d; }
-#refresh-btn:disabled { opacity: 0.5; cursor: default; }
-
-/* ---- tabs ---- */
-.tab-bar {
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
-  display: flex;
-  padding: 0 24px;
-  gap: 4px;
-}
-.tab-btn {
-  background: none; border: none; cursor: pointer;
-  color: #8b949e; font-size: 0.88rem; padding: 10px 18px;
-  border-bottom: 2px solid transparent; transition: all 0.15s;
-  font-family: inherit;
-}
-.tab-btn:hover { color: #c9d1d9; }
-.tab-btn.active { color: #f0f6fc; border-bottom-color: #58a6ff; font-weight: 600; }
-
-/* ---- filter bar ---- */
-.filter-bar {
-  padding: 10px 24px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
-  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
-}
-.filter-bar label { font-size: 0.82rem; color: #8b949e; }
-select, input[type=range] {
-  background: #21262d; color: #c9d1d9;
-  border: 1px solid #30363d; border-radius: 6px;
-  padding: 4px 8px; font-size: 0.82rem;
-}
-#threshold-val { font-size: 0.82rem; color: #58a6ff; min-width: 28px; }
-
-/* ---- legend ---- */
-.legend {
-  padding: 7px 24px;
-  display: flex; gap: 18px; font-size: 0.75rem; color: #8b949e;
-  border-bottom: 1px solid #30363d; flex-wrap: wrap;
-}
-.legend span { display: flex; align-items: center; gap: 5px; }
-.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot-long { background: #f85149; }
-.dot-short { background: #3fb950; }
-
-/* ---- tab panels ---- */
-.tab-panel { display: none; }
-.tab-panel.active { display: block; }
-
-/* ---- fixtures tab ---- */
-.fix-round-btn {
-  background: #21262d; color: #8b949e;
-  border: 1px solid #30363d; border-radius: 6px;
-  padding: 4px 14px; font-size: 0.82rem; cursor: pointer; font-family: inherit;
-  transition: all 0.15s;
-}
-.fix-round-btn:hover { color: #c9d1d9; }
-.fix-round-btn.active { background: #388bfd22; color: #58a6ff; border-color: #388bfd; font-weight: 600; }
-
-.fix-row {
-  display: flex; align-items: center; gap: 10px;
-  background: #161b22; border: 1px solid #21262d; border-radius: 8px;
-  padding: 8px 12px;
-  transition: border-color 0.15s;
-}
-.fix-row:hover { border-color: #30363d; }
-.fix-row.past { opacity: 0.38; }
-.fix-row.selected-row { border-color: #388bfd44; }
-.fix-match-info { flex: 1; min-width: 0; }
-.fix-match-name { font-size: 0.88rem; font-weight: 600; color: #e6edf3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fix-match-time { font-size: 0.72rem; color: #6e7681; margin-top: 1px; }
-.fix-btns { display: flex; gap: 5px; flex-shrink: 0; }
-.fix-outcome-btn {
-  background: #21262d; color: #c9d1d9;
-  border: 1px solid #30363d; border-radius: 6px;
-  padding: 5px 8px; font-size: 0.72rem; cursor: pointer; font-family: inherit;
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  min-width: 58px; transition: all 0.15s;
-}
-.fix-outcome-btn:hover:not(:disabled) { border-color: #58a6ff; background: #21262d; }
-.fix-outcome-btn.selected { background: #1c2e4a; border-color: #388bfd; }
-.fix-outcome-btn:disabled { opacity: 0.3; cursor: default; }
-.fix-price { font-size: 0.85rem; font-weight: 700; color: #f0f6fc; }
-.fix-outcome-btn.selected .fix-price { color: #58a6ff; }
-.fix-label { font-size: 0.68rem; color: #8b949e; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fix-outcome-btn.selected .fix-label { color: #388bfd; }
-
-/* ---- divergence grid ---- */
-#matches {
-  padding: 18px 24px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
-  gap: 14px;
-}
-
-/* ---- bets layout ---- */
-#bets-panel { padding: 18px 24px; display: flex; flex-direction: column; gap: 28px; }
-.bets-section-title {
-  font-size: 1rem; font-weight: 700; color: #f0f6fc;
-  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
-}
-.bets-section-title small { font-size: 0.75rem; font-weight: 400; color: #8b949e; }
-
-/* ---- card ---- */
-.card {
-  background: #161b22; border: 1px solid #30363d;
-  border-radius: 10px; overflow: hidden; transition: border-color 0.15s;
-}
-.card:hover { border-color: #58a6ff44; }
-.card.flag-long  { border-left: 3px solid #f85149; }
-.card.flag-short { border-left: 3px solid #3fb950; }
-
-.card-header {
-  padding: 11px 15px;
-  background: #1c2128;
-  display: flex; justify-content: space-between; align-items: flex-start;
-}
-.match-title { font-weight: 600; font-size: 0.93rem; color: #f0f6fc; }
-.match-time  { font-size: 0.73rem; color: #8b949e; margin-top: 3px; }
-.card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-
-.badge {
-  font-size: 0.7rem; font-weight: 600;
-  padding: 2px 8px; border-radius: 12px; white-space: nowrap;
-}
-.badge-long    { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
-.badge-short   { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
-.badge-neutral { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
-.badge-margin  { background: #21262d; color: #8b949e; border: 1px solid #30363d; font-weight: 400; }
-.badge-high    { background: #1f6feb33; color: #58a6ff; border: 1px solid #1f6feb66; }
-.badge-medium  { background: #9e6a0322; color: #d29922; border: 1px solid #9e6a0344; }
-.badge-low     { background: #21262d; color: #6e7681; border: 1px solid #30363d; }
-
-table { width: 100%; border-collapse: collapse; font-size: 0.81rem; }
-th {
-  padding: 5px 11px; text-align: right;
-  color: #6e7681; font-weight: 500; font-size: 0.7rem;
-  text-transform: uppercase; letter-spacing: 0.04em;
-  border-bottom: 1px solid #21262d;
-}
-th:first-child { text-align: left; }
-td {
-  padding: 7px 11px; text-align: right;
-  border-bottom: 1px solid #21262d; color: #c9d1d9;
-}
-td:first-child { text-align: left; color: #e6edf3; font-weight: 500; }
-tr:last-child td { border-bottom: none; }
-
-.diff-cell { font-weight: 700; min-width: 52px; }
-.diff-long  { color: #f85149; }
-.diff-short { color: #3fb950; }
-.diff-neutral { color: #6e7681; }
-
-.edge-pos { color: #3fb950; font-weight: 700; }
-.edge-neg { color: #6e7681; }
-.edge-na  { color: #484f58; }
-
-.bar-cell { padding: 7px 11px 7px 0; width: 70px; }
-.bar-wrap  { background: #21262d; border-radius: 4px; height: 5px; overflow: hidden; }
-.bar-fill  { height: 5px; border-radius: 4px; }
-.bar-long    { background: #f85149; }
-.bar-short   { background: #3fb950; }
-.bar-neutral { background: #484f58; }
-
-.pm-missing { color: #484f58; font-size: 0.74rem; }
-.paddy-price { color: #88c0d0; font-size: 0.78rem; }
-
-/* ---- totals sub-table ---- */
-.totals-toggle {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 15px; background: #1c2128;
-  font-size: 0.75rem; color: #8b949e; cursor: pointer;
-  border-top: 1px solid #21262d; user-select: none;
-}
-.totals-toggle:hover { color: #c9d1d9; }
-.totals-body { display: none; }
-.totals-body.open { display: block; }
-
-/* ---- singles list ---- */
-.singles-list { display: flex; flex-direction: column; gap: 10px; }
-
-.single-card {
-  background: #161b22; border: 1px solid #30363d;
-  border-radius: 8px; padding: 14px 16px;
-  display: grid; gap: 6px;
-}
-.single-card.conf-high   { border-left: 3px solid #3fb950; }
-.single-card.conf-medium { border-left: 3px solid #d29922; }
-.single-card.conf-low    { border-left: 3px solid #484f58; }
-
-.single-top {
-  display: flex; justify-content: space-between; align-items: flex-start;
-}
-.single-title { font-weight: 600; font-size: 0.92rem; color: #f0f6fc; }
-.single-sub   { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
-.single-prices {
-  display: flex; gap: 14px; flex-wrap: wrap;
-  font-size: 0.82rem; color: #c9d1d9; margin-top: 4px;
-}
-.single-prices .lbl { color: #6e7681; margin-right: 3px; }
-.single-prices .val { font-weight: 600; }
-.single-prices .val.green { color: #3fb950; }
-.single-prices .val.blue  { color: #58a6ff; }
-.single-prices .val.gold  { color: #d29922; }
-.single-prices .val.pp    { color: #88c0d0; }
-
-.why-box {
-  font-size: 0.76rem; color: #8b949e;
-  background: #1c2128; border-radius: 5px;
-  padding: 6px 10px; margin-top: 2px;
-  line-height: 1.5;
-}
-
-/* ---- bet type sub-tabs ---- */
-.bet-type-btn {
-  background: none; border: none; cursor: pointer;
-  color: #8b949e; font-size: 0.82rem; padding: 8px 16px;
-  border-bottom: 2px solid transparent; transition: all 0.15s;
-  font-family: inherit;
-}
-.bet-type-btn:hover { color: #c9d1d9; }
-.bet-type-btn.active { color: #f0f6fc; border-bottom-color: #58a6ff; font-weight: 600; }
-
-/* ---- top picks ---- */
-.picks-round-title {
-  font-size: 0.82rem; font-weight: 700; color: #58a6ff;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 6px 0 10px 0; border-bottom: 1px solid #21262d; margin-bottom: 12px;
-}
-
-/* ---- parlays ---- */
-.parlay-list { display: flex; flex-direction: column; gap: 12px; }
-
-.parlay-card {
-  background: #161b22; border: 1px solid #30363d;
-  border-radius: 8px; overflow: hidden;
-}
-.parlay-card.conf-high   { border-left: 3px solid #3fb950; }
-.parlay-card.conf-medium { border-left: 3px solid #d29922; }
-.parlay-card.conf-low    { border-left: 3px solid #484f58; }
-
-.parlay-header {
-  background: #1c2128; padding: 10px 16px;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.parlay-ev { font-weight: 700; font-size: 1rem; }
-.parlay-ev.pos { color: #3fb950; }
-.parlay-meta { font-size: 0.78rem; color: #8b949e; margin-top: 2px; }
-
-.parlay-legs { padding: 0; }
-.parlay-leg {
-  padding: 8px 16px;
-  border-top: 1px solid #21262d;
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 0.82rem;
-}
-.parlay-leg-left  { color: #c9d1d9; }
-.parlay-leg-match { font-size: 0.73rem; color: #8b949e; }
-.parlay-leg-right { display: flex; align-items: center; gap: 10px; }
-.parlay-leg-price {
-  font-weight: 700; color: #f0f6fc;
-  background: #21262d; padding: 2px 8px; border-radius: 5px;
-}
-.parlay-leg-book { font-size: 0.73rem; color: #8b949e; }
-.parlay-leg-pp   { font-size: 0.73rem; color: #88c0d0; }
-
-/* ---- acca controls ---- */
-.acca-controls {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  padding: 12px 24px 4px;
-}
-.acca-risk-group { display: flex; align-items: center; gap: 6px; }
-.acca-ctrl-label { font-size: 0.73rem; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
-.acca-risk-btn {
-  background: #161b22; color: #c9d1d9; border: 1px solid #30363d;
-  border-radius: 6px; padding: 5px 12px; font-size: 0.8rem; cursor: pointer;
-}
-.acca-risk-btn:hover { border-color: #58a6ff66; }
-.acca-risk-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; font-weight: 600; }
-.acca-guard { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #c9d1d9; cursor: pointer; }
-.acca-guard input { accent-color: #3fb950; }
-.acca-ctrl-note { font-size: 0.73rem; color: #6e7681; margin-left: auto; }
-.parlay-chance {
-  font-size: 1.05rem; font-weight: 700; color: #3fb950;
-}
-/* demoted (speculative longshot) single + muted badge */
-.single-card.demoted { opacity: 0.55; }
-.single-card.demoted:hover { opacity: 0.85; }
-.badge-muted { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
-/* EV framing banners */
-.ev-banner { margin: 12px 24px 0; padding: 10px 14px; border-radius: 8px; font-size: 0.82rem; line-height: 1.45; }
-.ev-banner.good { background: #11271a; border: 1px solid #3fb95055; color: #c9d1d9; }
-.ev-banner.warn { background: #2a1411; border: 1px solid #f8514955; color: #c9d1d9; }
-.ev-banner strong { color: #f0f6fc; }
-/* weather flag on legs / singles */
-.wflag { font-size: 0.72rem; margin-top: 4px; cursor: help; line-height: 1.3; }
-.wflag.good    { color: #3fb950; }
-.wflag.warn    { color: #d29922; }
-.wflag.neutral { color: #8b949e; }
-/* hoverable term — dotted underline + help cursor hints there's a tooltip */
-.help { cursor: help; border-bottom: 1px dotted #6e7681; }
-.parlay-leg-price.help { border-bottom: 1px dotted #58506e; }
-.acca-legend {
-  padding: 0 24px 10px; font-size: 0.74rem; color: #6e7681; line-height: 1.5;
-}
-.acca-legend strong { color: #8b949e; }
-
-/* ---- loading / empty ---- */
-#loading, .loading-inner {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 60px 24px; color: #8b949e; gap: 14px;
-  grid-column: 1/-1;
-}
-.spinner {
-  width: 34px; height: 34px;
-  border: 3px solid #30363d; border-top-color: #58a6ff;
-  border-radius: 50%; animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.empty { color: #484f58; font-size: 0.88rem; padding: 30px 0; text-align: center; }
-
-/* ---- mobile (owner checks on phone) ---- */
-.tab-bar {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;        /* keep the scrolling, hide the bar */
-}
-.tab-bar::-webkit-scrollbar { display: none; }
-.tab-btn { white-space: nowrap; flex-shrink: 0; }
-
-@media (max-width: 760px) {
-  header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
-  .tab-bar, .filter-bar, .legend { padding-left: 14px; padding-right: 14px; }
-  #matches { padding: 14px; grid-template-columns: 1fr; }
-  #bets-panel, #picks-panel, #sensible-panel, #today-panel, #mybets-panel, #injuries-panel {
-    padding-left: 14px !important; padding-right: 14px !important;
-  }
-  /* Acca Builder: stack the betslip under the fixture list instead of a
-     280px side column squeezing everything */
-  #tab-fixtures > div:not(.filter-bar) { flex-direction: column; }
-  #fix-sidebar {
-    width: 100% !important; position: static !important;
-    height: auto !important; border-left: none !important;
-    border-top: 1px solid #30363d;
-  }
-  #team-search { width: 150px !important; }
-}
-</style>
+<link rel="stylesheet" href="/static/css/app.css?v=2">
 </head>
 <body>
 
-<header>
-  <h1>WC 2026 <span>Edge Finder</span></h1>
-  <div id="meta">
-    <span id="fetch-time">Loading...</span>
-    <button id="refresh-btn" onclick="loadData(true)">Refresh</button>
-    <button id="team-btn" onclick="refreshInjuries()" style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">Refresh Injuries</button>
+<!-- ===================== HEADER ===================== -->
+<header class="app-header">
+  <div class="brand">
+    <span class="brand__name">WC26 <b>Edge Finder</b></span>
+    <span class="brand__tag">de-vigged prices · analyst-checked</span>
+  </div>
+  <div class="header-meta">
+    <div class="search-wrap">
+      <input id="team-search" type="text" placeholder="Search team…" autocomplete="off"
+        oninput="onTeamSearch(this.value)">
+      <button id="team-search-clear" class="btn btn--quiet btn--sm" onclick="clearTeamSearch()" style="display:none">✕</button>
+    </div>
+    <span id="fetch-time" class="updated-stamp">Loading…</span>
+    <button id="refresh-btn" class="btn btn--sm" onclick="loadData(true)" title="Re-fetch latest odds (server enforces a cooldown to protect the API quota)">
+      ↻ <span class="btn-label">Refresh</span>
+    </button>
   </div>
 </header>
 
-<div style="padding:8px 24px;background:#0d1117;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px">
-  <input id="team-search" type="text" placeholder="Search team… (e.g. Brazil)" autocomplete="off"
-    oninput="onTeamSearch(this.value)"
-    style="background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.85rem;padding:5px 10px;width:220px;outline:none">
-  <span id="team-search-clear" onclick="clearTeamSearch()" style="display:none;cursor:pointer;color:#6e7681;font-size:0.85rem">✕ clear</span>
-  <span id="team-search-summary" style="font-size:0.8rem;color:#8b949e"></span>
+<!-- ===================== PRIMARY NAV (desktop) ===================== -->
+<nav class="nav" id="primary-nav">
+  <button class="nav-btn active" data-view="today" onclick="switchView('today')"><span class="nav-ico">📅</span>Today</button>
+  <button class="nav-btn" data-view="best" onclick="switchView('best')"><span class="nav-ico">★</span>Best Bets</button>
+  <button class="nav-btn" data-view="markets" onclick="switchView('markets')"><span class="nav-ico">📊</span>Markets</button>
+  <button class="nav-btn" data-view="mybets" onclick="switchView('mybets')"><span class="nav-ico">📒</span>My Bets</button>
+  <button class="nav-btn" id="more-btn" data-view="more" onclick="toggleMoreMenu(event)"><span class="nav-ico">⋯</span>More <span class="caret">▾</span></button>
+</nav>
+
+<!-- More menu (shared by desktop nav + mobile bottom bar) -->
+<div class="more-menu" id="more-menu">
+  <button class="more-item" data-view="injuries" onclick="switchView('injuries')">🩹 Injuries &amp; Suspensions</button>
+  <button class="more-item" data-view="method" onclick="switchView('method')">📖 Methodology</button>
 </div>
 
-<div id="team-search-results" style="display:none;padding:18px 24px;display:none;flex-direction:column;gap:20px"></div>
+<!-- search results overlay (replaces views while searching) -->
+<div id="team-search-summary" class="legend" style="display:none"></div>
+<div id="team-search-results" class="search-results"></div>
 
-<div class="tab-bar">
-  <button class="tab-btn active" data-tab="today" onclick="switchTab('today'); renderToday()">📅 Today</button>
-  <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
-  <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
-  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">Prices &amp; EV</button>
-  <button class="tab-btn" data-tab="injuries" onclick="switchTab('injuries')">🩹 Injuries</button>
-  <button class="tab-btn" data-tab="fixtures" onclick="switchTab('fixtures'); renderFixtures()">🎰 Acca Builder</button>
-  <button class="tab-btn" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
-  <button class="tab-btn" data-tab="mybets" onclick="switchTab('mybets'); renderMyBets()">📋 My Bets</button>
-  <button class="tab-btn" data-tab="method" onclick="switchTab('method')">📖 Methodology</button>
-</div>
+<main id="views">
 
-<!-- ===================== DIVERGENCE TAB ===================== -->
-<div id="tab-divergence" class="tab-panel">
-  <div class="filter-bar">
-    <label>Sort:</label>
-    <select id="sort-select" onchange="renderDivergence()">
-      <option value="gap">Largest gap</option>
-      <option value="time">Kick-off time</option>
-    </select>
-    <label>Min gap:</label>
-    <input type="range" id="threshold" min="0" max="10" step="0.5" value="0" oninput="onThreshold()">
-    <span id="threshold-val">0%</span>
-    <label>Show:</label>
-    <select id="pm-filter" onchange="renderDivergence()">
-      <option value="all">All matches</option>
-      <option value="pm">PM data only</option>
-    </select>
-  </div>
-  <div class="legend">
-    <span><span class="dot dot-long"></span> Books LONG — this side overpriced</span>
-    <span><span class="dot dot-short"></span> Books SHORT — possible value here</span>
-    <span style="color:#88c0d0">PP = Paddy Power price</span>
-  </div>
-  <div id="matches"><div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div></div>
-</div>
+  <!-- ===================== TODAY ===================== -->
+  <section id="tab-today" class="view active">
+    <div id="today-panel" class="view-body"></div>
+  </section>
 
-<!-- ===================== BETS TAB ===================== -->
-<div id="tab-bets" class="tab-panel">
-  <div class="filter-bar">
-    <label>Bookmaker:</label>
-    <select id="book-select" onchange="renderBets()">
-      <option value="best">Best available (any book)</option>
-    </select>
-    <label>Stake:</label>
-    <span style="display:flex;align-items:center;gap:4px">
-      <span style="color:#8b949e">€</span>
-      <input type="number" id="stake-input" value="10" min="1" step="1"
-        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
-        oninput="renderBets()">
-    </span>
-    <label>Confidence:</label>
-    <select id="conf-filter" onchange="renderBets()">
-      <option value="all">All (incl. speculative)</option>
-      <option value="high,medium" selected>High + Medium (default)</option>
-      <option value="high">High only</option>
-    </select>
-    <label>Market:</label>
-    <select id="market-filter" onchange="renderBets()">
-      <option value="all">All markets</option>
-      <option value="h2h">Match result (1X2)</option>
-      <option value="totals">Over / Under</option>
-      <option value="spreads">Asian Handicap</option>
-    </select>
-    <label>Round:</label>
-    <select id="round-filter" onchange="onRoundChange()">
-      <option value="">All rounds</option>
-    </select>
-  </div>
-  <div class="legend">
-    <span><span class="dot" style="background:#3fb950"></span> High confidence — book edge + PM confirms</span>
-    <span><span class="dot" style="background:#d29922"></span> Medium — book edge or strong PM signal</span>
-    <span><span class="dot" style="background:#484f58"></span> Low — small edge, no confirmation</span>
-    <span style="color:#88c0d0">PP = Paddy Power price</span>
-  </div>
-  <!-- Singles / Multi sub-tabs -->
-  <div style="background:#161b22;border-bottom:1px solid #21262d;padding:0 24px;display:flex;gap:2px">
-    <button id="btn-singles" class="bet-type-btn active" onclick="switchBetsTab('singles')">Value Singles <span style="color:#3fb950;font-weight:700">+EV</span></button>
-    <button id="btn-parlays" class="bet-type-btn" onclick="switchBetsTab('parlays')">Accumulators <span style="color:#f85149;font-weight:700">−EV</span></button>
-  </div>
-  <div id="bets-panel">
-    <div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>
-  </div>
-</div>
-
-<!-- ===================== TOP PICKS TAB ===================== -->
-<div id="tab-picks" class="tab-panel">
-  <div class="filter-bar">
-    <label>Bookmaker:</label>
-    <select id="picks-book-select" onchange="renderTopPicks()">
-      <option value="best">Best available (any book)</option>
-    </select>
-    <label>Stake:</label>
-    <span style="display:flex;align-items:center;gap:4px">
-      <span style="color:#8b949e">€</span>
-      <input type="number" id="picks-stake-input" value="10" min="1" step="1"
-        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
-        oninput="renderTopPicks()">
-    </span>
-  </div>
-  <div class="legend">
-    <span>The analyst's professional read + recommended bets per match — a second opinion, not fact</span>
-    <span style="color:#88c0d0">Cross-check with Prices &amp; EV; agreement = strongest signal</span>
-  </div>
-  <div id="picks-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
-    <div class="loading-inner"><div class="spinner"></div><span>Loading picks...</span></div>
-  </div>
-</div>
-
-<!-- ===================== TODAY TAB ===================== -->
-<div id="tab-today" class="tab-panel active">
-  <div id="today-panel" style="padding:18px 24px 80px;display:flex;flex-direction:column;gap:10px">
-    <div class="loading-inner"><div class="spinner"></div><span>Loading today's matches...</span></div>
-  </div>
-</div>
-
-<!-- ===================== SENSIBLE BETS TAB ===================== -->
-<div id="tab-sensible" class="tab-panel">
-  <div class="filter-bar">
-    <label>Stake:</label>
-    <span style="display:flex;align-items:center;gap:4px">
-      <span style="color:#8b949e">€</span>
-      <input type="number" id="sensible-stake-input" value="10" min="1" step="1"
-        style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
-        oninput="renderSensible()">
-    </span>
-    <label>Round:</label>
-    <select id="sensible-round-filter" onchange="renderSensible()">
-      <option value="">All rounds</option>
-    </select>
-    <label>Show:</label>
-    <select id="sensible-tier-filter" onchange="renderSensible()">
-      <option value="all">All tiers</option>
-      <option value="strong">★ Strong only</option>
-      <option value="solid">Solid + Strong</option>
-    </select>
-  </div>
-  <div id="sensible-panel" style="padding:18px 24px 120px;display:flex;flex-direction:column;gap:12px">
-    <div class="loading-inner"><div class="spinner"></div><span>Scoring bets...</span></div>
-  </div>
-  <!-- Acca builder tray — sticky at bottom, appears when 2+ legs ticked -->
-  <div id="acca-tray" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#161b22;border-top:2px solid #388bfd;padding:12px 24px;z-index:100;box-shadow:0 -4px 24px #0008">
-    <div style="max-width:900px;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div>
-          <span style="font-size:0.8rem;color:#8b949e" id="tray-legs-summary"></span>
-          <div id="tray-warning" style="font-size:0.75rem;color:#f85149;margin-top:2px"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-          <div id="tray-book" style="font-size:0.82rem;color:#c9d1d9"></div>
-          <div id="tray-price" style="font-size:1.1rem;font-weight:700;color:#f0f6fc"></div>
-          <div id="tray-ev" style="font-size:0.82rem"></div>
-          <button onclick="clearAccaBuilder()" style="background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer">Clear</button>
-        </div>
-      </div>
-      <div id="tray-leg-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
+  <!-- ===================== BEST BETS ===================== -->
+  <section id="tab-best" class="view">
+    <div class="subnav">
+      <button class="pill active" data-best="picks" onclick="switchBestTab('picks')">Picks</button>
+      <button class="pill" data-best="writeups" onclick="switchBestTab('writeups')">Analyst Writeups</button>
     </div>
-  </div>
-</div>
 
-<!-- ===================== FIXTURES TAB ===================== -->
-<div id="tab-fixtures" class="tab-panel">
-  <div class="filter-bar" style="gap:8px">
-    <span style="font-size:0.82rem;color:#8b949e">Round:</span>
-    <button class="fix-round-btn active" data-round="R1" onclick="setFixtureRound('R1')">R1</button>
-    <button class="fix-round-btn" data-round="R2" onclick="setFixtureRound('R2')">R2</button>
-    <button class="fix-round-btn" data-round="R3" onclick="setFixtureRound('R3')">R3</button>
-  </div>
-  <div style="display:flex;align-items:flex-start">
-    <!-- Match list -->
-    <div id="fixtures-grid" style="flex:1;min-width:0;padding:14px 20px;display:flex;flex-direction:column;gap:6px">
-      <div class="loading-inner"><div class="spinner"></div><span>Loading fixtures...</span></div>
+    <div id="best-picks-wrap">
+      <div class="toolbar">
+        <div class="field"><label>Stake</label>
+          <span class="stake-wrap"><span class="cur">€</span>
+            <input type="number" id="sensible-stake-input" value="10" min="1" step="1" oninput="renderSensible()">
+          </span>
+        </div>
+        <div class="field"><label>Round</label>
+          <select id="sensible-round-filter" onchange="renderSensible()">
+            <option value="">All rounds</option>
+          </select>
+        </div>
+        <div class="field"><label>Show</label>
+          <select id="sensible-tier-filter" onchange="renderSensible()">
+            <option value="all">All tiers</option>
+            <option value="strong">★ Strong only</option>
+            <option value="solid">Solid + Strong</option>
+          </select>
+        </div>
+      </div>
+      <div id="sensible-panel" class="view-body"></div>
     </div>
-    <!-- Betslip sidebar -->
-    <div id="fix-sidebar" style="width:280px;flex-shrink:0;position:sticky;top:48px;height:calc(100vh - 48px);overflow-y:auto;border-left:1px solid #21262d">
-      <!-- header -->
-      <div style="background:#161b22;border-bottom:1px solid #30363d;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="background:#388bfd;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700" id="fix-leg-count">0</span>
-          <span style="font-size:0.85rem;font-weight:600;color:#f0f6fc">Betslip</span>
-          <span style="font-size:0.75rem;color:#8b949e" id="fix-acca-odds-header"></span>
+
+    <div id="best-writeups-wrap" style="display:none">
+      <div class="toolbar">
+        <div class="field"><label>Bookmaker</label>
+          <select id="picks-book-select" onchange="renderTopPicks()">
+            <option value="best">Best available (any book)</option>
+          </select>
         </div>
-        <button onclick="clearFixtureAcca()" style="background:none;border:none;color:#484f58;font-size:0.75rem;cursor:pointer;padding:0">Clear all</button>
+        <div class="field"><label>Stake</label>
+          <span class="stake-wrap"><span class="cur">€</span>
+            <input type="number" id="picks-stake-input" value="10" min="1" step="1" oninput="renderTopPicks()">
+          </span>
+        </div>
       </div>
-      <!-- leg list -->
-      <div id="fix-acca-legs" style="display:flex;flex-direction:column">
-        <div style="font-size:0.78rem;color:#484f58;text-align:center;padding:28px 16px;line-height:1.5">Click any odds button<br>to add to your betslip</div>
+      <div id="picks-panel" class="view-body"></div>
+    </div>
+  </section>
+
+  <!-- ===================== MARKETS ===================== -->
+  <section id="tab-markets" class="view">
+    <div class="subnav">
+      <button class="pill active" data-mkt="singles" onclick="switchMarketsTab('singles')">Value Singles <span class="pill-hint">+EV</span></button>
+      <button class="pill" data-mkt="accas" onclick="switchMarketsTab('accas')">Accumulators <span class="pill-hint">−EV</span></button>
+      <button class="pill" data-mkt="builder" onclick="switchMarketsTab('builder')">Acca Builder</button>
+      <button class="pill" data-mkt="divergence" onclick="switchMarketsTab('divergence')">Market Divergence</button>
+    </div>
+
+    <!-- shared toolbar for Singles / Accumulators -->
+    <div class="toolbar" id="markets-toolbar">
+      <div class="field"><label>Bookmaker</label>
+        <select id="book-select" onchange="renderBets()">
+          <option value="best">Best available (any book)</option>
+        </select>
       </div>
-      <!-- stake + returns footer -->
-      <div id="fix-acca-summary" style="display:none;border-top:1px solid #30363d;background:#161b22;padding:12px 14px">
-        <div id="fix-acca-book" style="font-size:0.72rem;color:#6e7681;margin-bottom:8px"></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:0.82rem;color:#8b949e;white-space:nowrap">Stake €</span>
-          <input type="number" id="fix-stake" value="10" min="1" step="1"
-            style="flex:1;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;padding:5px 8px;font-size:0.88rem;font-weight:600"
-            oninput="renderFixtureAcca()">
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:0.78rem;color:#8b949e">Acca odds</span>
-          <span id="fix-acca-odds" style="font-size:1rem;font-weight:700;color:#f0f6fc"></span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:0.78rem;color:#8b949e">Potential returns</span>
-          <span id="fix-acca-return" style="font-size:1.1rem;font-weight:700;color:#3fb950"></span>
-        </div>
-        <div id="fix-acca-ev" style="font-size:0.75rem;text-align:right;margin-bottom:4px"></div>
-        <div id="fix-acca-nobook" style="font-size:0.72rem;color:#d29922;margin-bottom:8px"></div>
-        <div id="fix-acca-actions" style="display:none;display:flex;flex-direction:column;gap:6px;margin-top:8px">
-          <a id="fix-whatsapp-btn" href="#" target="_blank"
-            style="display:flex;align-items:center;justify-content:center;gap:6px;background:#25d366;color:#fff;border-radius:7px;padding:8px;font-size:0.82rem;font-weight:600;text-decoration:none">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-            Share on WhatsApp
-          </a>
-          <a id="fix-bookie-btn" href="#" target="_blank"
-            style="display:flex;align-items:center;justify-content:center;gap:6px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:7px;padding:8px;font-size:0.82rem;font-weight:600;text-decoration:none">
-            🌐 <span id="fix-bookie-label">Open bookmaker</span>
-          </a>
-        </div>
+      <div class="field"><label>Stake</label>
+        <span class="stake-wrap"><span class="cur">€</span>
+          <input type="number" id="stake-input" value="10" min="1" step="1" oninput="renderBets()">
+        </span>
+      </div>
+      <div class="field singles-only"><label>Confidence</label>
+        <select id="conf-filter" onchange="renderBets()">
+          <option value="all">All (incl. speculative)</option>
+          <option value="high,medium" selected>High + Medium</option>
+          <option value="high">High only</option>
+        </select>
+      </div>
+      <div class="field singles-only"><label>Market</label>
+        <select id="market-filter" onchange="renderBets()">
+          <option value="all">All markets</option>
+          <option value="h2h">Match result (1X2)</option>
+          <option value="totals">Over / Under</option>
+          <option value="spreads">Asian Handicap</option>
+        </select>
+      </div>
+      <div class="field"><label>Round</label>
+        <select id="round-filter" onchange="onRoundChange()">
+          <option value="">All rounds</option>
+        </select>
       </div>
     </div>
+    <div id="bets-panel" class="view-body"></div>
+
+    <!-- Acca Builder -->
+    <div id="builder-wrap" style="display:none">
+      <div class="toolbar">
+        <div class="field"><label>Round</label></div>
+        <button class="pill active" data-round="R1" onclick="setFixtureRound('R1')">R1</button>
+        <button class="pill" data-round="R2" onclick="setFixtureRound('R2')">R2</button>
+        <button class="pill" data-round="R3" onclick="setFixtureRound('R3')">R3</button>
+      </div>
+      <div class="builder-layout">
+        <div id="fixtures-grid" class="fixtures-col"></div>
+        <aside id="fix-sidebar" class="slip">
+          <div class="slip__head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="slip__count" id="fix-leg-count">0</span>
+              <strong style="font-size:var(--fs-sm)">Betslip</strong>
+              <span style="font-size:var(--fs-xs);color:var(--tx-3)" id="fix-acca-odds-header"></span>
+            </div>
+            <button class="btn btn--quiet btn--sm" onclick="clearFixtureAcca()">Clear all</button>
+          </div>
+          <div id="fix-acca-legs"></div>
+          <div id="fix-acca-summary" class="slip__summary" style="display:none">
+            <div id="fix-acca-book" style="font-size:var(--fs-xs);color:var(--tx-4);margin-bottom:8px"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:var(--fs-sm);color:var(--tx-3);white-space:nowrap">Stake €</span>
+              <input type="number" id="fix-stake" value="10" min="1" step="1" style="flex:1" oninput="renderFixtureAcca()">
+            </div>
+            <div class="slip-row"><span>Acca odds</span><b id="fix-acca-odds"></b></div>
+            <div class="slip-row"><span>Potential returns</span><b id="fix-acca-return" style="color:var(--green)"></b></div>
+            <div id="fix-acca-ev" style="font-size:var(--fs-xs);text-align:right;margin-bottom:6px"></div>
+            <div id="fix-acca-nobook" style="font-size:var(--fs-xs);color:var(--amber);margin-bottom:8px"></div>
+            <div id="fix-acca-actions" style="display:none;flex-direction:column;gap:6px;margin-top:8px">
+              <a id="fix-whatsapp-btn" class="btn btn--wa btn--block" href="#" target="_blank" rel="noopener">📲 Share on WhatsApp</a>
+              <a id="fix-bookie-btn" class="btn btn--block" href="#" target="_blank" rel="noopener">🌐 <span id="fix-bookie-label">Open bookmaker</span></a>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- Market Divergence -->
+    <div id="divergence-wrap" style="display:none">
+      <div class="toolbar">
+        <div class="field"><label>Sort</label>
+          <select id="sort-select" onchange="renderDivergence()">
+            <option value="gap">Largest gap</option>
+            <option value="time">Kick-off time</option>
+          </select>
+        </div>
+        <div class="field"><label>Min gap</label>
+          <input type="range" id="threshold" min="0" max="10" step="0.5" value="0" oninput="onThreshold()">
+          <span id="threshold-val" style="font-size:var(--fs-sm);color:var(--blue);min-width:32px">0%</span>
+        </div>
+        <div class="field"><label>Show</label>
+          <select id="pm-filter" onchange="renderDivergence()">
+            <option value="all">All matches</option>
+            <option value="pm">PM data only</option>
+          </select>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--red)"></span>Books LONG — this side overpriced</span>
+        <span><span class="dot" style="background:var(--green)"></span>Books SHORT — possible value here</span>
+        <span style="color:var(--cyan)">PP = Paddy Power price</span>
+      </div>
+      <div id="matches" class="view-body div-grid"></div>
+    </div>
+  </section>
+
+  <!-- ===================== MY BETS ===================== -->
+  <section id="tab-mybets" class="view">
+    <div id="mybets-panel" class="view-body"></div>
+  </section>
+
+  <!-- ===================== INJURIES ===================== -->
+  <section id="tab-injuries" class="view">
+    <div class="toolbar">
+      <button id="injuries-refresh-btn" class="btn" onclick="refreshInjuriesDigest()">🩹 Refresh injuries</button>
+      <span id="injuries-updated" style="font-size:var(--fs-xs);color:var(--tx-4)"></span>
+    </div>
+    <div class="legend">
+      <span>Tournament-wide injury &amp; suspension news — the same data the analyst uses for its "Absences" reasoning.</span>
+      <span style="color:var(--tx-4)">Refreshing runs one web search, updates affected analyst cards, and is rate-limited server-side.</span>
+    </div>
+    <div id="injuries-panel" class="view-body"></div>
+  </section>
+
+  <!-- ===================== METHODOLOGY ===================== -->
+  <section id="tab-method" class="view">
+    <div class="prose">
+      <h2>How this works — and what it can't do</h2>
+      <p class="prose-sub">Plain-English methodology. If anything here sounds like a guarantee of profit, re-read it — it isn't.</p>
+
+      <h3>1. Where the prices come from</h3>
+      <p>Live decimal odds for every World Cup match from The Odds API, covering the Irish-accessible bookmakers
+      (Paddy Power, Betfair, Bet365, BoyleSports, Ladbrokes, William Hill). The timestamp in the header is the truth
+      about freshness. Prediction-market prices (Kalshi, Polymarket) are pulled alongside as an independent cross-check.</p>
+
+      <h3>2. "Fair" probability — de-vigging</h3>
+      <p>Bookmaker odds include a built-in margin (the "vig"): the implied probabilities of Home/Draw/Away sum to
+      more than 100%. We remove it proportionally for each bookmaker, then average across books to get a consensus
+      <strong>fair probability</strong> for each outcome. Two honest limits:</p>
+      <ul>
+        <li><strong>"Fair" means the market average, not the truth.</strong> Beating it means you got a better price
+        than the consensus — it does not prove the consensus is right.</li>
+        <li><strong>Proportional de-vigging slightly flatters longshots</strong> (the favourite–longshot bias).
+        Small edges on big prices are therefore treated as noise and labelled <em>speculative</em>, not value.</li>
+      </ul>
+
+      <h3>3. Edge and EV</h3>
+      <p><strong>Edge</strong> = fair probability − the probability implied by the best price (in percentage points).
+      It's a model diagnostic. The money number is <strong>EV (expected value)</strong>:
+      <code>EV = fair probability × price − 1</code>.
+      "EV +€0.30 per €10" means that if this exact bet were repeated many times and the fair probability is correct,
+      you'd average +€0.30 profit per €10 staked. Any single bet still just wins or loses — EV only shows up over
+      dozens of bets. Variance dominates small samples.</p>
+
+      <h3>4. The prediction-market cross-check</h3>
+      <p>Kalshi and Polymarket are real-money exchanges with low margins. Their prices are normalised to sum to 100%
+      and compared against the book consensus. When they disagree with the books in your favour, that's confirmation;
+      when they disagree against you, the "edge" is probably the model being wrong, and the card says so.</p>
+
+      <h3>5. The AI analyst</h3>
+      <p>A language-model analyst writes a football read for each match using only sourced inputs: the official FIFA
+      squad lists, FIFA rankings, sourced recent form, one tournament-wide injury digest from a web search, and venue
+      conditions (live forecast inside 16 days, otherwise climate normals — always labelled which). It is explicitly
+      forbidden from inventing stats, records, managers or formations, and it never sees enough to judge value — it
+      supplies football reasons; the price layer judges the odds. It is a second opinion, not a fact, and it can be wrong.</p>
+
+      <h3>6. Best Bets — the two gates</h3>
+      <p>A bet appears only when (1) the analyst explicitly recommended that outcome for football reasons, and
+      (2) the current price is fair or better for that pick. Verdicts: <strong style="color:var(--green)">Bet Now</strong>
+      (EV ≥ +2% and outside the longshot-noise band), <strong style="color:var(--amber)">Lean</strong> (roughly fair price),
+      <strong style="color:var(--blue)">Track Price</strong> (analyst likes it, price short), <strong style="color:var(--red)">
+      Avoid at Price</strong>.</p>
+
+      <h3>7. Accumulators are −EV. Full stop.</h3>
+      <p>Multiplying legs multiplies the bookmaker's margin. The acca tools here exist because people enjoy accas:
+      they find the least-bad version (single-book pricing, high-probability legs, honest EV in red). The long-term
+      expectation of every acca on this site is negative and the cards say exactly how negative. The genuine edge,
+      where it exists, is in singles.</p>
+
+      <h3>8. What would prove this works</h3>
+      <p>A logged record. The My Bets journal records the model's fair probability and EV at the moment you log a bet,
+      so over time you can compare expected P/L with actual P/L and check whether prices you took beat the market's
+      later prices (closing line value). Until that record exists over a meaningful sample, treat every number here as
+      a hypothesis, not a promise.</p>
+
+      <h3>9. Bankroll</h3>
+      <p>Flat, small stakes — 1–2% of a bankroll you can afford to lose — survive variance. Chasing losses and
+      increasing stakes after wins are both how positive-EV bettors go broke. If betting stops being fun, stop.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===================== ACCA TRAY (Best Bets multi-select) ===================== -->
+<div id="acca-tray" class="tray">
+  <div class="tray__inner">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <span style="font-size:var(--fs-sm);color:var(--tx-3)" id="tray-legs-summary"></span>
+        <div id="tray-warning" style="font-size:var(--fs-xs);color:var(--red);margin-top:2px"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div id="tray-book" style="font-size:var(--fs-sm);color:var(--tx-2)"></div>
+        <div id="tray-price" style="font-size:1.1rem;font-weight:700;color:var(--tx-1)"></div>
+        <div id="tray-ev" style="font-size:var(--fs-sm)"></div>
+        <button class="btn btn--sm" onclick="clearAccaBuilder()">Clear</button>
+      </div>
+    </div>
+    <div id="tray-leg-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
   </div>
 </div>
 
-<!-- ===================== MY BETS TAB ===================== -->
-<div id="tab-mybets" class="tab-panel">
-  <div id="mybets-panel" style="padding:18px 24px 80px;display:flex;flex-direction:column;gap:8px">
-    <div class="loading-inner"><div class="spinner"></div><span>Loading...</span></div>
-  </div>
-</div>
-
-
-<!-- ===================== METHODOLOGY TAB ===================== -->
-<div id="tab-method" class="tab-panel">
-  <div style="max-width:780px;margin:0 auto;padding:24px;font-size:0.88rem;line-height:1.65;color:#c9d1d9">
-    <h2 style="color:#f0f6fc;font-size:1.2rem;margin-bottom:4px">How this works — and what it can't do</h2>
-    <p style="color:#8b949e;font-size:0.8rem;margin-bottom:18px">Plain-English methodology. If anything here sounds like a guarantee of profit, re-read it — it isn't.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">1. Where the prices come from</h3>
-    <p>Live decimal odds for every World Cup match from The Odds API, covering the Irish-accessible bookmakers
-    (Paddy Power, Betfair, Bet365, BoyleSports, Ladbrokes, William Hill). Odds refresh roughly every 2 hours —
-    the timestamp in the header is the truth. Prediction-market prices (Kalshi, Polymarket) are pulled alongside
-    as an independent cross-check.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">2. "Fair" probability — de-vigging</h3>
-    <p>Bookmaker odds include a built-in margin (the "vig"): the implied probabilities of Home/Draw/Away sum to
-    more than 100%. We remove it proportionally for each bookmaker, then average across books to get a consensus
-    <strong>fair probability</strong> for each outcome. Two honest limits:</p>
-    <ul style="margin:6px 0 6px 20px">
-      <li><strong>"Fair" means the market average, not the truth.</strong> Beating it means you got a better price
-      than the consensus — it does not prove the consensus is right.</li>
-      <li><strong>Proportional de-vigging slightly flatters longshots</strong> (the favourite–longshot bias).
-      Small edges on big prices are therefore treated as noise and labelled <em>speculative</em>, not value.</li>
-    </ul>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">3. Edge and EV</h3>
-    <p><strong>Edge</strong> = fair probability − the probability implied by the best price (in percentage points).
-    It's a model diagnostic. The money number is <strong>EV (expected value)</strong>:
-    <code style="background:#161b22;padding:1px 6px;border-radius:4px">EV = fair probability × price − 1</code>.
-    "EV +€0.30 per €10" means that if this exact bet were repeated many times and the fair probability is correct,
-    you'd average +€0.30 profit per €10 staked. Any single bet still just wins or loses — EV only shows up over
-    dozens of bets. Variance dominates small samples.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">4. The prediction-market cross-check</h3>
-    <p>Kalshi and Polymarket are real-money exchanges with low margins. Their prices are normalised to sum to 100%
-    and compared against the book consensus. When they disagree with the books in your favour, that's confirmation;
-    when they disagree against you, the "edge" is probably the model being wrong, and the card says so.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">5. The AI analyst</h3>
-    <p>A language-model analyst writes a football read for each match using only sourced inputs: the official FIFA
-    squad lists, FIFA rankings, sourced recent form, one tournament-wide injury digest from a web search, and venue
-    conditions (live forecast inside 16 days, otherwise climate normals — always labelled which). It is explicitly
-    forbidden from inventing stats, records, managers or formations, and it never sees enough to judge value — it
-    supplies football reasons; the price layer judges the odds. It is a second opinion, not a fact, and it can be wrong.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">6. Sensible Bets — the two gates</h3>
-    <p>A bet appears only when (1) the analyst explicitly recommended that outcome for football reasons, and
-    (2) the current price is fair or better for that pick. Verdicts: <strong style="color:#3fb950">Bet Now</strong>
-    (EV ≥ +2% and outside the longshot-noise band), <strong style="color:#d29922">Lean</strong> (roughly fair price),
-    <strong style="color:#58a6ff">Track Price</strong> (analyst likes it, price short), <strong style="color:#f85149">
-    Avoid at Price</strong>.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">7. Accumulators are −EV. Full stop.</h3>
-    <p>Multiplying legs multiplies the bookmaker's margin. The acca tools here exist because people enjoy accas:
-    they find the least-bad version (single-book pricing, high-probability legs, honest EV in red). The long-term
-    expectation of every acca on this site is negative and the cards say exactly how negative. The genuine edge,
-    where it exists, is in singles.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">8. What would prove this works</h3>
-    <p>A logged record. The My Bets journal records the model's fair probability and EV at the moment you log a bet,
-    so over time you can compare expected P/L with actual P/L and check whether prices you took beat the market's
-    later prices (closing line value). Until that record exists over a meaningful sample, treat every number here as
-    a hypothesis, not a promise.</p>
-
-    <h3 style="color:#58a6ff;font-size:0.95rem;margin:18px 0 6px">9. Bankroll</h3>
-    <p>Flat, small stakes — 1–2% of a bankroll you can afford to lose — survive variance. Chasing losses and
-    increasing stakes after wins are both how positive-EV bettors go broke. If betting stops being fun, stop.</p>
-  </div>
-</div>
-
-<!-- ===================== INJURIES TAB ===================== -->
-<div id="tab-injuries" class="tab-panel">
-  <div class="filter-bar">
-    <button id="injuries-refresh-btn" onclick="refreshInjuriesDigest()"
-      style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;font-size:0.8rem;cursor:pointer">
-      Refresh injuries
-    </button>
-    <span id="injuries-updated" style="font-size:0.78rem;color:#6e7681"></span>
-  </div>
-  <div class="legend">
-    <span>Tournament-wide injury &amp; suspension news. This is the same data the analyst uses for its "Absences" reasoning.</span>
-    <span style="color:#6e7681">Refreshing costs one web search and updates the analyst too — it does not auto-refresh.</span>
-  </div>
-  <div id="injuries-panel" style="padding:18px 24px">
-    <div class="loading-inner"><div class="spinner"></div><span>Loading injuries...</span></div>
-  </div>
-</div>
-
-<!-- ===================== RESPONSIBLE GAMBLING FOOTER (all tabs) ===================== -->
-<footer style="border-top:1px solid #30363d;background:#161b22;padding:16px 24px;margin-top:30px;
-               font-size:0.74rem;color:#8b949e;line-height:1.7">
-  <div style="max-width:900px;margin:0 auto">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;
-                   border:2px solid #f85149;color:#f85149;font-weight:700;font-size:0.72rem;flex-shrink:0">18+</span>
-      <strong style="color:#c9d1d9">Gamble responsibly.</strong>
+<!-- ===================== RESPONSIBLE GAMBLING FOOTER ===================== -->
+<footer class="app-footer">
+  <div class="inner">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="age-badge">18+</span>
+      <strong style="color:var(--tx-2)">Gamble responsibly.</strong>
     </div>
     <div>
       This site shows information and statistical estimates — it is <strong>not betting or financial advice</strong>,
       and nothing here guarantees a profit. Expected value is a long-run average; any individual bet can lose.
       Only bet money you can afford to lose, set limits before you start, and never chase losses.
     </div>
-    <div style="margin-top:6px">
+    <div>
       Help and support:
-      <a href="https://www.begambleaware.org" target="_blank" rel="noopener" style="color:#58a6ff">BeGambleAware.org</a> ·
-      <a href="https://www.gamblingcare.ie" target="_blank" rel="noopener" style="color:#58a6ff">GamblingCare.ie</a> ·
-      <a href="https://www.gamblersanonymous.ie" target="_blank" rel="noopener" style="color:#58a6ff">Gamblers Anonymous Ireland</a>
+      <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware.org</a> ·
+      <a href="https://www.gamblingcare.ie" target="_blank" rel="noopener">GamblingCare.ie</a> ·
+      <a href="https://www.gamblersanonymous.ie" target="_blank" rel="noopener">Gamblers Anonymous Ireland</a>
       — free, confidential, 24/7.
     </div>
-    <div style="margin-top:6px;color:#6e7681">
+    <div style="color:var(--tx-4)">
       Odds can change after they're displayed; always confirm the price on your betslip.
-      See the <a onclick="switchTab('method')" style="color:#58a6ff;cursor:pointer">Methodology</a> tab for how every number is computed.
+      See <button class="linklike" onclick="switchView('method')">Methodology</button> for how every number is computed.
     </div>
   </div>
 </footer>
 
-<script>
-// ---- state ----
-let allMatches    = [];
-let allSingles    = [];
-let allParlays    = [];
-let allIntel      = {};   // {match_label: analyst intel} — the Bettor's Analysis source
-let allBookmakers = [];
-let threshold     = 0;
-let betsSubTab    = 'singles';
-let accaRisk      = 'balanced';   // 'banker' | 'balanced' | 'punchy'
-let accaGuard     = true;         // value guard: legs must be priced at/above fair
-let _accaBusy     = false;
-let accaMarkets   = [];           // market keys currently in the odds feed
-let accaRound     = '';           // round filter ('' = all rounds)
-let roundsAvailable = [];         // round labels present in the schedule
-let accaSort      = 'chance';     // 'chance' | 'return'
-let _injuriesLoaded = false;      // Injuries tab loads once (cached digest); never auto-polls
-let _reanalysing    = new Set();  // match labels currently being re-analysed due to injury news
-
-// ---- tab switching ----
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === tab);
-  });
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  if (tab === 'today')   renderToday();
-  if (tab === 'picks')   renderTopPicks();
-  if (tab === 'mybets')  renderMyBets();
-  if (tab === 'injuries' && !_injuriesLoaded) loadInjuries();
-}
-
-// ---- team search ----
-function onTeamSearch(q) {
-  const resultsEl = document.getElementById('team-search-results');
-  const clearEl   = document.getElementById('team-search-clear');
-  const summaryEl = document.getElementById('team-search-summary');
-  const tabBar    = document.querySelector('.tab-bar');
-  const tabPanels = document.querySelectorAll('.tab-panel');
-
-  q = q.trim();
-  if (!q) { clearTeamSearch(); return; }
-
-  clearEl.style.display = '';
-  tabBar.style.display = 'none';
-  tabPanels.forEach(p => p.style.display = 'none');
-  resultsEl.style.display = 'flex';
-
-  const lq = q.toLowerCase();
-  const matchesTeam = str => str.toLowerCase().includes(lq);
-
-  // --- Singles ---
-  const singles = allSingles.filter(s => matchesTeam(s.outcome || '') || matchesTeam(s.match || ''));
-
-  // --- Accas ---
-  const accas = allParlays.filter(p => p.legs && p.legs.some(l => matchesTeam(l.match || '') || matchesTeam(l.outcome || '')));
-
-  // --- Divergence matches (matches carry a 'label', not home/away fields) ---
-  const divMatches = allMatches.filter(m => matchesTeam(m.label || ''));
-
-  // --- Bettor's Analysis intel ---
-  const intelMatches = Object.entries(allIntel).filter(([label]) => matchesTeam(label));
-
-  const total = singles.length + accas.length + divMatches.length + intelMatches.length;
-  summaryEl.textContent = total ? `${total} result${total !== 1 ? 's' : ''} for "${q}"` : `No results for "${q}"`;
-
-  let html = '';
-
-  if (divMatches.length) {
-    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Market Divergence (${divMatches.length})</div>`;
-    divMatches.forEach(m => {
-      const probs = (m.outcomes || []).map(o =>
-        `${fmtLabel(o.outcome)} ${o.book_fair != null ? o.book_fair.toFixed(0) + '%' : '—'}`).join(' · ');
-      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
-        <strong style="color:#c9d1d9">${fmtLabel(m.label)}</strong>
-        <span style="color:#6e7681;margin-left:8px">${esc(m.round?.label || '')}</span>
-        <div style="color:#8b949e;margin-top:4px">Book fair: ${probs || '—'}${m.has_pm_data ? ` · PM gap ${m.max_gap > 0 ? '+' : ''}${m.max_gap}%` : ''}</div>
-      </div>`;
-    });
-    html += '</div>';
-  }
-
-  if (singles.length) {
-    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Value Singles (${singles.length})</div>`;
-    singles.forEach(s => {
-      const edge = s.edge != null ? `${s.edge > 0 ? '+' : ''}${s.edge.toFixed(1)}%` : '';
-      const fairPct = s.fair_prob != null ? (s.fair_prob * 100).toFixed(1) : '—';
-      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
-        <strong style="color:#c9d1d9">${s.outcome}</strong>
-        <span style="color:#6e7681;margin-left:6px">${s.match}</span>
-        <span style="float:right;color:${s.edge > 0 ? '#3fb950' : '#f85149'}">${edge}</span>
-        <div style="color:#8b949e;margin-top:2px">Best: ${s.best_price} @ ${s.best_book} · Fair: ${fairPct}%</div>
-      </div>`;
-    });
-    html += '</div>';
-  }
-
-  if (accas.length) {
-    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Accumulators (${accas.length})</div>`;
-    accas.forEach(p => {
-      const legsStr = p.legs.map(l => {
-        const hi = matchesTeam(l.match || '') || matchesTeam(l.outcome || '');
-        return `<span style="color:${hi ? '#c9d1d9' : '#6e7681'}">${l.outcome} (${l.best_price})</span>`;
-      }).join(' + ');
-      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
-        <div style="margin-bottom:4px">${legsStr}</div>
-        <span style="color:#8b949e">Combined: ${p.combined_price?.toFixed(2)} · ${p.legs.length} legs</span>
-      </div>`;
-    });
-    html += '</div>';
-  }
-
-  if (intelMatches.length) {
-    html += `<div><div style="font-size:0.78rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Bettor's Analysis (${intelMatches.length})</div>`;
-    intelMatches.forEach(([label, intel]) => {
-      const rec = intel.recommendation || {};
-      const conf = intel.intel_confidence || 'low';
-      const confColor = conf === 'high' ? '#3fb950' : conf === 'medium' ? '#d29922' : '#6e7681';
-      const summary = intel.overall_summary || '—';
-      const recs = intel.recommended_bets || [];
-      const recsHtml = recs.length ? recs.map(r => `<div style="color:#c9d1d9;margin-top:3px">→ ${esc((r.outcome || '').replace(/_/g, ' '))} <span style="color:#8b949e">(${esc(r.reasoning || '')})</span></div>`).join('') : '';
-      html += `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:0.82rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="color:#c9d1d9">${fmtLabel(label)}</strong>
-          <span style="font-size:0.75rem;color:${confColor};text-transform:uppercase">${esc(conf)} confidence</span>
-        </div>
-        <div style="color:#8b949e;line-height:1.5">${esc(summary)}</div>
-        ${recsHtml}
-      </div>`;
-    });
-    html += '</div>';
-  }
-
-  if (!html) html = '<div style="color:#6e7681;font-size:0.85rem">No mentions of that team across any section.</div>';
-  resultsEl.innerHTML = html;
-}
-
-function clearTeamSearch() {
-  document.getElementById('team-search').value = '';
-  document.getElementById('team-search-clear').style.display = 'none';
-  document.getElementById('team-search-summary').textContent = '';
-  document.getElementById('team-search-results').style.display = 'none';
-  document.querySelector('.tab-bar').style.display = '';
-  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = '');
-  // Re-activate the current tab panel
-  const activeBtn = document.querySelector('.tab-btn.active');
-  if (activeBtn) document.getElementById('tab-' + activeBtn.dataset.tab).classList.add('active');
-}
-
-// ---- injuries (manual refresh only — never auto-polls, to control cost) ----
-function fmtLabel(label) {
-  // Title-case each word, but keep 'vs' lowercase. HTML-escaped (team names
-  // arrive from a third-party odds feed) — safe to drop into innerHTML.
-  const t = (label || '').split(' ').map(w => w === 'vs' ? 'vs' : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  return esc(t);
-}
-
-function fmtInjuryDigest(text) {
-  if (!text) return '<div class="empty">No injury data yet — hit "Refresh injuries".</div>';
-  // Strip AI preamble lines — keep stripping while the line is blank or starts with
-  // a known AI phrase. Stop at the first real content line.
-  const preambleRe = /^(i'?ll\s|i will\s|based on\s|here is\s|here'?s\s|let me\s|searching\s|i('ve| have)\s)/i;
-  const lines = text.split('\n');
-  while (lines.length > 0 && (lines[0].trim() === '' || preambleRe.test(lines[0].trim()))) {
-    lines.shift();
-  }
-  text = lines.join('\n').trim();
-  if (!text) return '<div class="empty">Injury data is empty — try refreshing.</div>';
-  // Light markdown: ## TEAM headers, **bold**, line breaks.
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  return esc(text)
-    .replace(/^#+\s*\*\*(.+?)\*\*/gm, '<div style="color:#58a6ff;font-weight:700;margin:14px 0 4px;font-size:0.95rem">$1</div>')
-    .replace(/^#+\s*(.+)$/gm, '<div style="color:#58a6ff;font-weight:700;margin:14px 0 4px;font-size:0.95rem">$1</div>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f6fc">$1</strong>')
-    .replace(/\n/g, '<br>');
-}
-
-// ---- structured injuries table ----
-let _injuryInfo = null;   // last /api/injuries payload (items may be null = legacy text)
-
-const INJURY_STATUS_META = {
-  out:       { label: 'Out',          col: '#f85149' },
-  doubtful:  { label: 'Doubtful',     col: '#d29922' },
-  suspended: { label: 'Suspended',    col: '#bc8cff' },
-  fit_again: { label: 'Fit Again',    col: '#3fb950' },
-  unknown:   { label: 'Unclear',      col: '#8b949e' },
-};
-
-function renderInjuryTable() {
-  const panel = document.getElementById('injuries-panel');
-  const items = _injuryInfo?.items || [];
-  const teamFilter   = document.getElementById('inj-team-filter')?.value || '';
-  const statusFilter = document.getElementById('inj-status-filter')?.value || '';
-
-  const teams    = [...new Set(items.map(i => i.team))].sort();
-  const statuses = [...new Set(items.map(i => i.status))];
-  const list = items.filter(i =>
-    (!teamFilter || i.team === teamFilter) && (!statusFilter || i.status === statusFilter));
-
-  const filterBar = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-    <label style="font-size:0.8rem;color:#8b949e">Team:</label>
-    <select id="inj-team-filter" onchange="renderInjuryTable()">
-      <option value="">All teams (${teams.length})</option>
-      ${teams.map(t => `<option value="${esc(t)}"${t === teamFilter ? ' selected' : ''}>${esc(t)}</option>`).join('')}
-    </select>
-    <label style="font-size:0.8rem;color:#8b949e">Status:</label>
-    <select id="inj-status-filter" onchange="renderInjuryTable()">
-      <option value="">All statuses</option>
-      ${statuses.map(st => `<option value="${esc(st)}"${st === statusFilter ? ' selected' : ''}>${esc(INJURY_STATUS_META[st]?.label || st)}</option>`).join('')}
-    </select>
-    <span style="font-size:0.78rem;color:#6e7681">${list.length} player${list.length !== 1 ? 's' : ''}</span>
-  </div>`;
-
-  const rows = list.map(i => {
-    const meta = INJURY_STATUS_META[i.status] || INJURY_STATUS_META.unknown;
-    return `<tr>
-      <td style="font-weight:600">${esc(i.team)}</td>
-      <td style="text-align:left">${esc(i.player)}</td>
-      <td style="text-align:left"><span class="badge" style="background:${meta.col}18;color:${meta.col};border:1px solid ${meta.col}55">${meta.label}</span></td>
-      <td style="text-align:left;color:#8b949e">${esc(i.detail || '—')}</td>
-    </tr>`;
-  }).join('');
-
-  const table = list.length
-    ? `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;overflow-x:auto">
-        <table style="min-width:560px"><thead><tr>
-          <th>Team</th><th style="text-align:left">Player</th><th style="text-align:left">Status</th><th style="text-align:left">Detail</th>
-        </tr></thead><tbody>${rows}</tbody></table>
-      </div>`
-    : `<div class="empty">No injury or suspension news matches the current filters.</div>`;
-
-  panel.innerHTML = filterBar + table;
-}
-
-function renderInjuries(info) {
-  const panel = document.getElementById('injuries-panel');
-  const upd   = document.getElementById('injuries-updated');
-  _injuryInfo = info;
-  if (Array.isArray(info.items)) {
-    renderInjuryTable();   // structured digest → table with team/status filters
-  } else {
-    // legacy text digest (pre-structured cache) → formatted text fallback
-    panel.innerHTML = `<div style="line-height:1.6;font-size:0.86rem;color:#c9d1d9">${fmtInjuryDigest(info.digest)}</div>`;
-  }
-  if (info.fetched_at) {
-    const d = new Date(info.fetched_at * 1000);
-    upd.textContent = 'Last refreshed: ' + d.toLocaleString();
-  } else {
-    upd.textContent = '';
-  }
-}
-
-async function loadInjuries() {
-  const panel = document.getElementById('injuries-panel');
-  try {
-    const res = await fetch('/api/injuries');   // cached digest — no web search, free
-    const info = await res.json();
-    _injuriesLoaded = true;
-    renderInjuries(info);
-  } catch (e) {
-    panel.innerHTML = `<div class="empty">Couldn't load injuries: ${e.message}</div>`;
-  }
-}
-
-async function refreshInjuriesDigest() {
-  const btn   = document.getElementById('injuries-refresh-btn');
-  const panel = document.getElementById('injuries-panel');
-  btn.disabled = true; btn.textContent = 'Refreshing…';
-  try {
-    const r = await (await fetch('/api/refresh-injuries')).json();
-    if (r.status === 'cooldown') {
-      // Server-side cooldown (protects the search budget) — cached digest is current.
-      btn.disabled = false; btn.textContent = 'Refresh injuries';
-      const upd = document.getElementById('injuries-updated');
-      if (upd) upd.textContent = `Refreshed recently — try again in ~${Math.ceil((r.retry_in_s || 60) / 60)} min`;
-      return;
-    }
-  } catch (e) {
-    btn.disabled = false; btn.textContent = 'Refresh injuries';
-    return;
-  }
-  // Restart the intel poll so re-analysis banners appear on match cards promptly
-  if (!_intelPollTimer) _intelPollTimer = setInterval(pollIntel, 8000);
-  // Poll every 5s for up to 90s — web search + retries can take well over 30s
-  let elapsed = 0;
-  const pollId = setInterval(async () => {
-    elapsed += 5;
-    btn.textContent = `Refreshing… (${elapsed}s)`;
-    try {
-      const res  = await fetch('/api/injuries');
-      const info = await res.json();
-      if (info.digest) {
-        clearInterval(pollId);
-        _injuriesLoaded = true;
-        renderInjuries(info);
-        btn.disabled = false; btn.textContent = 'Refresh injuries';
-        return;
-      }
-    } catch (e) { /* keep polling */ }
-    if (elapsed >= 90) {
-      clearInterval(pollId);
-      panel.innerHTML = `<div class="empty">Injury refresh is taking longer than expected — check back in a moment or try again.</div>`;
-      btn.disabled = false; btn.textContent = 'Refresh injuries';
-    }
-  }, 5000);
-}
-
-// ---- data loading ----
-let _intelPollTimer = null;
-
-async function loadData(force = false) {
-  const btn = document.getElementById('refresh-btn');
-  btn.disabled = true; btn.textContent = 'Refreshing...';
-  document.getElementById('matches').innerHTML = '<div id="loading"><div class="spinner"></div><span>Pulling live data...</span></div>';
-  document.getElementById('bets-panel').innerHTML = '<div class="loading-inner"><div class="spinner"></div><span>Building recommendations...</span></div>';
-
-  // Stop any running intel poll
-  if (_intelPollTimer) { clearInterval(_intelPollTimer); _intelPollTimer = null; }
-
-  try {
-    const [divRes, betsRes, intelRes] = await Promise.all([
-      fetch(force ? '/api/refresh' : '/api/divergence'),
-      fetch('/api/bets'),
-      fetch('/api/intel')
-    ]);
-    try { allIntel = (await intelRes.json()).intel || {}; } catch (e) { allIntel = {}; }
-    const divData  = await divRes.json();
-    const betsData = await betsRes.json();
-
-    if (divData.error) throw new Error(divData.error);
-
-    allMatches    = divData.matches    || [];
-    allSingles    = betsData.bets?.singles || [];
-    allParlays    = betsData.bets?.parlays || [];
-    allBookmakers = betsData.bookmakers   || [];
-    accaMarkets   = betsData.markets_available || [];
-    roundsAvailable = betsData.rounds_available || [];
-    populateRoundFilter();
-    populateSensibleRoundFilter();
-
-    // Populate bookmaker dropdowns once (bets tab + picks tab)
-    ['book-select', 'picks-book-select'].forEach(selId => {
-      const sel = document.getElementById(selId);
-      if (sel.options.length <= 1 && allBookmakers.length) {
-        allBookmakers.forEach(bk => {
-          const opt = document.createElement('option');
-          opt.value = bk; opt.textContent = bk;
-          if (bk === 'Paddy Power') opt.selected = true;
-          sel.appendChild(opt);
-        });
-      }
-    });
-
-    const d = new Date((divData.fetched_at || betsData.fetched_at) * 1000);
-    document.getElementById('fetch-time').textContent = 'Updated ' + d.toLocaleTimeString();
-
-    renderDivergence();
-    renderBets();
-    renderTopPicks();
-    renderSensible();
-    renderToday();
-    renderFixtures();
-
-    // If intel is still loading in background, poll for it every 8s
-    if (betsData.intel_loading) {
-      _intelPollTimer = setInterval(pollIntel, 8000);
-    } else if (betsData.intel_ready === 0) {
-      // Intel finished but got nothing — credits likely exhausted
-      document.querySelectorAll('.intel-loading').forEach(el => {
-        el.innerHTML = '<span style="color:#6e7681;font-size:0.8rem">Analyst unavailable — check Anthropic API credits at console.anthropic.com</span>';
-      });
-    }
-  } catch (e) {
-    document.getElementById('matches').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
-    document.getElementById('bets-panel').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
-  } finally {
-    btn.disabled = false; btn.textContent = 'Refresh';
-  }
-}
-
-async function refreshInjuries() {
-  const btn = document.getElementById('team-btn');
-  btn.disabled = true; btn.textContent = 'Refreshing injuries...';
-  try {
-    await fetch('/api/refresh-injuries');
-    // One BBC injury-digest search (~15-30s); affected analyst cards then
-    // re-analyse in the background. Reload shortly to pick up the changes.
-    setTimeout(async () => {
-      await loadData(false);
-      btn.disabled = false; btn.textContent = 'Refresh Injuries';
-    }, 25000);
-  } catch(e) {
-    btn.disabled = false; btn.textContent = 'Refresh Injuries';
-  }
-}
-
-async function pollIntel() {
-  try {
-    const res  = await fetch('/api/intel');
-    const data = await res.json();
-    if (!data.intel || !Object.keys(data.intel).length) return;
-
-    allIntel = { ...allIntel, ...data.intel };
-
-    // Merge intel into allSingles and allParlays; compute analyst confirmation
-    let changed = false;
-    allSingles.forEach(s => {
-      if (!s.intel && data.intel[s.match]) {
-        s.intel = data.intel[s.match];
-        s.analyst_confirms = analystConfirms(s, s.intel);
-        changed = true;
-      }
-    });
-    allParlays.forEach(p => p.legs.forEach(l => {
-      if (!l.intel && data.intel[l.match]) { l.intel = data.intel[l.match]; changed = true; }
-    }));
-
-    // Track which matches are being re-analysed (injury-triggered re-run)
-    const newReanalysing = new Set(data.reanalysing || []);
-    const reanalysisChanged = [...newReanalysing].some(l => !_reanalysing.has(l))
-                           || [..._reanalysing].some(l => !newReanalysing.has(l));
-    _reanalysing = newReanalysing;
-
-    if (changed || reanalysisChanged) { renderBets(); renderTopPicks(); renderFixtures(); renderSensible(); renderToday(); }
-
-    // Stop polling once intel is done loading AND no re-analysis in flight
-    if (!data.intel_loading && !_reanalysing.size) {
-      clearInterval(_intelPollTimer);
-      _intelPollTimer = null;
-      if (!data.intel_ready) {
-        document.querySelectorAll('.intel-loading').forEach(el => {
-          el.innerHTML = '<span style="color:#6e7681;font-size:0.8rem">Analyst unavailable — check Anthropic API credits at console.anthropic.com</span>';
-        });
-      }
-    }
-  } catch (e) { /* ignore poll errors */ }
-}
-
-// ---- utils ----
-// Escape text for safe interpolation into innerHTML. Applied to anything that
-// originates outside this app: analyst (LLM) free text, the web-sourced injury
-// digest, team/bookmaker names from third-party APIs.
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-// True expected value per unit stake: fair probability × decimal price − 1.
-// NOT the same as the probability-point "edge" (fair − 1/price): that gap is a
-// model diagnostic; EV is the money number. Returns % (e.g. +2.4) or null.
-function evPct(fairProb, price) {
-  if (fairProb == null || !price || price <= 0) return null;
-  return (fairProb * price - 1) * 100;
-}
-
-// The primary money metric: "EV +€0.23 per €10" — the long-run average result
-// of this bet at this price, per the model. Sign decides colour.
-function evMoneyHTML(fairProb, price, stake, fontSize = '1rem') {
-  const ev = evPct(fairProb, price);
-  if (ev == null) return '<span style="color:#6e7681">EV —</span>';
-  const amt = ev / 100 * stake;
-  const col = ev >= 0 ? '#3fb950' : '#f85149';
-  return `<span class="help" style="font-size:${fontSize};font-weight:700;color:${col}" `
-    + `title="Expected value: the average profit/loss of this bet per €${stake} staked if it were repeated many times at the model's fair probability. = (fair prob × price − 1) × stake.">`
-    + `EV ${amt >= 0 ? '+' : '−'}€${Math.abs(amt).toFixed(2)} per €${stake}`
-    + ` <span style="font-weight:400;font-size:0.78rem">(${ev >= 0 ? '+' : ''}${ev.toFixed(1)}%)</span></span>`;
-}
-
-function fmt(iso) {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-GB', {weekday:'short',day:'numeric',month:'short'})
-      + ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
-  } catch { return iso; }
-}
-
-function eur(val) { return '€' + val.toFixed(2); }
-
-function onThreshold() {
-  threshold = parseFloat(document.getElementById('threshold').value);
-  document.getElementById('threshold-val').textContent = threshold + '%';
-  renderDivergence();
-}
-
-function chosenBook()  { return document.getElementById('book-select').value; }
-function chosenStake() { return parseFloat(document.getElementById('stake-input').value) || 10; }
-
-// Get price for a single at the chosen bookmaker (falls back to best price)
-function priceForBook(s, book) {
-  if (book === 'best') return { price: s.best_price, bookLabel: s.best_book, fallback: false };
-  const p = s.per_book?.[book];
-  if (p) return { price: p, bookLabel: book, fallback: false };
-  return { price: s.best_price, bookLabel: s.best_book, fallback: true };
-}
-
-// ====================================================================
-// DIVERGENCE RENDER
-// ====================================================================
-function renderDivergence() {
-  const sortBy = document.getElementById('sort-select').value;
-  const pmOnly = document.getElementById('pm-filter').value === 'pm';
-
-  let list = allMatches.filter(m => {
-    if (pmOnly && !m.has_pm_data) return false;
-    if (Math.abs(m.max_gap) < threshold) return false;
-    return true;
-  });
-
-  if (sortBy === 'time') list.sort((a,b) => a.commence.localeCompare(b.commence));
-  else list.sort((a,b) => Math.abs(b.max_gap) - Math.abs(a.max_gap));
-
-  const container = document.getElementById('matches');
-  if (!list.length) {
-    container.innerHTML = '<div class="empty">No matches meet current filters.</div>';
-    return;
-  }
-  container.innerHTML = list.map(m => matchCardHTML(m)).join('');
-}
-
-function matchCardHTML(m) {
-  const gap     = m.max_gap;
-  const isLong  = gap >  2;
-  const isShort = gap < -2;
-
-  let cardCls  = 'card' + (isLong ? ' flag-long' : isShort ? ' flag-short' : '');
-  let badgeCls = isLong  ? 'badge badge-long'
-               : isShort ? 'badge badge-short'
-               :            'badge badge-neutral';
-  let badgeTxt = Math.abs(gap) > 0
-    ? (gap > 0 ? '+' : '') + gap.toFixed(1) + '% gap'
-    : 'no PM data';
-
-  const rows = m.outcomes.map(o => {
-    const diff     = o.diff;
-    const hasDiff  = diff !== null;
-    const diffCls  = !hasDiff ? 'diff-neutral' : diff > 2 ? 'diff-long' : diff < -2 ? 'diff-short' : 'diff-neutral';
-    const barCls   = !hasDiff ? 'bar-neutral'  : diff > 2 ? 'bar-long'  : diff < -2 ? 'bar-short'  : 'bar-neutral';
-    const barW     = hasDiff ? Math.min(Math.abs(diff)/10*100,100) : 0;
-    const diffTxt  = hasDiff ? (diff>0?'+':'') + diff.toFixed(1)+'%' : '—';
-    const polyTxt  = o.poly   != null ? o.poly.toFixed(1)+'%'   : '<span class="pm-missing">—</span>';
-    const kalTxt   = o.kalshi != null ? o.kalshi.toFixed(1)+'%' : '<span class="pm-missing">—</span>';
-    const bestTxt  = o.best_price ? o.best_price.toFixed(2)+' <span style="color:#6e7681;font-size:0.7rem">('+o.best_book+')</span>' : '—';
-    const paddyTxt = o.paddy  != null ? '<span class="paddy-price">PP '+o.paddy.toFixed(2)+'</span>' : '';
-    const edgeTxt  = o.edge   != null ? `<span class="${o.edge>0?'edge-pos':'edge-neg'}">${o.edge>0?'+':''}${o.edge.toFixed(1)}%</span>` : '<span class="edge-na">—</span>';
-
-    return `<tr>
-      <td>${o.outcome}</td>
-      <td>${o.book_fair.toFixed(1)}%</td>
-      <td>${polyTxt}</td>
-      <td>${kalTxt}</td>
-      <td class="diff-cell ${diffCls}">${diffTxt}</td>
-      <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill ${barCls}" style="width:${barW}%"></div></div></td>
-      <td>${bestTxt} ${paddyTxt}</td>
-      <td>${edgeTxt}</td>
-    </tr>`;
-  }).join('');
-
-  let totalsHTML = '';
-  if (m.totals && m.totals.length) {
-    const id = 'tot-' + m.label.replace(/\W/g,'');
-    const totRows = m.totals.map(t =>
-      Object.entries(t.outcomes).map(([name, od]) => {
-        const eCls = od.edge > 0 ? 'edge-pos' : 'edge-neg';
-        return `<tr>
-          <td>${name} ${t.line}</td>
-          <td>${od.fair}%</td>
-          <td colspan="3" style="color:#6e7681">no PM data</td>
-          <td class="bar-cell"></td>
-          <td>${od.best_price ? od.best_price.toFixed(2)+' <span style="color:#6e7681;font-size:0.7rem">('+od.best_book+')</span>' : '—'}</td>
-          <td><span class="${eCls}">${od.edge != null ? (od.edge>0?'+':'')+od.edge.toFixed(1)+'%' : '—'}</span></td>
-        </tr>`;
-      }).join('')
-    ).join('');
-    totalsHTML = `
-      <div class="totals-toggle" onclick="toggleTotals('${id}')">
-        ▶ Over / Under <span style="color:#484f58">(click to expand)</span>
-      </div>
-      <div class="totals-body" id="${id}">
-        <table><thead><tr>
-          <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th><th>Edge</th>
-        </tr></thead><tbody>${totRows}</tbody></table>
-      </div>`;
-  }
-
-  return `<div class="${cardCls}">
-    <div class="card-header">
-      <div>
-        <div class="match-title">${m.label}</div>
-        <div class="match-time">${fmt(m.commence)}</div>
-      </div>
-      <div class="card-badges">
-        <span class="${badgeCls}">${badgeTxt}</span>
-        <span class="badge badge-margin">margin ${m.margin}%</span>
-      </div>
-    </div>
-    <table>
-      <thead><tr>
-        <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th><th>Edge</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    ${totalsHTML}
-  </div>`;
-}
-
-function toggleTotals(id) {
-  const el = document.getElementById(id);
-  el.classList.toggle('open');
-  el.previousElementSibling.textContent = el.classList.contains('open')
-    ? '▼ Over / Under'
-    : '▶ Over / Under (click to expand)';
-}
-
-// ====================================================================
-// BETS RENDER
-// ====================================================================
-function switchBetsTab(tab) {
-  betsSubTab = tab;
-  document.getElementById('btn-singles').classList.toggle('active', tab === 'singles');
-  document.getElementById('btn-parlays').classList.toggle('active', tab === 'parlays');
-  renderBets();
-}
-
-const ACCA_RISK_INFO = {
-  banker:   { label: 'Banker',   blurb: 'nailed-on legs · 2–4 legs · ≥30% chance · all markets' },
-  balanced: { label: 'Balanced', blurb: 'solid legs · 4–6 legs · ≥12% chance · all markets' },
-  punchy:   { label: 'Punchy',   blurb: 'long slips · 6–8 legs · ≥4% chance · all markets' },
-};
-
-function accaControlsHTML() {
-  const riskBtns = Object.entries(ACCA_RISK_INFO).map(([key, info]) =>
-    `<button class="acca-risk-btn${accaRisk === key ? ' active' : ''}" onclick="setAccaRisk('${key}')" title="${info.blurb}">${info.label}</button>`
-  ).join('');
-  return `
-    <div class="acca-controls">
-      <div class="acca-risk-group">
-        <span class="acca-ctrl-label">Risk</span>
-        ${riskBtns}
-      </div>
-      <label class="acca-guard" title="Drop legs priced well below fair (after line-shopping all books). Favourite accas are never strictly +EV, so this minimises the bookmaker margin rather than eliminating it.">
-        <input type="checkbox" ${accaGuard ? 'checked' : ''} onchange="toggleAccaGuard(this.checked)">
-        Value guard <span style="color:#6e7681">(low-margin legs)</span>
-      </label>
-      <span class="acca-risk-group">
-        <span class="acca-ctrl-label">Sort</span>
-        <select onchange="setAccaSort(this.value)" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px;font-size:0.8rem">
-          <option value="chance" ${accaSort==='chance'?'selected':''}>Chance to land (high→low)</option>
-          <option value="return" ${accaSort==='return'?'selected':''}>Return / odds (high→low)</option>
-        </select>
-      </span>
-      <span class="acca-ctrl-note">${ACCA_RISK_INFO[accaRisk].blurb}${_accaBusy ? ' · updating…' : ''}</span>
-    </div>`;
-}
-
-const MARKET_LABELS = { h2h: 'Match Result', totals: 'Goals Over/Under', spreads: 'Asian Handicap' };
-
-function accaMarketsNote() {
-  const have = accaMarkets.length
-    ? accaMarkets.map(m => MARKET_LABELS[m] || m).join(' · ')
-    : 'Match Result';
-  const handicapMissing = !accaMarkets.includes('spreads');
-  const note = handicapMissing
-    ? `<span style="color:#d29922">⚠ Asian handicaps (e.g. +2) aren't posted by the bookmakers this far out — they'll be folded into accas automatically as books publish them closer to kick-off.</span>`
-    : `<span style="color:#3fb950">✓ incl. Asian handicaps</span>`;
-  return `<div style="padding:2px 24px 8px;font-size:0.74rem;color:#8b949e">
-            Markets in current odds feed: <strong style="color:#c9d1d9">${have}</strong><br>${note}
-          </div>`;
-}
-
-function accaLegendHTML() {
-  return `<div class="acca-legend">
-    💡 Odds are <strong>decimal</strong>: e.g. <strong>Paddy Power 1.04</strong> means a €100 bet returns €104
-    (just €4 profit) — a very strong favourite, ~96% to win. Lower number = bigger favourite.
-    A leg at 2.00 doubles your money (~50%); 5.00 returns 5× (~20%).
-    <br><em>Hover any underlined figure for a plain-English explanation.</em>
-  </div>`;
-}
-
-function setAccaRisk(risk) {
-  if (risk === accaRisk) return;
-  accaRisk = risk;
-  refetchParlays();
-}
-
-function toggleAccaGuard(on) {
-  accaGuard = on;
-  refetchParlays();
-}
-
-function setAccaSort(v) {
-  accaSort = v;
-  renderBets();   // client-side re-sort, no refetch needed
-}
-
-function populateRoundFilter() {
-  const sel = document.getElementById('round-filter');
-  if (!sel || sel.options.length > 1 || !roundsAvailable.length) return;
-  roundsAvailable.forEach(r => {
-    const o = document.createElement('option');
-    o.value = r; o.textContent = r;
-    sel.appendChild(o);
-  });
-}
-
-// Round dropdown changes BOTH the singles shown and the accas built
-// (single-round accas need the server to rebuild from that round's legs).
-function onRoundChange() {
-  accaRound = document.getElementById('round-filter').value;
-  refetchParlays();   // re-renders singles too (filtered by round)
-}
-
-async function refetchParlays() {
-  _accaBusy = true;
-  if (betsSubTab === 'parlays') renderBets();   // reflect busy state immediately
-  try {
-    const res  = await fetch(`/api/bets?risk=${encodeURIComponent(accaRisk)}&value_guard=${accaGuard}&round=${encodeURIComponent(accaRound)}`);
-    const data = await res.json();
-    allParlays = data.bets?.parlays || [];
-    accaMarkets = data.markets_available || accaMarkets;
-  } catch (e) {
-    allParlays = [];
-  } finally {
-    _accaBusy = false;
-    renderBets();
-  }
-}
-
-function renderBets() {
-  const book         = chosenBook();
-  const stake        = chosenStake();
-  const confFilter   = document.getElementById('conf-filter').value;
-  const marketFilter = document.getElementById('market-filter').value;
-  const allowedConf  = confFilter === 'all' ? ['high','medium','low'] : confFilter.split(',');
-
-  const singles = allSingles.filter(s =>
-    allowedConf.includes(s.confidence) &&
-    (marketFilter === 'all' || s.market === marketFilter) &&
-    (accaRound === '' || (s.round && s.round.label === accaRound))
-  );
-  // Accas are driven by their own risk/value preset, not the singles confidence filter.
-  // Client-side sort by chance-to-land or by return (combined odds), high→low.
-  const parlays = [...allParlays].sort((a, b) =>
-    accaSort === 'return' ? b.combined_price - a.combined_price
-                          : b.combined_fair - a.combined_fair);
-
-  const panel = document.getElementById('bets-panel');
-
-  if (betsSubTab === 'parlays') {
-    const controls = accaControlsHTML();
-    const body = !parlays.length
-      ? `<div class="empty" style="padding:24px">No accumulators clear the <strong>${accaRisk}</strong> threshold${accaGuard ? ' with the value guard on' : ''}.<br><small style="color:#6e7681">Try a punchier risk level, turn the value guard off, or refresh for more data.</small></div>`
-      : `<div class="parlay-list" style="padding:0 24px 24px">
-           ${parlays.map(p => parlayHTML(p, book, stake)).join('')}
-         </div>`;
-    panel.innerHTML = `
-      <div style="padding:18px 24px 0">
-        <div class="bets-section-title">
-          High-Probability Accumulators
-          <small>${parlays.length} slip${parlays.length !== 1 ? 's' : ''}, ranked by chance of landing · ${book === 'best' ? 'best available price' : book}</small>
-        </div>
-      </div>
-      ${recommendedAccaHTML(allParlays, book, stake)}
-      <div class="ev-banner" style="padding:0">${collapsibleBanner("acca-ev-warn",
-        "⚠ Accumulators are −EV — expected to lose money long-term.",
-        "⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong> Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than \"Best available\". The genuine edge is in <a onclick=\"switchBetsTab('singles')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">Value Singles →</a>"
-      )}</div>
-      ${controls}
-      ${accaMarketsNote()}
-      ${accaLegendHTML()}
-      ${body}`;
-  } else {
-    if (!singles.length) {
-      panel.innerHTML = '<div class="empty" style="padding:24px">No value singles found under current filters.</div>';
-      return;
-    }
-    // Reliable edges first; speculative longshots demoted to the bottom.
-    const ranked = [...singles].sort((a, b) => {
-      const da = edgeReliable(a) ? 0 : 1, db = edgeReliable(b) ? 0 : 1;
-      return da !== db ? da - db : b.edge - a.edge;
-    });
-    const solid = ranked.filter(edgeReliable).length;
-    panel.innerHTML = `
-      <div style="padding:18px 24px 0">
-        <div class="bets-section-title">
-          Prices &amp; EV — positive-edge candidates
-          <small>${ranked.length} where the price beats fair (${solid} solid, ${ranked.length - solid} speculative) · ${book === 'best' ? 'best available price' : book}</small>
-        </div>
-      </div>
-      <div class="ev-banner" style="padding:0">${collapsibleBanner("singles-maths-info",
-        "✅ What the numbers say — candidates, not endorsements.",
-        "✅ <strong>What the numbers say — candidates, not endorsements.</strong> Each one's best price beats the de-vigged fair probability (positive edge). Small edges on long-odds outcomes are greyed out as <em>speculative</em> (within the model's margin of error). For the football view, see <a onclick=\"switchTab('picks')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">Bettor's Analysis →</a>; bets marked <span style=\"color:#3fb950\">★ Both agree</span> are the strongest."
-      )}</div>
-      <div class="singles-list" style="padding:0 24px 24px">
-        ${ranked.map(s => singleHTML(s, book, stake)).join('')}
-      </div>`;
-  }
-}
-
-// Mirror of Python prediction_markets.normalize_team — must stay in sync.
-const _TEAM_ALIASES = {
-  "usa": "united states", "us": "united states", "u s a": "united states",
-  "korea republic": "south korea", "korea": "south korea",
-  "republic of korea": "south korea",
-  "czech republic": "czechia",
-  "cote divoire": "ivory coast", "cote d ivoire": "ivory coast",
-  "ivory coast": "ivory coast",
-  "bosnia and herzegovina": "bosnia", "bosnia herzegovina": "bosnia",
-  "bosnia-herzegovina": "bosnia",
-  "cabo verde": "cape verde", "cape verde": "cape verde",
-  "turkey": "turkiye", "ir iran": "iran",
-  "curacao": "curacao",
-  "congo dr": "dr congo", "democratic republic of congo": "dr congo",
-  "democratic republic congo": "dr congo",
-};
-function normalizeTeam(name) {
-  if (!name) return "";
-  // NFKD decomposition + strip Unicode combining diacritics
-  let n = name.normalize("NFKD").replace(/\p{M}/gu, "");
-  n = n.replace(/[^a-z0-9 ]/gi, " ").toLowerCase().replace(/\s+/g, " ").trim();
-  return _TEAM_ALIASES[n] ?? n;
-}
-
-function normalizeMatchLabel(label) {
-  return (label || '').split(' vs ').map(normalizeTeam).join(' vs ');
-}
-
-function analystConfirms(single, intel) {
-  if (!intel) return null;
-  const recs = intel.recommended_bets;
-  if (!recs || !recs.length) return null;
-  const sMarket  = single.market;
-  const sOutcome = single.outcome.toLowerCase();
-  const parts    = single.match.includes(' vs ') ? single.match.split(' vs ') : ['', ''];
-  const homeName = normalizeTeam(parts[0]);
-  const awayName = normalizeTeam(parts[1]);
-
-  // Only compare against recs in the same market — a spread rec (Brazil -2)
-  // doesn't contradict a 1X2 Draw bet; they're separate markets entirely.
-  const isH2hRec      = ao => ao === 'home_win' || ao === 'away_win' || ao === 'draw';
-  const isTotalsRec   = ao => ao.startsWith('over') || ao.startsWith('under');
-  const isSpreadsRec  = ao => ao.startsWith('home_-') || ao.startsWith('home_+') || ao.startsWith('away_-') || ao.startsWith('away_+');
-  const inSameMarket  = ao =>
-    (sMarket === 'h2h'     && isH2hRec(ao))    ||
-    (sMarket === 'totals'  && isTotalsRec(ao))  ||
-    (sMarket === 'spreads' && isSpreadsRec(ao));
-
-  const sameMarketRecs = recs.filter(rb => inSameMarket((rb.outcome || '').toLowerCase().replace(/ /g, '_')));
-  if (!sameMarketRecs.length) return null; // analyst hasn't opined on this market
-
-  for (const rb of sameMarketRecs) {
-    const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
-    if (sMarket === 'h2h') {
-      if (ao === 'home_win' && sOutcome === homeName) return true;
-      if (ao === 'away_win' && sOutcome === awayName) return true;
-      if (ao === 'draw' && sOutcome === 'draw') return true;
-    } else if (sMarket === 'totals') {
-      if (ao.startsWith('over')  && sOutcome.includes('over'))  return true;
-      if (ao.startsWith('under') && sOutcome.includes('under')) return true;
-    } else if (sMarket === 'spreads') {
-      if (ao.startsWith('home_')) {
-        const pt = ao.split('home_')[1];
-        if (sOutcome.includes(homeName) && sOutcome.includes(pt)) return true;
-      }
-      if (ao.startsWith('away_')) {
-        const pt = ao.split('away_')[1];
-        if (sOutcome.includes(awayName) && sOutcome.includes(pt)) return true;
-      }
-    }
-  }
-  return false; // analyst has a same-market rec but picked a different outcome
-}
-
-// A small edge on a long-priced outcome is within the de-vig's own margin of
-// error — i.e. noise, not value. Require the edge to grow with the price.
-function edgeReliable(s) {
-  return s.edge >= (0.5 + 0.3 * ((s.best_price || 1) - 1));
-}
-
-function singleHTML(s, book, stake, opts = {}) {
-  const context = opts.context || 'maths';   // 'maths' | 'analyst'
-  const { price, bookLabel, fallback } = priceForBook(s, book);
-  const grossReturn = stake * price;
-  const profit      = grossReturn - stake;
-  const mktLabel    = s.market === 'totals' ? 'Over/Under'
-                    : s.market === 'spreads' ? 'Handicap'
-                    : '1X2';
-
-  // Analyst confirmation (may be pre-set by server, or compute from intel)
-  let confirmed = s.analyst_confirms;
-  if (confirmed === undefined || confirmed === null) {
-    confirmed = analystConfirms(s, s.intel);
-  }
-  const reliable    = edgeReliable(s);
-  const speculative = !reliable;
-  // In The Maths tab the analyst is a *separate* layer — we only surface the
-  // positive overlap ("both agree"), never the contradiction (that lives in
-  // the Bettor's Analysis tab). In the analyst tab we show the full verdict.
-  const overlapBadge = confirmed === true
-    ? `<span class="badge" style="background:#0d2818;color:#3fb950;border:1px solid #3fb95088" title="The maths and the analyst both like this — the strongest signal.">★ Both agree</span>`
-    : ``;
-  const analystBadge = confirmed === true
-    ? `<span class="badge" style="background:#1a3626;color:#3fb950;border:1px solid #3fb95066">✓ Analyst backed</span>`
-    : confirmed === false
-    ? `<span class="badge" style="background:#2a1a1a;color:#d29922;border:1px solid #d2992266">⚠ Analyst prefers other outcome</span>`
-    : ``;
-
-  // Confidence badge: maths-only. Demote speculative longshots instead of
-  // dressing them as "medium/high".
-  const confBadge = speculative
-    ? `<span class="badge badge-muted" title="Edge (+${s.edge.toFixed(1)}%) is small relative to the long price (${(s.best_price||0).toFixed(2)}) — within the model's margin of error, so treat as noise, not value.">Speculative · longshot</span>`
-    : `<span class="badge badge-${s.confidence}">${s.confidence.charAt(0).toUpperCase()+s.confidence.slice(1)}</span>`;
-
-  const topRight = context === 'analyst'
-    ? `${analystBadge}
-       <span class="badge badge-neutral" style="color:#3fb950;border-color:#3fb95044">edge +${s.edge.toFixed(1)}%</span>`
-    : `${confBadge}
-       <span class="badge badge-neutral" style="color:${reliable ? '#3fb950' : '#6e7681'};border-color:${reliable ? '#3fb95044' : '#30363d'}">edge +${s.edge.toFixed(1)}%</span>
-       ${overlapBadge}`;
-
-  const fallbackNote = fallback
-    ? `<span style="color:#d29922;font-size:0.73rem"> ⚠ not at ${book}, using ${bookLabel}</span>`
-    : '';
-
-  const kalLine  = s.kalshi != null ? `<span><span class="lbl">Kalshi:</span><span class="val blue">${s.kalshi}%</span></span>` : '';
-  const polyLine = s.poly   != null ? `<span><span class="lbl">Poly:</span><span class="val blue">${s.poly}%</span></span>`   : '';
-
-  return `<div class="single-card conf-${s.confidence}${speculative && context !== 'analyst' ? ' demoted' : ''}">
-    <div class="single-top">
-      <div>
-        <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${fmtLabel(s.match)}</div>
-        <div class="single-sub">${fmt(s.commence)} &nbsp;&middot;&nbsp; ${mktLabel}${s.round ? ' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">' + s.round.label + '</span>' : ''}</div>
-        ${weatherFlagHTML(s)}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        ${topRight}
-      </div>
-    </div>
-    <div class="single-prices">
-      <span><span class="lbl">Price:</span><span class="val green">${price.toFixed(2)}</span>
-        <span style="color:#6e7681;font-size:0.75rem">(${bookLabel})</span>${fallbackNote}</span>
-      <span><span class="lbl">Book fair:</span><span class="val">${(s.fair_prob*100).toFixed(1)}%</span></span>
-      ${kalLine}${polyLine}
-    </div>
-    <div style="background:#1c2128;border-radius:6px;padding:10px 14px;margin-top:6px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
-      <div>
-        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Expected value (the number that matters)</div>
-        ${evMoneyHTML(s.fair_prob, price, stake)}
-      </div>
-      <div>
-        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Stake</div>
-        <div style="font-size:0.9rem;font-weight:600;color:#c9d1d9">${eur(stake)}</div>
-      </div>
-      <div>
-        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:2px">Returns if it wins</div>
-        <div style="font-size:0.9rem;font-weight:600;color:#8b949e">${eur(grossReturn)} <span style="font-size:0.75rem">(+${eur(profit)})</span></div>
-      </div>
-    </div>
-    <div class="why-box">${buildWhy(s)}</div>
-    ${intelHTML(s.intel)}
-  </div>`;
-}
-
-function buildWhy(s) {
-  const parts = [];
-  parts.push(`De-vigged consensus fair prob <strong>${(s.fair_prob*100).toFixed(1)}%</strong> vs best price implied <strong>${(1/s.best_price*100).toFixed(1)}%</strong> — <strong>+${s.edge.toFixed(1)}% price edge</strong>.`);
-  if (s.pm_gap !== null) {
-    if (s.pm_gap < -2)
-      parts.push(`Kalshi/Polymarket price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than the books — prediction markets confirm the value.`);
-    else if (s.pm_gap > 2)
-      parts.push(`<strong>Warning:</strong> Prediction markets price this side <strong>${s.pm_gap.toFixed(1)}%</strong> <em>lower</em> than the books — the price edge may be misleading.`);
-    else
-      parts.push(`Prediction markets broadly agree with bookmaker consensus.`);
-  } else {
-    parts.push(`No prediction market data — price signal from bookmaker consensus only.`);
-  }
-  return parts.join(' ');
-}
-
-function intelHTML(intel) {
-  if (!intel) return `<div class="intel-loading" style="margin-top:10px;border:1px solid #30363d;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;color:#6e7681;font-size:0.82rem"><div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0"></div> Analyst researching form, conditions &amp; injuries...</div>`;
-
-  const rec    = intel.recommendation || {};
-  const cond   = intel.conditions || {};
-  const conf   = intel.intel_confidence || 'low';
-  const confColour = conf === 'high' ? '#3fb950' : conf === 'medium' ? '#d29922' : '#6e7681';
-
-  // Does the analyst recommendation agree with the bet?
-  const recOutcome = rec.outcome || '';
-
-  // Conditions block
-  const altWarn = cond.altitude_m > 800
-    ? `<span style="color:#f85149;font-weight:700"> ALTITUDE ${Math.round(cond.altitude_m).toLocaleString()}m</span>` : '';
-  const condLine = cond.city
-    ? `<div style="margin-bottom:6px"><span style="color:#6e7681">Venue:</span> <strong>${esc(cond.city)}</strong>${altWarn} &nbsp;·&nbsp; <span style="color:#6e7681">Local KO:</span> <strong>${esc(cond.local_kickoff)}</strong> &nbsp;·&nbsp; ${esc(cond.avg_high_c)}°C feels ${esc(cond.feels_like_c)}°C, ${esc(cond.humidity_pct)}% humidity</div>`
-    : '';
-
-  const strengthColour = rec.strength === 'strong' ? '#3fb950' : rec.strength === 'moderate' ? '#d29922' : '#8b949e';
-
-  return `<div style="margin-top:10px;border:1px solid #30363d;border-radius:8px;overflow:hidden">
-    <div style="background:#1c2128;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:0.78rem;font-weight:700;color:#c9d1d9;letter-spacing:0.04em">ANALYST RESEARCH</span>
-      <span style="font-size:0.72rem;color:${confColour}">analyst confidence: ${esc(conf)}</span>
-    </div>
-    <div style="padding:12px 14px;font-size:0.82rem;display:flex;flex-direction:column;gap:8px">
-      ${condLine}
-      <div><span style="color:#6e7681">Conditions impact:</span> ${esc(intel.conditions_impact || '—')}</div>
-      <div><span style="color:#6e7681">Home form:</span> ${esc(intel.home_form || '—')}</div>
-      <div><span style="color:#6e7681">Away form:</span> ${esc(intel.away_form || '—')}</div>
-      <div><span style="color:#6e7681">Tactical matchup:</span> ${esc(intel.tactical_matchup || '—')}</div>
-      <div><span style="color:#6e7681">Goals:</span> ${esc(intel.goals_assessment || '—')}</div>
-      <div><span style="color:#6e7681">Market read:</span> ${esc(intel.market_read || '—')}</div>
-      ${intel.key_absences ? `<div><span style="color:#6e7681">Absences:</span> ${esc(intel.key_absences)}</div>` : ''}
-      <div style="background:#0d1117;border-radius:6px;padding:10px 12px;margin-top:2px">
-        <div style="font-size:0.72rem;color:#6e7681;margin-bottom:4px">ANALYST RECOMMENDATION</div>
-        <div style="font-weight:700;color:${strengthColour};margin-bottom:4px">${esc(recOutcome.replace(/_/g,' ').toUpperCase())} &nbsp;<span style="font-weight:400;font-size:0.78rem">(${esc(rec.strength || '—')})</span></div>
-        <div style="color:#c9d1d9;line-height:1.5">${esc(rec.reasoning || '—')}</div>
-        ${rec.watch_out ? `<div style="margin-top:6px;color:#d29922;font-size:0.78rem">Watch out: ${esc(rec.watch_out)}</div>` : ''}
-      </div>
-      <div style="color:#c9d1d9;line-height:1.6;font-style:italic">${esc(intel.overall_summary || '')}</div>
-      ${intel.knowledge_caveat ? `<div style="font-size:0.73rem;color:#6e7681;border-top:1px solid #21262d;padding-top:6px">Data caveat: ${esc(intel.knowledge_caveat)}</div>` : ''}
-    </div>
-  </div>`;
-}
-
-function weatherFlagHTML(item) {
-  const w = item.weather;
-  if (!w) return '';
-  const o   = (item.outcome || '').toLowerCase();
-  const fav = (w.favours || '').toLowerCase();
-  const dis = (w.disfavours || '').toLowerCase();
-  const hits = (name) => name && (name.includes(o) || o.includes(name));
-  let cls = 'wflag neutral', prefix = '';
-  if (hits(fav))                                       { cls = 'wflag good'; prefix = '✓ conditions favour this — '; }
-  else if (hits(dis))                                  { cls = 'wflag warn'; prefix = '⚠ conditions against this — '; }
-  else if (w.goals_lean === 'under' && o.includes('under')) { cls = 'wflag good'; prefix = '✓ heat suits Under — '; }
-  else if (w.goals_lean === 'under' && o.includes('over'))  { cls = 'wflag warn'; prefix = '⚠ heat works against Over — '; }
-  else if (w.goals_lean === 'over'  && o.includes('over'))  { cls = 'wflag good'; prefix = '✓ altitude suits Over — '; }
-  else if (w.goals_lean === 'over'  && o.includes('under')) { cls = 'wflag warn'; prefix = '⚠ altitude works against Under — '; }
-  // Be explicit about whether this is a real forecast or a historical average,
-  // so an extreme live forecast is never confused with a climate normal.
-  const srcTag = w.source === 'forecast'
-    ? `<span style="color:#3fb950;font-weight:600"> · live forecast${w.days_out != null ? ' ' + w.days_out + 'd out' : ''}</span>`
-    : `<span style="color:#8b949e"> · historical avg (no live forecast)</span>`;
-  const tip = ((w.detail || '') + (w.source === 'forecast'
-                ? '  [Live Open-Meteo forecast.]'
-                : '  [Historical climate normal — live forecast unavailable, so an abnormal forecast would NOT be reflected here.]'
-              )).replace(/"/g, '&quot;');
-  return `<div class="${cls}" title="${tip}">${w.emoji} ${prefix}${w.headline}${srcTag}</div>`;
-}
-
-function recommendedAccaHTML(parlays, book, stake) {
-  // Find the best analyst-backed acca: all legs confirmed by analyst, ranked by combined_fair.
-  // Search allSingles directly (not just parlay pool) so EV gate doesn't exclude favourites.
-  const bookUrls = {
-    'Paddy Power': 'https://www.paddypower.com',
-    'Betfair Sportsbook': 'https://www.betfair.com/sport/football',
-    'Betfair': 'https://www.betfair.com/sport/football',
-    'Ladbrokes': 'https://www.ladbrokes.com',
-    'Coral': 'https://www.coral.co.uk',
-    'William Hill': 'https://www.williamhill.com',
-    'Bet365': 'https://www.bet365.com',
-    'Sky Bet': 'https://www.skybet.com',
-    'BetVictor': 'https://www.betvictor.com',
-    'BoyleSports': 'https://www.boylesports.com',
-  };
-
-  // Build analyst-confirmed singles pool (ignores EV — analyst signal is enough)
-  const confirmedSingles = allSingles.filter(s => {
-    const intel = s.intel || allIntel[s.match] || allIntel[s.match.split(' vs ').reverse().join(' vs ')];
-    if (!intel) return false;
-    return analystConfirms(s, intel) === true;
-  });
-
-  // Pick top 2-4 legs: R1 first, then by fair_prob descending, no duplicate matches
-  const seen = new Set();
-  const legs = [];
-  [...confirmedSingles]
-    .sort((a, b) => {
-      const rA = (a.round || {}).order || 99;
-      const rB = (b.round || {}).order || 99;
-      if (rA !== rB) return rA - rB;
-      return (b.fair_prob || 0) - (a.fair_prob || 0);
-    })
-    .forEach(s => {
-      if (legs.length >= 4) return;
-      if (seen.has(s.match)) return;
-      seen.add(s.match);
-      legs.push(s);
-    });
-
-  if (legs.length < 2) {
-    const hasIntel = Object.keys(allIntel).length > 0;
-    return `<div style="margin:16px 24px;padding:16px;border:1px solid #30363d;border-radius:8px;background:#0d1117">
-      <div style="font-size:0.8rem;font-weight:700;color:#f0f6fc;letter-spacing:.04em;margin-bottom:6px">⭐ RECOMMENDED ACCA</div>
-      <div style="color:#8b949e;font-size:0.85rem">${hasIntel ? 'No acca found where the analyst backs multiple legs — check back as more intel loads.' : '⏳ Analyst intel loading — recommended acca will appear shortly.'}</div>
-    </div>`;
-  }
-
-  // Build combined price from per_book or best_price
-  const slipBook = book === 'best' ? 'best' : book;
-  let combinedPrice = 1;
-  const legData = legs.map(s => {
-    const { price, bookLabel } = priceForBook(s, slipBook);
-    combinedPrice *= price;
-    return { match: s.match, outcome: s.outcome, commence: s.commence, round: s.round,
-             usedPrice: price, usedBook: bookLabel };
-  });
-
-  // Best single book that prices all legs
-  const allBooks = [...new Set(legs.flatMap(s => Object.keys(s.per_book || {})))];
-  let bestBook = slipBook !== 'best' ? slipBook : (legData[0]?.usedBook || 'your bookmaker');
-  if (slipBook === 'best') {
-    const bookTotals = allBooks.map(bk => {
-      const prices = legs.map(s => (s.per_book || {})[bk]);
-      if (!prices.every(p => p > 0)) return null;
-      return { bk, combined: prices.reduce((a, b) => a * b, 1) };
-    }).filter(Boolean);
-    if (bookTotals.length) bestBook = bookTotals.sort((a, b) => b.combined - a.combined)[0].bk;
-  }
-
-  const grossReturn = stake * combinedPrice;
-  const profit = grossReturn - stake;
-  // fair_prob is stored as decimal 0-1 — multiply directly
-  const fairProb = legs.reduce((p, s) => p * (s.fair_prob != null ? s.fair_prob : 0.5), 1);
-  // True EV per unit stake = fair prob × price − 1 (not the prob-point gap).
-  const evRaw = (fairProb * combinedPrice - 1) * 100;
-
-  // Build "why" blurb from analyst intel
-  const whyParts = legData.map(l => {
-    const intel = allIntel[l.match] || allIntel[l.match.split(' vs ').reverse().join(' vs ')];
-    const teams = l.match.split(' vs ');
-    const home = teams[0], away = teams[1] || '';
-    const outcome = l.outcome === 'draw' ? 'Draw'
-      : l.outcome === home?.toLowerCase() ? home
-      : l.outcome === away?.toLowerCase() ? away
-      : l.outcome;
-    if (!intel) return `${outcome} (${l.match})`;
-    const recs = (intel.recommended_bets || []);
-    const matchingRec = recs.find(r => {
-      const ro = (r.outcome || '').toLowerCase();
-      return ro === 'home_win' ? l.outcome === home?.toLowerCase()
-           : ro === 'away_win' ? l.outcome === away?.toLowerCase()
-           : ro === 'draw'     ? l.outcome === 'draw'
-           : false;
-    });
-    const reason = matchingRec?.rationale || intel.overall_summary || '';
-    const shortReason = reason.split('.')[0];
-    return `<strong>${esc(outcome)}</strong> (${esc(l.match)}): ${esc(shortReason)}.`;
-  });
-
-  const whyHTML = whyParts.map(w => `<div style="margin-bottom:4px;color:#c9d1d9;font-size:0.82rem">★ ${w}</div>`).join('');
-
-  const legsHTML = legData.map(l => {
-    const teams = l.match.split(' vs ');
-    const home = teams[0], away = teams[1] || '';
-    const outcomeLabel = l.outcome === 'draw' ? 'Draw'
-      : l.outcome === home?.toLowerCase() ? home
-      : l.outcome === away?.toLowerCase() ? away
-      : l.outcome.toUpperCase();
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #21262d">
-      <div>
-        <div style="font-weight:700;color:#f0f6fc">${outcomeLabel}</div>
-        <div style="font-size:0.77rem;color:#8b949e">${l.match}${l.round ? ' · ' + l.round.label.replace('Group Stage ','') : ''} · ${fmt(l.commence)}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-weight:700;color:#3fb950;font-size:1.05rem">${l.usedPrice.toFixed(2)}</div>
-        <div style="font-size:0.7rem;color:#8b949e">${l.usedBook}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  const bookUrl = bookUrls[bestBook] || 'https://www.paddypower.com';
-  const bookName = bestBook;
-
-  const legLines = legData.map(l => {
-    const teams = l.match.split(' vs ');
-    const home = teams[0], away = teams[1] || '';
-    const ol = l.outcome === 'draw' ? 'Draw'
-      : l.outcome === home?.toLowerCase() ? home
-      : l.outcome === away?.toLowerCase() ? away
-      : l.outcome.toUpperCase();
-    return `${ol} @ ${l.usedPrice.toFixed(2)} (${l.match})`;
-  }).join('\n');
-  const waMsg = `⭐ WC 2026 Recommended Acca\n\n${legLines}\n\nCombined: ${combinedPrice.toFixed(2)}\nStake €${stake} → Returns €${grossReturn.toFixed(2)}\n\nBuilt with WC Edge Finder`;
-
-  return `<div style="margin:16px 24px;border:1px solid #3fb95044;border-radius:8px;background:#0d1117;overflow:hidden">
-    <div style="background:#0d1117;padding:14px 16px;border-bottom:1px solid #21262d">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-size:0.8rem;font-weight:700;color:#3fb950;letter-spacing:.04em">⭐ RECOMMENDED ACCA</span>
-        <span style="font-size:0.75rem;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:1px 7px">${legData.length}-leg · ${(fairProb*100).toFixed(1)}% chance · ${combinedPrice.toFixed(2)} odds</span>
-        <span style="font-size:0.75rem;color:${evRaw >= 0 ? '#3fb950' : '#f85149'};background:#161b22;border:1px solid ${evRaw >= 0 ? '#3fb95044' : '#f8514944'};border-radius:4px;padding:1px 7px">EV ${evRaw >= 0 ? '+' : ''}${evRaw.toFixed(1)}%</span>
-      </div>
-      <div style="font-size:0.8rem;color:#8b949e;margin-bottom:10px">Every leg is backed by the analyst. Here's why:</div>
-      ${whyHTML}
-    </div>
-    <div style="padding:0 16px">${legsHTML}</div>
-    <div style="padding:12px 16px;background:#161b22;border-top:1px solid #21262d">
-      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-        <div><div style="font-size:0.7rem;color:#6e7681">Expected value</div>${evMoneyHTML(fairProb, combinedPrice, stake, '0.95rem')}</div>
-        <div><div style="font-size:0.7rem;color:#6e7681">Stake</div><div style="font-weight:700;color:#f0f6fc">${eur(stake)}</div></div>
-        <div><div style="font-size:0.7rem;color:#6e7681">Combined odds</div><div style="font-weight:700;color:#f0f6fc">${combinedPrice.toFixed(2)}</div></div>
-        <div><div style="font-size:0.7rem;color:#6e7681">Returns if wins</div><div style="font-weight:600;color:#8b949e">${eur(grossReturn)}</div></div>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <a href="${bookUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#238636;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.82rem;font-weight:600;text-decoration:none;cursor:pointer">🏦 Place at ${bookName}</a>
-        <a href="https://wa.me/?text=${encodeURIComponent(waMsg)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#25D366;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.82rem;font-weight:600;text-decoration:none;cursor:pointer">📲 Share on WhatsApp</a>
-      </div>
-    </div>
-  </div>`;
-}
-
-function parlayHTML(p, book, stake) {
-  // Recalculate combined price using the chosen book's prices per leg
-  let combinedPrice = 1;
-  let anyFallback   = false;
-
-  // An acca is placed on ONE book. In "best" mode use the single best book for
-  // the whole slip (computed server-side as acca_book), not a different book per
-  // leg. When a specific book is chosen, honour that.
-  const slipBook = (book === 'best') ? (p.acca_book || 'best') : book;
-  const legData = p.legs.map(l => {
-    const { price, bookLabel, fallback } = priceForBook(l, slipBook);
-    combinedPrice *= price;
-    if (fallback) anyFallback = true;
-    return { ...l, usedPrice: price, usedBook: bookLabel, fallback };
-  });
-
-  const grossReturn   = stake * combinedPrice;
-  const profit        = grossReturn - stake;
-  const fairProb      = p.combined_fair / 100;
-  const impliedProb   = 1 / combinedPrice;
-  // True EV per unit stake = fair prob × combined price − 1 (recomputed here
-  // because the price depends on the chosen bookmaker).
-  const evRaw         = (fairProb * combinedPrice - 1) * 100;
-  const evTxt         = Math.abs(evRaw) < 0.1 ? evRaw.toFixed(2) : evRaw.toFixed(1);
-
-  const legs = legData.map(l => {
-    const fallNote = l.fallback
-      ? `<span style="color:#d29922;font-size:0.7rem"> ⚠ ${l.usedBook}</span>`
-      : '';
-    const impl   = (100 / l.usedPrice).toFixed(0);
-    const ret    = eur(stake * l.usedPrice);
-    const priceTip = `Decimal odds at ${l.usedBook}: ${l.usedPrice.toFixed(2)}.\n`
-      + `• Implied chance ≈ ${impl}% (= 1 ÷ ${l.usedPrice.toFixed(2)}).\n`
-      + `• A winning ${l.usedPrice.toFixed(2)} leg multiplies your stake by ${l.usedPrice.toFixed(2)} `
-      + `(on its own, ${eur(stake)} → ${ret}).\n`
-      + `The lower the number, the bigger the favourite.`;
-    return `<div class="parlay-leg">
-      <div class="parlay-leg-left">
-        <div><strong title="Your selection for this match">${l.outcome.toUpperCase()}</strong></div>
-        <div class="parlay-leg-match">${l.match} &middot; ${fmt(l.commence)}${l.round ? ' &middot; <span style="color:#88c0d0;font-weight:600">' + l.round.label.replace('Group Stage ', '') + '</span>' : ''}</div>
-        ${weatherFlagHTML(l)}
-      </div>
-      <div class="parlay-leg-right">
-        ${fallNote}
-        <span class="parlay-leg-book" title="Bookmaker offering this price (best of your accounts, unless you picked a specific book above)">${l.usedBook}</span>
-        <span class="parlay-leg-price help" title="${priceTip}">${l.usedPrice.toFixed(2)}</span>
-      </div>
-    </div>`;
-  }).join('');
-
-  const fallbackWarning = anyFallback
-    ? `<div style="font-size:0.73rem;color:#d29922;padding:6px 16px;border-top:1px solid #21262d">⚠ One or more legs not available at ${book === 'best' ? 'chosen book' : book} — best price used instead.</div>`
-    : '';
-
-  // No single bookmaker prices every leg → this can't go on one acca slip.
-  const mixedWarning = (book === 'best' && p.mixed_books)
-    ? `<div style="font-size:0.73rem;color:#f85149;padding:6px 16px;border-top:1px solid #21262d">⚠ No single bookmaker prices all ${p.legs.length} legs — this can't be placed as one acca. Prices shown are best-available per leg.</div>`
-    : '';
-
-  // Which book this slip is actually placeable at (best mode, single book found).
-  const slipBookBadge = (book === 'best' && p.acca_book)
-    ? `<span class="badge badge-neutral help" title="The single bookmaker that prices every leg at the best combined odds — place the whole acca here.">@ ${p.acca_book}</span>`
-    : '';
-
-  const evAmt     = Math.abs(evRaw / 100 * stake);
-  const evLine    = evRaw >= 0
-    ? `<span class="help" style="font-size:1rem;font-weight:700;color:#3fb950" title="Long-run average result per €${stake} staked = (fair chance × combined price − 1) × stake.">Expected gain: +€${evAmt.toFixed(2)} per €${stake} staked</span>`
-    : `<span class="help" style="font-size:1rem;font-weight:700;color:#f85149" title="Long-run average result per €${stake} staked = (fair chance × combined price − 1) × stake. Negative: the bookmaker margin compounds across legs.">Expected cost: −€${evAmt.toFixed(2)} per €${stake} staked</span>`;
-
-  return `<div class="parlay-card conf-${p.confidence}">
-    <div class="parlay-header">
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          ${evLine}
-          <span class="badge badge-neutral help" title="Accumulator: all ${p.legs.length} selections must win.">${p.legs.length}-leg acca</span>
-          ${slipBookBadge}
-          ${p.round_label ? `<span class="badge badge-neutral" style="color:#88c0d0;border-color:#88c0d044">${p.round_label}</span>` : ''}
-        </div>
-        <div style="font-size:0.75rem;color:#8b949e;margin-top:5px">
-          <span class="help" title="The model's probability that every leg wins.">Model: ${p.combined_fair.toFixed(1)}% to land</span>
-          &nbsp;&middot;&nbsp; <span class="help" title="= 1 ÷ combined price">Price implies: ${(impliedProb*100).toFixed(1)}%</span>
-          &nbsp;&middot;&nbsp; <span class="help" title="Expected value per stake = fair chance × combined price − 1.">EV ${evRaw >= 0 ? '+' : ''}${evTxt}%</span>
-        </div>
-        <div style="display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap">
-          <div>
-            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="The amount you'd put on this acca. Change it in the Stake box above.">Stake</div>
-            <div style="font-weight:700;color:#f0f6fc">${eur(stake)}</div>
-          </div>
-          <div style="color:#484f58">→</div>
-          <div>
-            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="All the leg odds multiplied together (${legData.map(l=>l.usedPrice.toFixed(2)).join(' × ')}). This is your total payout multiplier.">Combined price</div>
-            <div style="font-weight:700;color:#f0f6fc">${combinedPrice.toFixed(2)}</div>
-          </div>
-          <div>
-            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="What you get back if every leg wins = stake × combined price (includes your stake).">Gross return</div>
-            <div style="font-weight:700;color:#f0f6fc">${eur(grossReturn)}</div>
-          </div>
-          <div>
-            <div class="help" style="font-size:0.7rem;color:#6e7681;margin-bottom:1px" title="Your winnings = gross return minus your stake.">Profit if wins</div>
-            <div style="font-weight:700;color:#3fb950">+${eur(profit)}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="parlay-legs">${legs}</div>
-    ${mixedWarning}
-    ${fallbackWarning}
-  </div>`;
-}
-
-// ---- tournament round helpers ----
-const ROUND_ORDER = [
-  'Group Stage — Round 1', 'Group Stage — Round 2', 'Group Stage — Round 3',
-  'Round of 32', 'Round of 16', 'Quarter-finals', 'Semi-finals', 'Final', 'Upcoming'
-];
-
-function getTournamentRound(iso) {
-  if (!iso) return 'Upcoming';
-  const d = new Date(iso);
-  const m = d.getMonth() + 1, day = d.getDate();
-  // WC 2026: Jun 11 start
-  if (m === 6 && day <= 15) return 'Group Stage — Round 1';
-  if (m === 6 && day <= 20) return 'Group Stage — Round 2';
-  if (m === 6 && day <= 26) return 'Group Stage — Round 3';
-  if (m === 6 || (m === 7 && day <= 4)) return 'Round of 32';
-  if (m === 7 && day <= 9) return 'Round of 16';
-  if (m === 7 && day <= 12) return 'Quarter-finals';
-  if (m === 7 && day <= 16) return 'Semi-finals';
-  return 'Final';
-}
-
-function picksChosenBook() {
-  return document.getElementById('picks-book-select')?.value || 'best';
-}
-function picksChosenStake() {
-  return parseFloat(document.getElementById('picks-stake-input')?.value) || 10;
-}
-
-function fmtAnalystOutcome(rb, home, away) {
-  const o = (rb.outcome || '').toLowerCase();
-  if (o === 'home_win') return `${home} to win`;
-  if (o === 'away_win') return `${away} to win`;
-  if (o === 'draw')     return 'Draw';
-  if (o.startsWith('over_'))  return `Over ${o.split('_')[1]} goals`;
-  if (o.startsWith('under_')) return `Under ${o.split('_')[1]} goals`;
-  if (o.startsWith('home_'))  return `${home} (${o.split('home_')[1]}) handicap`;
-  if (o.startsWith('away_'))  return `${away} (${o.split('away_')[1]}) handicap`;
-  return rb.outcome || '';
-}
-
-function analystMatchHTML(label, intel) {
-  const parts = label.includes(' vs ') ? label.split(' vs ') : [label, ''];
-  const home = parts[0], away = parts[1];
-  const cc = c => c === 'high' ? '#3fb950' : c === 'medium' ? '#d29922' : '#8b949e';
-  const updatingBanner = _reanalysing.has(label)
-    ? `<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;padding:6px 10px;background:#1c2128;border:1px solid #d2992255;border-radius:6px;font-size:0.8rem;color:#d29922">
-         <div class="spinner" style="width:12px;height:12px;border-width:2px;border-color:#d29922;border-top-color:transparent;flex-shrink:0;margin:0"></div>
-         🩹 Injury news detected — updating analysis, check back in a moment
-       </div>`
-    : '';
-  const recs = intel.recommended_bets || [];
-  const book = picksChosenBook();
-  const recsHTML = recs.length
-    ? recs.map(rb => {
-        // Live odds for this exact selection (joined server-side in /api/intel).
-        const { price, bookLabel, fallback } = rb.best_price ? priceForBook(rb, book) : { price: null };
-        const oddsHTML = price
-          ? `<span class="badge help" style="color:#f0f6fc;border-color:#30363d" title="Best available decimal odds for this selection${fallback ? ' — not posted at ' + book + ', best price shown' : ''}.">${price.toFixed(2)} @ ${bookLabel}${fallback ? ' ⚠' : ''}</span>`
-            + (rb.edge != null && rb.edge > 0
-                ? `<span class="badge help" style="color:#3fb950;border-color:#3fb95044" title="The price beats the de-vigged fair value by this much — the analyst pick is also +EV on the maths.">+${rb.edge.toFixed(1)}% edge</span>`
-                : '')
-          : `<span style="font-size:0.72rem;color:#6e7681">no price posted yet</span>`;
-        return `
-        <div style="border-left:3px solid ${cc(rb.confidence)};padding:8px 12px;margin-top:8px;background:#0d1117;border-radius:0 6px 6px 0">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <strong style="color:#f0f6fc">${esc(fmtAnalystOutcome(rb, home, away))}</strong>
-            <span class="badge" style="color:${cc(rb.confidence)};border-color:${cc(rb.confidence)}44">${esc(rb.confidence || '')}${rb.strength ? ' · ' + esc(rb.strength) : ''}</span>
-            ${oddsHTML}
-          </div>
-          <div style="font-size:0.82rem;color:#8b949e;margin-top:4px;line-height:1.45">${esc(rb.reasoning || '')}</div>
-        </div>`;
-      }).join('')
-    : `<div style="color:#8b949e;font-size:0.85rem;margin-top:6px">Analyst sees no clear edge — no bet recommended.</div>`;
-  const cond = intel.conditions;
-  const condNote = cond && cond.stadium
-    ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${esc(cond.stadium)}${cond.altitude_m > 800 ? ' · ' + Math.round(cond.altitude_m).toLocaleString() + 'm venue altitude' : ''}</div>`
-    : '';
-  const ageNote = intelAge(intel) ? `<span style="color:#484f58;font-size:0.74rem;margin-left:8px">${intelAge(intel)}</span>` : '';
-  return `<div class="single-card">
-    <div class="single-title">${fmtLabel(label)}${ageNote}</div>
-    ${updatingBanner}
-    ${condNote}
-    ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${esc(intel.overall_summary)}</div>` : ''}
-    ${recsHTML}
-  </div>`;
-}
-
-function renderTopPicks() {
-  const panel = document.getElementById('picks-panel');
-  if (!panel) return;
-
-  const intro = `<div class="ev-banner" style="padding:0">${collapsibleBanner("btrs-analysis-intro",
-    "⚖️ Bettor&#39;s Analysis — analyst read on squad, form &amp; injuries.",
-    "<span style=\"color:#8b949e\">⚖️ <strong style=\"color:#f0f6fc\">The football view — a professional second opinion, not fact.</strong> The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <a onclick=\"switchTab('bets')\" style=\"color:#58a6ff;cursor:pointer;text-decoration:underline\">Prices &amp; EV</a> — agreement between the two is the strongest signal.</span>"
-  )}</div>`;
-
-  const labels = Object.keys(allIntel || {});
-  if (!labels.length) {
-    const loading = document.querySelector('.intel-loading') || _intelPollTimer;
-    panel.innerHTML = intro + `<div class="empty" style="padding:24px">
-      ${loading ? 'Analyst is still researching matches…' : 'No analyst coverage yet.'}<br>
-      <small style="color:#6e7681">Analysis is rate-limited (only a few matches per refresh) — coverage grows as it runs. Meanwhile see <a onclick="switchTab('bets')" style="color:#58a6ff;cursor:pointer;text-decoration:underline">Prices &amp; EV →</a></small>
-    </div>`;
-    return;
-  }
-
-  // Sort analysed matches by kick-off (looked up from the divergence list)
-  const commenceBy = {};
-  allMatches.forEach(m => { commenceBy[m.label] = m.commence; });
-  const items = labels
-    .map(l => ({ label: l, intel: allIntel[l], commence: commenceBy[l] || '' }))
-    .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
-
-  panel.innerHTML = intro +
-    `<div style="display:flex;flex-direction:column;gap:14px">
-       ${items.map(it => analystMatchHTML(it.label, it.intel)).join('')}
-     </div>`;
-}
-
-// ====================================================================
-// SENSIBLE BETS — analyst-led. A bet only appears if the analyst
-// explicitly recommended that outcome. The maths then scores how good
-// the price is for that pick. Analyst = gate. Maths = quality check.
-// ====================================================================
-function sensibleScore(s) {
-  let score = 0; const reasons = [];
-
-  // 1. Edge — how well priced are the odds for this analyst pick?
-  if (s.edge == null) {
-    reasons.push({t:'muted', x:`— no odds data yet`});
-  } else if (edgeReliable(s) && s.edge > 2) {
-    score += 4;
-    reasons.push({t:'good', x:`✅ great price — +${s.edge.toFixed(1)}% above fair value (${s.best_book})`});
-  } else if (edgeReliable(s)) {
-    score += 2;
-    reasons.push({t:'good', x:`✅ fair price — +${s.edge.toFixed(1)}% edge (${s.best_book})`});
-  } else if (s.edge > 0) {
-    score += 1;
-    reasons.push({t:'warn', x:`⚠ marginal value — +${s.edge.toFixed(1)}% edge, treat as fair odds`});
-  } else {
-    reasons.push({t:'warn', x:`⚠ odds below fair value (${s.edge.toFixed(1)}%) — shop around`});
-  }
-
-  // 2. Kalshi prediction market — does real-money market agree with analyst?
-  if (s.pm_gap != null) {
-    if (s.pm_gap > 1)       { score += 2; reasons.push({t:'good', x:`✅ Kalshi agrees — prediction market also backs this (+${s.pm_gap}%)`}); }
-    else if (s.pm_gap < -2) { score -= 1; reasons.push({t:'warn', x:`⚠ Kalshi less convinced (${s.pm_gap}%) — analyst and market diverge`}); }
-    else                    { reasons.push({t:'muted', x:`— Kalshi neutral on this outcome`}); }
-  } else {
-    reasons.push({t:'muted', x:`— no Kalshi data for this match`});
-  }
-
-  // 3. Weather / conditions
-  const w = s.weather;
-  if (w) {
-    const o = (s.outcome||'').toLowerCase();
-    const fav = (w.favours||'').toLowerCase(), dis = (w.disfavours||'').toLowerCase();
-    const hits = (n)=> n && (n.includes(o) || o.includes(n));
-    if (hits(fav))                                          { score += 1; reasons.push({t:'good', x:`🌡️ conditions favour this — ${w.headline}`}); }
-    else if (hits(dis))                                     { score -= 1; reasons.push({t:'warn', x:`🌡️ conditions work against this — ${w.headline}`}); }
-    else if (w.goals_lean==='under' && o.includes('under')) { score += 1; reasons.push({t:'good', x:`🌡️ heat suits Under`}); }
-    else if (w.goals_lean==='under' && o.includes('over'))  { score -= 1; reasons.push({t:'warn', x:`🌡️ heat works against Over`}); }
-    else if (w.goals_lean==='over'  && o.includes('over'))  { score += 1; reasons.push({t:'good', x:`⛰️ altitude suits Over`}); }
-  }
-
-  // 4. Analyst confidence level (high/medium/low from the intel itself)
-  const iconf = s.intel?.intel_confidence;
-  if (iconf === 'high')   { score += 2; reasons.push({t:'good', x:`★ analyst is highly confident in this pick`}); }
-  else if (iconf === 'medium') { score += 1; reasons.push({t:'good', x:`analyst is moderately confident`}); }
-  else if (iconf === 'low')    { reasons.push({t:'warn', x:`⚠ analyst confidence is low — treat carefully`}); }
-
-  const tier = score >= 6 ? 'strong' : score >= 3 ? 'solid' : 'speculative';
-  return { score, reasons, tier };
-}
-
-function sensibleStake() { return parseFloat(document.getElementById('sensible-stake-input')?.value) || 10; }
-
-// ---- Banner seen-state (localStorage) ----
-function hasSeen(key) {
-  try { return !!JSON.parse(localStorage.getItem('wc26_seen')||'{}')[key]; } catch { return false; }
-}
-function markSeen(key) {
-  try {
-    const s = JSON.parse(localStorage.getItem('wc26_seen')||'{}');
-    s[key] = true;
-    localStorage.setItem('wc26_seen', JSON.stringify(s));
-  } catch {}
-}
-function collapsibleBanner(key, shortText, fullHTML) {
-  const safeShort = shortText.replace(/"/g, '&quot;');
-  if (hasSeen(key)) {
-    return `<div style="font-size:0.8rem;color:#6e7681;padding:8px 0">${shortText}</div>`;
-  }
-  return `<div data-banner-key="${key}" data-short="${safeShort}" style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;position:relative">
-    ${fullHTML}
-    <button onclick="dismissBanner(this)" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#6e7681;font-size:1rem;cursor:pointer;line-height:1" title="Got it — hide this">×</button>
-  </div>`;
-}
-function dismissBanner(btn) {
-  const b = btn.closest('[data-banner-key]');
-  markSeen(b.dataset.bannerKey);
-  b.setAttribute('style', 'padding:8px 0');
-  b.innerHTML = `<span style="font-size:0.8rem;color:#6e7681">${b.dataset.short}</span>`;
-}
-
-// ---- Verdict badge (single dominant signal per bet card) ----
-// Runs on TRUE EV (fair × price − 1), not the probability-point edge, and only
-// awards "Bet Now" when the edge clears the longshot-noise gate (edgeReliable).
-// Thresholds: ≥+2% EV and reliable = Bet Now; ≥0% = Lean; ≥−3% = Track; else Avoid.
-function verdictBadge(s) {
-  const ev = evPct(s.fair_prob, s.best_price);
-  if (ev == null) return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#1c2128;color:#6e7681;border:1px solid #30363d">Awaiting Price</span>`;
-  const reliable = s.edge != null && edgeReliable(s);
-  if (ev >= 2 && reliable) return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#0d2818;color:#3fb950;border:1px solid #3fb950aa">🎯 Bet Now</span>`;
-  if (ev >= 0)  return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2d2005;color:#d29922;border:1px solid #d29922aa">→ Lean${s.rb_strength === 'strong' ? ' (Analyst Strong)' : ' Only'}</span>`;
-  if (ev >= -3) return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#0d1a2e;color:#58a6ff;border:1px solid #388bfd66">⏳ Track Price</span>`;
-  return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2a1010;color:#f85149;border:1px solid #f8514988">⚠ Avoid at Price</span>`;
-}
-
-function intelAge(intel) {
-  const ca = intel?.cached_at;
-  if (!ca) return '';
-  const h = (Date.now() - ca * 1000) / 3600000;
-  if (h < 1)  return 'analysed just now';
-  if (h < 24) return `analysed ${Math.round(h)}h ago`;
-  return `analysed ${Math.round(h / 24)}d ago`;
-}
-
-function populateSensibleRoundFilter() {
-  const sel = document.getElementById('sensible-round-filter');
-  if (!sel || !roundsAvailable.length) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All rounds</option>'
-    + roundsAvailable.map(r => `<option value="${r}">${r}</option>`).join('');
-  // Default to the first round that has an upcoming match — the active round
-  if (!cur) {
-    const now = new Date();
-    const activeRound = roundsAvailable.find(r =>
-      allMatches.some(m => m.round?.label === r && new Date(m.commence) > now)
-    ) || '';
-    sel.value = activeRound;
-  } else {
-    sel.value = cur;
-  }
-}
-
-function kickoffCountdown(iso) {
-  if (!iso) return '';
-  const now = new Date();
-  const ko  = new Date(iso);
-  const diffMs = ko - now;
-  if (diffMs < 0) return 'In progress / finished';
-  const diffH = diffMs / 3600000;
-  const time  = ko.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
-  const nowDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const koDay    = new Date(ko.getFullYear(), ko.getMonth(), ko.getDate());
-  const daysDiff = Math.round((koDay - nowDay) / 86400000);
-  if (daysDiff === 0) return `<span style="color:#f0883e;font-weight:600">Today ${time}</span>`;
-  if (daysDiff === 1) return `<span style="color:#d29922;font-weight:600">Tomorrow ${time}</span>`;
-  return fmt(iso);
-}
-
-function sensibleTimeFilter(s) {
-  const f = document.getElementById('sensible-time-filter')?.value || 'all';
-  if (f === 'all') return true;
-  if (!s.commence) return true;
-  const now = new Date();
-  const ko  = new Date(s.commence);
-  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const koDay  = new Date(ko.getFullYear(), ko.getMonth(), ko.getDate());
-  const days   = Math.round((koDay - nowDay) / 86400000);
-  if (f === 'today')    return days === 0;
-  if (f === 'tomorrow') return days === 1;
-  if (f === '2days')    return days >= 0 && days <= 1;
-  if (f === 'week')     return days >= 0 && days <= 6;
-  return true;
-}
-
-function sensibleCardHTML(s, sc, stake, grouped = false) {
-  const price = s.best_price, ret = stake*price, profit = ret-stake;
-  const mkt = s.market==='totals'?'Over/Under':s.market==='spreads'?'Handicap':'1X2';
-  const vBadge = verdictBadge(s);
-  const ev = evPct(s.fair_prob, s.best_price);
-
-  // Action note — plain English, keyed to the same EV thresholds as the badge
-  const actionNote = (() => {
-    if (ev == null) return '';
-    const reliable = s.edge != null && edgeReliable(s);
-    if (ev >= 2 && reliable) return `<span style="font-size:0.77rem;color:#3fb950">Price beats fair value — a bet, at sensible stakes</span>`;
-    if (ev >= 0)    return `<span style="font-size:0.77rem;color:#d29922">Roughly fair odds — small stake only if you back the analyst view</span>`;
-    if (ev >= -3)   return `<span style="font-size:0.77rem;color:#58a6ff">Analyst likes it but the price is short — wait for ${(s.best_price + 0.05).toFixed(2)}+</span>`;
-    return `<span style="font-size:0.77rem;color:#f85149">Odds well below fair value — pass</span>`;
-  })();
-
-  const tags = sc.reasons.map(r =>
-    `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':r.t==='muted'?'#484f58':'#d29922'}">${r.x}</span>`).join('');
-  const reasoning = s.rb_reasoning
-    ? `<div style="margin-top:6px;font-size:0.81rem;color:#8b949e;line-height:1.5;border-left:2px solid #30363d;padding-left:8px">${esc(s.rb_reasoning)}</div>`
-    : '';
-  const legId = `leg_${s.match.replace(/\W/g,'_')}_${s.outcome.replace(/\W/g,'_')}`;
-  const checked = _accaLegs.has(legId) ? 'checked' : '';
-  const titleLine = grouped
-    ? `<div class="single-title">${s.outcome.toUpperCase()} <span style="color:#8b949e;font-weight:400;font-size:0.85rem">${mkt}</span></div>`
-    : `<div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
-       <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>`;
-  const confLine = s.rb_confidence
-    ? `<div style="font-size:0.77rem;color:#6e7681;margin-top:3px">Football view: <span style="color:${s.rb_confidence==='high'?'#3fb950':s.rb_confidence==='medium'?'#d29922':'#8b949e'}">${s.rb_confidence} confidence${s.rb_strength?' · '+s.rb_strength:''}</span></div>`
-    : '';
-  return `<div class="single-card${sc.tier==='speculative'?' demoted':''}" id="card_${legId}" style="${grouped?'margin:0;border-radius:6px;':''}">
-    <div class="single-top">
-      <div style="display:flex;align-items:flex-start;gap:10px">
-        <input type="checkbox" ${checked} onchange="toggleAccaLeg(this,'${legId}',${JSON.stringify(s).replace(/"/g,'&quot;')})"
-          style="margin-top:3px;width:15px;height:15px;accent-color:#388bfd;cursor:pointer;flex-shrink:0">
-        <div>${titleLine}${confLine}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        ${vBadge}
-        <span style="font-size:0.78rem;color:#8b949e">@ <strong style="color:#f0f6fc">${price.toFixed(2)}</strong> ${s.best_book}</span>
-        ${actionNote}
-      </div>
-    </div>
-    ${reasoning}
-    <div style="margin-top:6px;line-height:1.7">${tags}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:6px">
-      <span style="font-size:0.8rem;color:#8b949e">${evMoneyHTML(s.fair_prob, price, stake, '0.85rem')} <span style="color:#484f58">·</span> €${stake.toFixed(2)} returns €${ret.toFixed(2)} if it wins</span>
-      <button onclick="openBetModal('${s.match.replace(/'/g,"\\'")}','${s.outcome}','${s.market}',${price},'${(s.best_book||'').replace(/'/g,"\\'")}',${s.fair_prob != null ? s.fair_prob : 'null'}); this.blur()"
-        style="padding:3px 10px;font-size:0.75rem;border-radius:5px;cursor:pointer;font-family:inherit;
-               background:#0d2818;color:#3fb950;border:1px solid #3fb95066">+ Log bet</button>
-    </div>
-  </div>`;
-}
-
-function renderSensible() {
-  const panel = document.getElementById('sensible-panel');
-  if (!panel) return;
-  if (!allMatches.length && !allSingles.length) { panel.innerHTML = '<div class="empty">No bets yet — data loading…</div>'; return; }
-
-  const stake = sensibleStake();
-  const tierFilter = document.getElementById('sensible-tier-filter')?.value || 'all';
-  const hasIntel = Object.keys(allIntel).length > 0;
-
-  // Build sensible bets from analyst recommendations + live prices from divergence data.
-  // The analyst recommends outcomes based on football logic (often favorites); the maths
-  // then scores how well-priced those picks are. Analyst = source. Maths = quality check.
-  const sensibleBets = [];
-  const seen = new Set();
-
-  for (const match of allMatches) {
-    const label = match.label;
-    const intel = allIntel[label] || allIntel[normalizeMatchLabel(label)];
-    if (!intel || !intel.recommended_bets || !intel.recommended_bets.length) continue;
-
-    const parts = label.split(' vs ');
-    if (parts.length !== 2) continue;
-    const homeNorm = normalizeTeam(parts[0]);
-    const awayNorm = normalizeTeam(parts[1]);
-
-    for (const rb of intel.recommended_bets) {
-      const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
-      const key = label + '|' + ao;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      // Map analyst outcome token → normalized outcome name used in match.outcomes
-      let targetOutcome = null;
-      if (ao === 'home_win') targetOutcome = homeNorm;
-      else if (ao === 'away_win') targetOutcome = awayNorm;
-      else if (ao === 'draw') targetOutcome = 'draw';
-      else continue; // totals/spreads tokens — no price in divergence outcomes array
-
-      const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
-      if (!priceData || !priceData.best_price) continue;
-
-      // diff = book_fair - pm_consensus; pm_gap = pm_consensus - book_fair = -diff
-      const pmGap = priceData.diff != null ? -priceData.diff : null;
-
-      sensibleBets.push({
-        match:          label,
-        commence:       match.commence,
-        market:         'h2h',
-        outcome:        targetOutcome,
-        fair_prob:      (priceData.book_fair || 0) / 100,
-        best_price:     priceData.best_price,
-        best_book:      priceData.best_book,
-        paddy:          priceData.paddy,
-        per_book:       priceData.per_book || {},
-        edge:           priceData.edge,
-        pm_gap:         pmGap,
-        kalshi:         priceData.kalshi,
-        poly:           priceData.poly,
-        confidence:     priceData.confidence || 'low',
-        round:          match.round,
-        weather:        match.weather,
-        intel:          intel,
-        analyst_confirms: true,
-        rb_reasoning:   rb.reasoning || '',
-        rb_confidence:  rb.confidence || '',
-        rb_strength:    rb.strength || '',
-      });
-    }
-  }
-
-  const scored = sensibleBets
-    .map(s => ({ s, sc: sensibleScore(s) }))
-    .sort((a,b) => (a.s.commence || '').localeCompare(b.s.commence || '') || b.sc.score - a.sc.score);
-
-  const roundFilter = document.getElementById('sensible-round-filter')?.value || '';
-  let list = scored;
-  if (roundFilter) list = list.filter(x => x.s.round?.label === roundFilter);
-  if (tierFilter === 'strong')     list = list.filter(x => x.sc.tier === 'strong');
-  else if (tierFilter === 'solid') list = list.filter(x => x.sc.tier !== 'speculative');
-
-  const nStrong  = scored.filter(x => x.sc.tier === 'strong').length;
-  const nTotal   = scored.length;
-  const intelCoverage = Object.keys(allIntel).length;
-
-  const sensibleStatsLine = `<div style="font-size:0.75rem;color:#6e7681;padding:6px 0 0">${intelCoverage} matches analysed · ${nTotal} analyst-backed bet${nTotal !== 1 ? 's' : ''} found${nStrong ? ` · <span style="color:#3fb950">${nStrong} ★ Strong</span>` : ''} · Kalshi (72 WC matches) · <em>Analyst runs in background — more bets appear as analysis completes</em></div>`;
-  const intro = `<div class="ev-banner" style="padding:0">${collapsibleBanner("sensible-bets-intro",
-    "🎯 Sensible Bets — analyst picks, odds quality scored.",
-    "🎯 <strong>Sensible Bets — analyst-recommended picks with odds quality scored.</strong><div style=\"margin-top:8px;font-size:0.83rem;color:#c9d1d9;line-height:1.6\">Every bet here passed two gates:<br><span style=\"color:#3fb950\">①</span> The <strong>AI analyst</strong> studied the match — squad, form, injuries, conditions — and explicitly recommended this outcome.<br><span style=\"color:#3fb950\">②</span> The <strong>bookmaker odds</strong> were checked: are you getting fair or better value for that pick?<br>Tiers: <strong style=\"color:#3fb950\">★ Strong</strong> = great price + Kalshi agrees · <strong>Solid</strong> = fair price · <em style=\"color:#6e7681\">Speculative</em> = analyst backed it but odds tight.</div>"
-  )}${sensibleStatsLine}</div>`;
-
-  if (!hasIntel) {
-    panel.innerHTML = intro + `<div class="empty" style="padding:24px;color:#8b949e">
-      Analyst is running in the background — sensible bets will appear as matches are analysed. Check back in a moment.
-    </div>`;
-    return;
-  }
-
-  if (!list.length) {
-    panel.innerHTML = intro + `<div class="empty" style="padding:24px;color:#8b949e">
-      No analyst-backed bets match the current filters.
-      ${tierFilter !== 'all' ? 'Try loosening the tier filter.' : ''}
-    </div>`;
-    return;
-  }
-
-  // Group bets by match so multiple recs for the same game appear together
-  const byMatch = new Map();
-  for (const x of list) {
-    if (!byMatch.has(x.s.match)) byMatch.set(x.s.match, []);
-    byMatch.get(x.s.match).push(x);
-  }
-  const groupsHTML = [...byMatch.entries()].map(([label, items]) => {
-    const s0 = items[0].s;
-    const age = intelAge(s0.intel);
-    const roundBadge = s0.round ? `<span style="color:#88c0d0;font-size:0.78rem">${s0.round.label}</span>` : '';
-    const ageBadge = age ? `<span style="color:#484f58;font-size:0.75rem">${age}</span>` : '';
-    return `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;overflow:hidden;margin-bottom:4px">
-      <div style="padding:9px 14px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <strong style="color:#f0f6fc;flex:1">${fmtLabel(label)}</strong>
-        <span style="color:#8b949e;font-size:0.8rem">${kickoffCountdown(s0.commence)}</span>
-        ${roundBadge} ${ageBadge}
-      </div>
-      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px">
-        ${items.map(x => sensibleCardHTML(x.s, x.sc, stake, true)).join('')}
-      </div>
-    </div>`;
-  }).join('');
-  panel.innerHTML = intro + groupsHTML;
-}
-
-// ---- acca builder ----
-const _accaLegs   = new Map();  // legId -> single object
-
-function toggleAccaLeg(cb, legId, s) {
-  if (cb.checked) _accaLegs.set(legId, s);
-  else            _accaLegs.delete(legId);
-  const card = document.getElementById('card_' + legId);
-  if (card) card.style.outline = cb.checked ? '2px solid #388bfd' : '';
-  renderAccaTray();
-}
-
-function clearAccaBuilder() {
-  _accaLegs.clear();
-  document.querySelectorAll('#sensible-panel input[type=checkbox]').forEach(cb => {
-    cb.checked = false;
-    const card = cb.closest('.single-card');
-    if (card) card.style.outline = '';
-  });
-  renderAccaTray();
-}
-
-function renderAccaTray() {
-  const tray = document.getElementById('acca-tray');
-  const legs = [..._accaLegs.values()];
-  if (legs.length < 2) { tray.style.display = 'none'; return; }
-  tray.style.display = 'block';
-
-  const stake = parseFloat(document.getElementById('sensible-stake-input')?.value) || 10;
-
-  // Same-match warning
-  const matches = legs.map(s => s.match);
-  const dupes = matches.filter((m, i) => matches.indexOf(m) !== i);
-  document.getElementById('tray-warning').textContent = dupes.length
-    ? `⚠ Same-match legs detected (${[...new Set(dupes)].join(', ')}) — most books won't allow this`
-    : '';
-
-  // Find best single bookmaker covering all legs
-  const bookSets = legs.map(s => new Set(Object.keys(s.per_book || {})));
-  const common   = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
-
-  let bestBook = null, bestCombined = 0;
-  common.forEach(bk => {
-    const combined = legs.reduce((p, s) => p * (s.per_book[bk] || 0), 1);
-    if (combined > bestCombined) { bestCombined = combined; bestBook = bk; }
-  });
-
-  // Fair combined probability; true EV per stake = fair × price − 1
-  const fairCombined = legs.reduce((p, s) => p * (s.fair_prob || 0), 1);
-  const ev           = (fairCombined > 0 && bestCombined > 0)
-                     ? ((fairCombined * bestCombined - 1) * 100).toFixed(1) : null;
-  const grossReturn  = stake * bestCombined;
-  const profit       = grossReturn - stake;
-
-  // Summary line
-  document.getElementById('tray-legs-summary').textContent =
-    `${legs.length}-leg acca · fair chance: ${(fairCombined * 100).toFixed(1)}%`;
-
-  if (bestBook) {
-    document.getElementById('tray-book').textContent = `Best book: ${bestBook}`;
-    document.getElementById('tray-price').textContent = bestCombined.toFixed(2);
-    const evColor = parseFloat(ev) >= 0 ? '#3fb950' : '#f85149';
-    const evAmt   = ev != null ? (parseFloat(ev) / 100 * stake) : null;
-    document.getElementById('tray-ev').innerHTML =
-      `<span style="color:${evColor};font-weight:700">EV ${parseFloat(ev) >= 0 ? '+' : '−'}€${Math.abs(evAmt).toFixed(2)} (${parseFloat(ev) >= 0 ? '+' : ''}${ev}%)</span>` +
-      `<span style="color:#8b949e;font-size:0.75rem;margin-left:8px">€${stake.toFixed(2)} → €${grossReturn.toFixed(2)} if it lands</span>`;
-  } else {
-    document.getElementById('tray-book').textContent = 'No single book covers all legs';
-    document.getElementById('tray-price').textContent = '';
-    document.getElementById('tray-ev').textContent = '';
-  }
-
-  // Leg chips
-  document.getElementById('tray-leg-list').innerHTML = legs.map(s => {
-    const bookPrice = bestBook && s.per_book?.[bestBook] ? s.per_book[bestBook].toFixed(2) : '—';
-    return `<span style="background:#21262d;border:1px solid #30363d;border-radius:14px;padding:3px 10px;font-size:0.75rem;color:#c9d1d9">
-      ${s.outcome} <span style="color:#8b949e">${s.match.split(' vs ')[0]} v ${s.match.split(' vs ')[1]}</span>
-      <strong style="color:#f0f6fc;margin-left:4px">${bookPrice}</strong>
-    </span>`;
-  }).join('');
-}
-
-// ---- fixtures tab ----
-let _fixtureRound = 'R1';
-const _fixtureLeg = new Map();  // matchId -> {legId, ocKey, single}
-
-function setFixtureRound(r) {
-  _fixtureRound = r;
-  document.querySelectorAll('.fix-round-btn').forEach(b => b.classList.toggle('active', b.dataset.round === r));
-  renderFixtures();
-}
-
-function toggleFixtureLeg(matchId, ocKey, singleObj) {
-  const existing = _fixtureLeg.get(matchId);
-  // clicking same button again = deselect
-  if (existing && existing.ocKey === ocKey) {
-    _fixtureLeg.delete(matchId);
-  } else {
-    _fixtureLeg.set(matchId, { legId: matchId + '|' + ocKey, ocKey, single: singleObj });
-  }
-  renderFixtures();
-  renderFixtureAcca();
-}
-
-function clearFixtureAcca() {
-  _fixtureLeg.clear();
-  renderFixtures();
-  renderFixtureAcca();
-}
-
-function renderFixtures() {
-  const grid = document.getElementById('fixtures-grid');
-  if (!grid) return;
-  if (!allMatches.length) {
-    grid.innerHTML = '<div style="color:#8b949e;padding:20px">No fixture data yet — loading...</div>';
-    return;
-  }
-
-  const rLabel = 'Group Stage ' + _fixtureRound;
-  const now = Date.now();
-  const filtered = allMatches
-    .filter(m => m.round && m.round.label === rLabel)
-    .sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
-
-  if (!filtered.length) {
-    grid.innerHTML = '<div style="color:#8b949e;padding:20px">No matches found for ' + _fixtureRound + '</div>';
-    return;
-  }
-
-  grid.innerHTML = filtered.map(m => {
-    const matchId = m.label;
-    const [mHome, mAway] = m.label.includes(' vs ') ? m.label.split(' vs ') : [m.label, ''];
-    const isPast  = m.commence && (new Date(m.commence).getTime() < now);
-    const sel     = _fixtureLeg.get(matchId);
-
-    const homeKey = mHome.toLowerCase();
-    const awayKey = mAway.toLowerCase();
-    const cols = [
-      { ocKey: homeKey, label: mHome },
-      { ocKey: 'draw',  label: 'Draw' },
-      { ocKey: awayKey, label: mAway },
-    ];
-
-    const btns = cols.map(({ ocKey, label }) => {
-      const od      = (m.outcomes || []).find(o => o.outcome === ocKey);
-      const price   = od?.best_price ? od.best_price.toFixed(2) : '—';
-      const isSel   = sel?.ocKey === ocKey;
-      const noOdds  = !od?.best_price;
-      if (noOdds) {
-        return `<div style="min-width:58px;padding:7px 10px;text-align:center;opacity:0.35">
-          <span style="display:block;font-size:0.68rem;color:#8b949e">${label}</span>
-          <span style="display:block;font-size:0.72rem;color:#484f58">No market</span>
-        </div>`;
-      }
-      const single  = {
-        match: matchId, outcome: label,
-        fair_prob: od ? (od.book_fair || 0) / 100 : 0,
-        best_price: od?.best_price ?? null,
-        best_book:  od?.best_book  ?? null,
-        per_book:   od?.per_book   ?? {},
-      };
-      const enc = JSON.stringify(single).replace(/"/g, '&quot;');
-      const click = isPast ? '' : ` onclick="toggleFixtureLeg('${matchId.replace(/'/g,"\\'")}','${ocKey}',${enc})"`;
-      return `<button class="fix-outcome-btn${isSel ? ' selected' : ''}"${isPast ? ' disabled' : ''}${click}>
-        <span class="fix-label">${label}</span>
-        <span class="fix-price">${price}</span>
-      </button>`;
-    }).join('');
-
-    const kick = (() => {
-      if (!m.commence) return '';
-      const d = new Date(m.commence);
-      const h = (d.getTime() - now) / 36e5;
-      if (h < -1)  return '<span style="color:#484f58">FT</span>';
-      if (h < 0)   return '<span style="color:#f85149">Live</span>';
-      const t = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-      const day = Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())) / 86400000);
-      if (day === 0) return `<span style="color:#d29922">Today ${t}</span>`;
-      if (day === 1) return `<span style="color:#8b949e">Tomorrow ${t}</span>`;
-      return `<span style="color:#6e7681">${d.toLocaleDateString([],{month:'short',day:'numeric'})} ${t}</span>`;
-    })();
-
-    return `<div class="fix-row${isPast ? ' past' : ''}${sel ? ' selected-row' : ''}">
-      <div class="fix-match-info">
-        <div class="fix-match-name">${mHome} <span style="color:#484f58;font-weight:400">v</span> ${mAway}</div>
-        <div class="fix-match-time">${kick}</div>
-      </div>
-      <div class="fix-btns">${btns}</div>
-    </div>`;
-  }).join('');
-}
-
-function renderFixtureAcca() {
-  const legs   = [..._fixtureLeg.values()];
-  const legsEl = document.getElementById('fix-acca-legs');
-  const summary = document.getElementById('fix-acca-summary');
-  const countEl = document.getElementById('fix-leg-count');
-  if (!legsEl) return;
-
-  if (countEl) countEl.textContent = legs.length || '0';
-
-  if (!legs.length) {
-    legsEl.innerHTML = '<div style="font-size:0.78rem;color:#484f58;text-align:center;padding:28px 16px;line-height:1.5">Click any odds button<br>to add to your betslip</div>';
-    if (summary) summary.style.display = 'none';
-    document.getElementById('fix-acca-odds-header').textContent = '';
-    return;
-  }
-
-  legsEl.innerHTML = legs.map(({ ocKey, single }) => {
-    const price = single.best_price ? single.best_price.toFixed(2) : '—';
-    const enc   = JSON.stringify(single).replace(/"/g, '&quot;');
-    const safeMatch = single.match.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-
-    // Analyst verdict for this leg
-    const intel    = allIntel[single.match] || allIntel[single.match.split(' vs ').reverse().join(' vs ')];
-    const confirms = intel ? analystConfirms(single, intel) : null;
-    let analystLine = '';
-    if (!intel) {
-      analystLine = `<div style="font-size:0.7rem;color:#484f58;margin-top:4px">⏳ Analyst not yet run for this match</div>`;
-    } else if (confirms === true) {
-      const snippet = intel.overall_summary ? intel.overall_summary.split('.')[0] + '.' : '';
-      analystLine = `<div style="font-size:0.7rem;color:#3fb950;margin-top:4px">★ Analyst backs this pick${snippet ? ' — ' + esc(snippet) : ''}</div>`;
-    } else if (confirms === false) {
-      // Find what the analyst actually recommended in the same market
-      const recs = (intel.recommended_bets || []).map(r => r.outcome).filter(Boolean).join(', ');
-      analystLine = `<div style="font-size:0.7rem;color:#d29922;margin-top:4px">⚠ Analyst prefers: ${esc(recs) || 'a different outcome'}</div>`;
-    } else {
-      // null = analyst ran but no same-market rec
-      const snippet = intel.overall_summary ? intel.overall_summary.split('.')[0] + '.' : '';
-      analystLine = `<div style="font-size:0.7rem;color:#6e7681;margin-top:4px">${esc(snippet) || 'Analyst has no 1X2 recommendation for this match'}</div>`;
-    }
-
-    return `<div style="border-bottom:1px solid #21262d;padding:10px 14px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
-            <span style="color:#3fb950;font-size:0.75rem">✓</span>
-            <span style="font-size:0.88rem;font-weight:700;color:#f0f6fc">${single.outcome}</span>
-          </div>
-          <div style="font-size:0.75rem;color:#6e7681">${single.match}</div>
-          ${analystLine}
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <span style="font-size:0.95rem;font-weight:700;color:#c9d1d9">${price}</span>
-          <button onclick="toggleFixtureLeg('${safeMatch}','${ocKey}',${enc})"
-            style="background:none;border:none;color:#484f58;cursor:pointer;font-size:1rem;line-height:1;padding:2px;transition:color 0.15s"
-            onmouseover="this.style.color='#f85149'" onmouseout="this.style.color='#484f58'">✕</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  if (summary) summary.style.display = 'block';
-
-  const singles  = legs.map(l => l.single);
-  const stake    = parseFloat(document.getElementById('fix-stake')?.value) || 10;
-  const fairCombo = singles.reduce((p, s) => p * (s.fair_prob || 0), 1);
-
-  // Build per-bookmaker combined odds (only books that price ALL legs)
-  const allBooks = new Set(singles.flatMap(s => Object.keys(s.per_book || {})));
-  const bookOdds = [];
-  allBooks.forEach(bk => {
-    const prices = singles.map(s => s.per_book?.[bk]);
-    if (prices.every(p => p > 0)) {
-      bookOdds.push({ bk, combined: prices.reduce((a, b) => a * b, 1) });
-    }
-  });
-  bookOdds.sort((a, b) => b.combined - a.combined);
-
-  const best = bookOdds[0] || null;
-  const bestOdds = best?.combined || 0;
-  const bestBook = best?.bk || null;
-
-  const oddsStr = bestOdds > 0 ? bestOdds.toFixed(2) : '—';
-  document.getElementById('fix-acca-odds-header').textContent = bestOdds > 0 ? `· Acca ${oddsStr}` : '';
-  document.getElementById('fix-acca-odds').textContent   = oddsStr;
-  document.getElementById('fix-acca-return').textContent = bestOdds > 0 ? `€${(stake * bestOdds).toFixed(2)}` : '—';
-
-  // True EV per stake = fair combined prob × combined price − 1
-  const ev = (fairCombo > 0 && bestOdds > 0) ? ((fairCombo * bestOdds - 1) * 100).toFixed(1) : null;
-  const evEl = document.getElementById('fix-acca-ev');
-  if (ev !== null) {
-    const c = parseFloat(ev) >= 0 ? '#3fb950' : '#f85149';
-    const evAmt = parseFloat(ev) / 100 * stake;
-    evEl.innerHTML = `<span style="color:${c};font-weight:700">EV ${evAmt >= 0 ? '+' : '−'}€${Math.abs(evAmt).toFixed(2)} (${parseFloat(ev) >= 0 ? '+' : ''}${ev}%)</span> <span style="color:#6e7681">· fair chance ${(fairCombo*100).toFixed(1)}%</span>`;
-  } else { evEl.textContent = ''; }
-
-  // Bookmaker comparison table
-  const bookEl = document.getElementById('fix-acca-book');
-  if (!bookOdds.length) {
-    bookEl.innerHTML = legs.length > 1
-      ? '<span style="color:#d29922">No single bookmaker prices all your selections — try removing a leg</span>'
-      : '';
-  } else {
-    bookEl.innerHTML = `
-      <div style="font-size:0.72rem;color:#6e7681;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Where to place it</div>
-      ${bookOdds.map((b, i) => {
-        const ret = (stake * b.combined).toFixed(2);
-        const isBest = i === 0;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:6px;margin-bottom:3px;background:${isBest ? '#0d2818' : '#161b22'};border:1px solid ${isBest ? '#3fb95044' : '#21262d'}">
-          <span style="font-size:0.78rem;color:${isBest ? '#3fb950' : '#8b949e'};font-weight:${isBest ? '600' : '400'}">${isBest ? '★ ' : ''}${b.bk}</span>
-          <div style="text-align:right">
-            <span style="font-size:0.82rem;font-weight:700;color:${isBest ? '#f0f6fc' : '#c9d1d9'}">${b.combined.toFixed(2)}</span>
-            <span style="font-size:0.72rem;color:#6e7681;margin-left:5px">→ €${ret}</span>
-          </div>
-        </div>`;
-      }).join('')}`;
-  }
-
-  document.getElementById('fix-acca-nobook').textContent = '';
-
-  // Bookmaker homepage URLs
-  const bookUrls = {
-    'Paddy Power':       'https://www.paddypower.com',
-    'Betfair':           'https://www.betfair.com',
-    'Betfair Exchange':  'https://www.betfair.com/exchange',
-    'Bet365':            'https://www.bet365.com',
-    'Ladbrokes':         'https://www.ladbrokes.com',
-    'BoyleSports':       'https://www.boylesports.com',
-    'William Hill':      'https://www.williamhill.com',
-  };
-
-  const actionsEl = document.getElementById('fix-acca-actions');
-  if (actionsEl) actionsEl.style.display = legs.length >= 2 ? 'flex' : 'none';
-
-  // WhatsApp share
-  const waBtn = document.getElementById('fix-whatsapp-btn');
-  if (waBtn && legs.length >= 2) {
-    const legLines = legs.map(({ single }) => {
-      const price = single.best_price ? single.best_price.toFixed(2) : '—';
-      return `✓ ${single.outcome} — ${single.match} @ ${price}`;
-    }).join('\n');
-    const stake = parseFloat(document.getElementById('fix-stake')?.value) || 10;
-    const ret   = bestOdds > 0 ? (stake * bestOdds).toFixed(2) : '—';
-    const msg   = `🏆 WC 2026 Acca${bestBook ? ` (${bestBook})` : ''}\n\n${legLines}\n\nCombined: ${oddsStr}\nStake €${stake} → Returns €${ret}\n\nBuilt with WC Edge Finder`;
-    waBtn.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  }
-
-  // Bookmaker link
-  const bookBtn   = document.getElementById('fix-bookie-btn');
-  const bookLabel = document.getElementById('fix-bookie-label');
-  if (bookBtn && bestBook) {
-    const url = bookUrls[bestBook] || 'https://www.google.com/search?q=' + encodeURIComponent(bestBook);
-    bookBtn.href = url;
-    if (bookLabel) bookLabel.textContent = `Open ${bestBook}`;
-  }
-}
-
-// ============================================================
-// PLACED BETS TRACKER (localStorage — no backend)
-// ============================================================
-const _BETS_KEY = 'wc26_placed_bets';
-function loadPlacedBets() {
-  try { return JSON.parse(localStorage.getItem(_BETS_KEY) || '[]'); } catch { return []; }
-}
-function savePlacedBets(bets) { localStorage.setItem(_BETS_KEY, JSON.stringify(bets)); }
-
-let _betModalData = null;
-
-// fairProb (0-1, may be null): the model's de-vigged fair probability at the
-// moment of logging — stored with the bet so the journal can later compare the
-// price you took against where the market moves (closing-line-value tracking).
-function openBetModal(match, outcome, market, defaultOdds, defaultBook, fairProb = null) {
-  _betModalData = { match, outcome, market, fairProb };
-  document.getElementById('bm-desc').textContent = `${outcome.toUpperCase()} — ${match}`;
-  document.getElementById('bm-odds').value  = defaultOdds  || '';
-  document.getElementById('bm-stake').value = sensibleStake();
-  document.getElementById('bm-book').value  = defaultBook  || '';
-  document.getElementById('bet-modal').style.display = 'flex';
-  setTimeout(() => document.getElementById('bm-odds').focus(), 50);
-}
-
-function closeBetModal() {
-  document.getElementById('bet-modal').style.display = 'none';
-  _betModalData = null;
-}
-
-function confirmLogBet() {
-  if (!_betModalData) return;
-  const odds  = parseFloat(document.getElementById('bm-odds').value);
-  const stake = parseFloat(document.getElementById('bm-stake').value);
-  const book  = document.getElementById('bm-book').value.trim();
-  if (!odds || !stake) return;
-  const fairAtLog = _betModalData.fairProb;
-  const bets = loadPlacedBets();
-  bets.push({ id: Date.now().toString(), match: _betModalData.match,
-    outcome: _betModalData.outcome, market: _betModalData.market,
-    odds, stake, bookmaker: book, placed_at: Math.floor(Date.now()/1000), result: 'pending',
-    // CLV groundwork: the model's fair prob at log time + EV at the odds taken
-    fair_at_log: fairAtLog != null ? +fairAtLog : null,
-    ev_at_log:   fairAtLog != null ? +((fairAtLog * odds - 1) * 100).toFixed(2) : null });
-  savePlacedBets(bets);
-  closeBetModal();
-  renderMyBets();
-  renderToday();   // refresh "Log bet" buttons to show ✓ Logged
-}
-
-function setPlacedBetResult(id, result) {
-  const bets = loadPlacedBets();
-  const b = bets.find(b => b.id === id);
-  if (b) { b.result = result; savePlacedBets(bets); renderMyBets(); }
-}
-
-function deletePlacedBet(id) {
-  if (!confirm('Remove this bet from your tracker?')) return;
-  savePlacedBets(loadPlacedBets().filter(b => b.id !== id));
-  renderMyBets();
-}
-
-// Latest model fair probability for a logged bet's outcome (h2h only) — used
-// to show how the market moved since you logged it (closing-line-value proxy:
-// if the fair prob of your pick ROSE after you bet, you beat the move).
-function currentFairFor(b) {
-  if (b.market !== 'h2h') return null;
-  const want = normalizeMatchLabel(b.match);
-  const m = allMatches.find(x => x.label === b.match || normalizeMatchLabel(x.label) === want);
-  if (!m) return null;
-  const oc = normalizeTeam(b.outcome) || (b.outcome || '').toLowerCase();
-  const o  = (m.outcomes || []).find(o => o.outcome === oc);
-  return o && o.book_fair != null ? o.book_fair / 100 : null;
-}
-
-function renderMyBets() {
-  const panel = document.getElementById('mybets-panel');
-  if (!panel) return;
-  const bets = loadPlacedBets();
-
-  if (!bets.length) {
-    panel.innerHTML = `<div style="padding:40px 0;text-align:center;color:#6e7681">
-      No bets logged yet.<br><br>
-      <small>Hit <strong style="color:#3fb950">+ Log bet</strong> on any card in Today or Sensible Bets to track it here.</small>
-    </div>`;
-    return;
-  }
-
-  const won     = bets.filter(b => b.result === 'won');
-  const lost    = bets.filter(b => b.result === 'lost');
-  const pending = bets.filter(b => b.result === 'pending');
-  const settled = bets.filter(b => b.result !== 'pending' && b.result !== 'void');
-  const totalStaked  = settled.reduce((s, b) => s + b.stake, 0);
-  const actualPnl    = won.reduce((s, b) => s + b.stake * (b.odds - 1), 0)
-                     - lost.reduce((s, b) => s + b.stake, 0);
-  const potentialRet = pending.reduce((s, b) => s + b.stake * b.odds, 0);
-  const pnlCol = actualPnl > 0 ? '#3fb950' : actualPnl < 0 ? '#f85149' : '#8b949e';
-
-  // Model-expected P/L: what the logged EVs predicted across every bet that
-  // captured a fair prob at log time. Over a real sample, actual P/L converging
-  // on this is the evidence the model works (and diverging is the evidence it
-  // doesn't) — that's the whole point of logging.
-  const evBets        = bets.filter(b => b.ev_at_log != null && b.result !== 'void');
-  const expectedPnl   = evBets.reduce((s, b) => s + b.stake * b.ev_at_log / 100, 0);
-  const expCol        = expectedPnl > 0 ? '#3fb950' : expectedPnl < 0 ? '#f85149' : '#8b949e';
-  const expCell = evBets.length
-    ? `<div><div class="help" style="font-size:0.75rem;color:#6e7681" title="Sum of (stake × EV at log time) over the ${evBets.length} bet(s) logged with a model fair price. Compare with actual P&L over a meaningful sample — convergence is the proof the model works.">Model-expected P&amp;L</div><strong style="color:${expCol}">${expectedPnl>=0?'+':''}€${expectedPnl.toFixed(2)}</strong></div>`
-    : '';
-
-  const summary = `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap">
-    <div><div style="font-size:0.75rem;color:#6e7681">Settled staked</div><strong>€${totalStaked.toFixed(2)}</strong></div>
-    <div><div style="font-size:0.75rem;color:#6e7681">P&amp;L</div><strong style="color:${pnlCol}">${actualPnl>=0?'+':''}€${actualPnl.toFixed(2)}</strong></div>
-    ${expCell}
-    ${pending.length ? `<div><div style="font-size:0.75rem;color:#6e7681">Pending return</div><strong style="color:#d29922">€${potentialRet.toFixed(2)}</strong></div>` : ''}
-    <div><div style="font-size:0.75rem;color:#6e7681">Record</div>
-      <strong style="color:#3fb950">${won.length}W</strong> <strong style="color:#f85149"> ${lost.length}L</strong> <strong style="color:#d29922"> ${pending.length}P</strong>
-    </div>
-  </div>`;
-
-  const rows = [...bets].reverse().map(b => {
-    const ret    = b.stake * b.odds;
-    const placed = new Date(b.placed_at * 1000).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
-
-    // EV at log + market movement since (CLV proxy)
-    let clvLine = '';
-    if (b.fair_at_log != null) {
-      const evCol = b.ev_at_log >= 0 ? '#3fb950' : '#f85149';
-      let movement = '';
-      const nowFair = b.result === 'pending' ? currentFairFor(b) : null;
-      if (nowFair != null && Math.abs(nowFair - b.fair_at_log) >= 0.001) {
-        const up  = nowFair > b.fair_at_log;
-        movement = ` · fair ${(b.fair_at_log*100).toFixed(1)}% → ${(nowFair*100).toFixed(1)}% now `
-          + (up ? `<span style="color:#3fb950" title="The market moved towards your pick after you logged it — you beat the move (positive closing-line value so far).">📈 you beat the move</span>`
-                : `<span style="color:#f85149" title="The market moved against your pick after you logged it.">📉 market moved against you</span>`);
-      }
-      clvLine = `<div style="font-size:0.75rem;color:#8b949e;margin-top:4px">
-        <span class="help" style="color:${evCol}" title="Expected value at the odds and model fair price when you logged this bet.">EV at log ${b.ev_at_log>=0?'+':''}${b.ev_at_log}%</span>${movement}
-      </div>`;
-    }
-    const rBtns  = ['pending','won','lost','void'].map(r => {
-      const on  = b.result === r;
-      const col = r==='won'?'#3fb950':r==='lost'?'#f85149':r==='void'?'#8b949e':'#d29922';
-      const lbl = r==='pending'?'Pending':r==='won'?'✓ Won':r==='lost'?'✗ Lost':'Void';
-      return `<button onclick="setPlacedBetResult('${b.id}','${r}')"
-        style="padding:3px 9px;font-size:0.75rem;border-radius:4px;cursor:pointer;font-family:inherit;
-               background:${on?col+'22':'#21262d'};color:${on?col:'#8b949e'};border:1px solid ${on?col+'88':'#30363d'}">${lbl}</button>`;
-    }).join('');
-    return `<div class="single-card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-        <div>
-          <div class="single-title">${esc(b.outcome.toUpperCase())} — ${fmtLabel(b.match)}</div>
-          <div class="single-sub">${esc(b.bookmaker||'—')} · ${b.odds.toFixed(2)} · ${placed}</div>
-          ${clvLine}
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:0.85rem;color:#f0f6fc">€${b.stake.toFixed(2)}</div>
-          <div style="font-size:0.78rem;color:#3fb950">→ €${ret.toFixed(2)}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
-        ${rBtns}
-        <button onclick="deletePlacedBet('${b.id}')"
-          style="margin-left:auto;padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;
-                 font-family:inherit;background:#21262d;color:#6e7681;border:1px solid #30363d">🗑</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  panel.innerHTML = summary + `<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">${rows}</div>`;
-}
-
-// ============================================================
-// TODAY TAB
-// ============================================================
-function renderToday() {
-  const panel = document.getElementById('today-panel');
-  if (!panel) return;
-
-  const now = new Date();
-  let dayMatches = [], dayLabel = '';
-
-  for (let d = 0; d <= 6; d++) {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 0, 0, 0);
-    const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 23, 59, 59);
-    const from  = d === 0 ? now : start;   // today: from now, not midnight
-    dayMatches = allMatches.filter(m => { const k = new Date(m.commence); return k >= from && k <= end; });
-    if (dayMatches.length) {
-      dayLabel = d === 0 ? 'Today' : d === 1 ? 'Tomorrow'
-               : start.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
-      break;
-    }
-  }
-
-  if (!dayMatches.length) {
-    panel.innerHTML = `<div class="empty">No upcoming matches in the next 7 days.</div>`;
-    return;
-  }
-
-  dayMatches.sort((a, b) => (a.commence||'').localeCompare(b.commence||''));
-  const logged = new Set(loadPlacedBets().map(b => b.match + '|' + b.outcome));
-
-  const cards = dayMatches.map(match => {
-    const label = match.label;
-    const intel = allIntel[label] || allIntel[normalizeMatchLabel(label)];
-    const recs  = intel?.recommended_bets || [];
-    const parts = label.split(' vs ');
-    const homeN = normalizeTeam(parts[0]||''), awayN = normalizeTeam(parts[1]||'');
-
-    // Build one row per recommendation (up to 3)
-    const recRows = recs.map(rb => {
-      const ao = (rb.outcome||'').toLowerCase().replace(/ /g,'_');
-      let norm = ao==='home_win' ? homeN : ao==='away_win' ? awayN : ao==='draw' ? 'draw' : null;
-      if (!norm) return '';
-      const pd = (match.outcomes||[]).find(o => o.outcome === norm);
-      if (!pd || !pd.best_price) return '';
-      const edgeCol = (pd.edge||0)>1.5 ? '#3fb950' : (pd.edge||0)>0 ? '#d29922' : '#8b949e';
-      const cCol    = rb.confidence==='high'?'#3fb950':rb.confidence==='medium'?'#d29922':'#8b949e';
-      const betKey  = label + '|' + norm;
-      const isLogged = logged.has(betKey);
-      const safeMatch = label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      const safeBook  = (pd.best_book||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;
-                          padding:8px 10px;background:#0d1117;border-radius:6px;margin-top:6px">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <strong style="color:#f0f6fc">${norm.toUpperCase()}</strong>
-            <span style="color:${cCol};font-size:0.78rem">${rb.confidence||''}${rb.strength?' · '+rb.strength:''}</span>
-            <span style="font-size:0.82rem;color:#c9d1d9">${pd.best_price.toFixed(2)} @ ${pd.best_book}</span>
-            ${pd.edge!=null?`<span style="font-size:0.78rem;color:${edgeCol}">${pd.edge>0?'+':''}${pd.edge.toFixed(1)}%</span>`:''}
-          </div>
-          ${rb.reasoning?`<div style="font-size:0.78rem;color:#6e7681;margin-top:3px;font-style:italic">${esc(rb.reasoning)}</div>`:''}
-        </div>
-        <button ${isLogged?'disabled':''} onclick="openBetModal('${safeMatch}','${norm}','h2h',${pd.best_price},'${safeBook}',${pd.book_fair != null ? (pd.book_fair / 100) : 'null'}); this.blur()"
-          style="flex-shrink:0;padding:4px 12px;font-size:0.78rem;border-radius:5px;cursor:${isLogged?'default':'pointer'};
-                 font-family:inherit;background:${isLogged?'#1a2f1a':'#0d2818'};
-                 color:#3fb950;border:1px solid #3fb95066;opacity:${isLogged?0.6:1}">
-          ${isLogged?'✓ Logged':'+ Log bet'}
-        </button>
-      </div>`;
-    }).filter(Boolean).join('');
-
-    const wHeadline = (match.weather?.headline || '').replace(/\b(\d+)\.0m\b/g, (_, n) => parseInt(n).toLocaleString() + 'm');
-    const wBadge = match.weather
-      ? `<span style="color:#d29922;font-size:0.78rem" title="${match.weather.detail}">${match.weather.emoji} ${wHeadline}</span>` : '';
-    const rBadge = match.round ? `<span style="color:#88c0d0;font-size:0.78rem">${match.round.label}</span>` : '';
-    const age = intelAge(intel);
-
-    let bodyHTML = '';
-    if (recRows) {
-      bodyHTML = recRows;
-    } else if (intel) {
-      bodyHTML = `<div style="margin-top:6px;font-size:0.82rem;color:#6e7681">Analyst sees no clear edge — no bet recommended.</div>`;
-    } else {
-      bodyHTML = `<div style="margin-top:6px;font-size:0.82rem;color:#484f58;display:flex;align-items:center;gap:6px">
-        <div class="spinner" style="width:10px;height:10px;border-width:2px;margin:0;border-color:#484f58;border-top-color:transparent"></div>
-        Analyst not yet run for this match
-      </div>`;
-    }
-
-    return `<div class="single-card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
-        <div>
-          <div class="single-title">${fmtLabel(label)}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:3px;font-size:0.8rem;color:#8b949e">
-            ${kickoffCountdown(match.commence)} ${rBadge} ${wBadge}
-          </div>
-        </div>
-        ${age?`<span style="color:#484f58;font-size:0.74rem">${age}</span>`:''}
-      </div>
-      ${bodyHTML}
-    </div>`;
-  }).join('');
-
-  const analysed = dayMatches.filter(m => allIntel[m.label]||allIntel[normalizeMatchLabel(m.label)]).length;
-  panel.innerHTML = `
-    <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 16px;margin-bottom:4px;
-                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <div>
-        <span style="font-size:1rem;font-weight:700;color:#f0f6fc">📅 ${dayLabel} — ${dayMatches.length} match${dayMatches.length>1?'es':''}</span>
-        <span style="font-size:0.78rem;color:#6e7681;margin-left:10px">${analysed === dayMatches.length ? `All ${analysed} analysed` : `${analysed}/${dayMatches.length} analysed`}${analysed < dayMatches.length ? ' · more analysis running' : ''}</span>
-      </div>
-    </div>
-    ${cards}`;
-}
-
-// ---- boot ----
-loadData();
-</script>
-
-<!-- Bet logger modal -->
-<div id="bet-modal" onclick="if(event.target===this)closeBetModal()"
-  style="display:none;position:fixed;inset:0;background:#000a;z-index:200;align-items:center;justify-content:center">
-  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px 24px;width:320px;max-width:90vw">
-    <div style="font-size:1rem;font-weight:700;color:#f0f6fc;margin-bottom:4px">Log bet</div>
-    <div id="bm-desc" style="font-size:0.84rem;color:#8b949e;margin-bottom:14px"></div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <label style="font-size:0.82rem;color:#8b949e">Odds taken
-        <input id="bm-odds" type="number" step="0.01" min="1"
-          style="display:block;margin-top:3px;width:100%;padding:6px 8px;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;font-size:0.9rem">
-      </label>
-      <label style="font-size:0.82rem;color:#8b949e">Stake (€)
-        <input id="bm-stake" type="number" step="1" min="1"
-          style="display:block;margin-top:3px;width:100%;padding:6px 8px;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;font-size:0.9rem">
-      </label>
-      <label style="font-size:0.82rem;color:#8b949e">Bookmaker
-        <input id="bm-book" type="text" placeholder="e.g. Paddy Power"
-          style="display:block;margin-top:3px;width:100%;padding:6px 8px;background:#21262d;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;font-size:0.9rem">
-      </label>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="confirmLogBet()"
-        style="flex:1;padding:8px;background:#0d2818;color:#3fb950;border:1px solid #3fb950aa;border-radius:6px;font-size:0.9rem;cursor:pointer;font-family:inherit;font-weight:600">
-        Log bet
-      </button>
-      <button onclick="closeBetModal()"
-        style="padding:8px 16px;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;font-size:0.9rem;cursor:pointer;font-family:inherit">
-        Cancel
-      </button>
+<!-- ===================== BOTTOM NAV (mobile) ===================== -->
+<nav class="bottombar" id="bottom-nav">
+  <button class="bb-btn active" data-view="today" onclick="switchView('today')"><span class="bb-ico">📅</span>Today</button>
+  <button class="bb-btn" data-view="best" onclick="switchView('best')"><span class="bb-ico">★</span>Best Bets</button>
+  <button class="bb-btn" data-view="markets" onclick="switchView('markets')"><span class="bb-ico">📊</span>Markets</button>
+  <button class="bb-btn" data-view="mybets" onclick="switchView('mybets')"><span class="bb-ico">📒</span>My Bets</button>
+  <button class="bb-btn" data-view="more" onclick="toggleMoreMenu(event, true)"><span class="bb-ico">⋯</span>More</button>
+</nav>
+
+<!-- ===================== BET LOG MODAL ===================== -->
+<div id="bet-modal" class="modal-overlay" onclick="if(event.target===this)closeBetModal()">
+  <div class="modal">
+    <h3>Log bet</h3>
+    <div id="bm-desc" class="modal-sub"></div>
+    <label>Odds taken
+      <input id="bm-odds" type="number" step="0.01" min="1">
+    </label>
+    <label>Stake (€)
+      <input id="bm-stake" type="number" step="1" min="1">
+    </label>
+    <label>Bookmaker
+      <input id="bm-book" type="text" placeholder="e.g. Paddy Power">
+    </label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn btn--primary" style="flex:1" onclick="confirmLogBet()">Log bet</button>
+      <button class="btn" onclick="closeBetModal()">Cancel</button>
     </div>
   </div>
 </div>
+
+<script src="/static/js/helpers.js?v=2"></script>
+<script src="/static/js/data.js?v=2"></script>
+<script src="/static/js/views-today.js?v=2"></script>
+<script src="/static/js/views-best.js?v=2"></script>
+<script src="/static/js/views-markets.js?v=2"></script>
+<script src="/static/js/views-journal.js?v=2"></script>
+<script src="/static/js/views-injuries.js?v=2"></script>
+<script src="/static/js/app.js?v=2"></script>
 </body>
 </html>
