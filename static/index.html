@@ -496,19 +496,15 @@ tr:last-child td { border-bottom: none; }
         style="width:64px;padding:4px 6px;font-size:0.82rem;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px"
         oninput="renderSensible()">
     </span>
+    <label>Round:</label>
+    <select id="sensible-round-filter" onchange="renderSensible()">
+      <option value="">All rounds</option>
+    </select>
     <label>Show:</label>
     <select id="sensible-tier-filter" onchange="renderSensible()">
       <option value="all">All tiers</option>
       <option value="strong">★ Strong only</option>
       <option value="solid">Solid + Strong</option>
-    </select>
-    <label>When:</label>
-    <select id="sensible-time-filter" onchange="renderSensible()">
-      <option value="all">All matches</option>
-      <option value="today">Today</option>
-      <option value="tomorrow">Tomorrow</option>
-      <option value="2days">Next 2 days</option>
-      <option value="week">This week</option>
     </select>
   </div>
   <div id="sensible-panel" style="padding:18px 24px 120px;display:flex;flex-direction:column;gap:12px">
@@ -865,6 +861,7 @@ async function loadData(force = false) {
     accaMarkets   = betsData.markets_available || [];
     roundsAvailable = betsData.rounds_available || [];
     populateRoundFilter();
+    populateSensibleRoundFilter();
 
     // Populate bookmaker dropdowns once (bets tab + picks tab)
     ['book-select', 'picks-book-select'].forEach(selId => {
@@ -1894,8 +1891,9 @@ function analystMatchHTML(label, intel) {
   const condNote = cond && cond.stadium
     ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${cond.stadium}${cond.altitude_m > 800 ? ' · ' + cond.altitude_m + 'm altitude' : ''}</div>`
     : '';
+  const ageNote = intelAge(intel) ? `<span style="color:#484f58;font-size:0.74rem;margin-left:8px">${intelAge(intel)}</span>` : '';
   return `<div class="single-card">
-    <div class="single-title">${label}</div>
+    <div class="single-title">${label}${ageNote}</div>
     ${updatingBanner}
     ${condNote}
     ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${intel.overall_summary}</div>` : ''}
@@ -1993,6 +1991,33 @@ function sensibleScore(s) {
 
 function sensibleStake() { return parseFloat(document.getElementById('sensible-stake-input')?.value) || 10; }
 
+function intelAge(intel) {
+  const ca = intel?.cached_at;
+  if (!ca) return '';
+  const h = (Date.now() - ca * 1000) / 3600000;
+  if (h < 1)  return 'analysed just now';
+  if (h < 24) return `analysed ${Math.round(h)}h ago`;
+  return `analysed ${Math.round(h / 24)}d ago`;
+}
+
+function populateSensibleRoundFilter() {
+  const sel = document.getElementById('sensible-round-filter');
+  if (!sel || !roundsAvailable.length) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All rounds</option>'
+    + roundsAvailable.map(r => `<option value="${r}">${r}</option>`).join('');
+  // Default to the first round that has an upcoming match — the active round
+  if (!cur) {
+    const now = new Date();
+    const activeRound = roundsAvailable.find(r =>
+      allMatches.some(m => m.round?.label === r && new Date(m.commence) > now)
+    ) || '';
+    sel.value = activeRound;
+  } else {
+    sel.value = cur;
+  }
+}
+
 function kickoffCountdown(iso) {
   if (!iso) return '';
   const now = new Date();
@@ -2025,7 +2050,7 @@ function sensibleTimeFilter(s) {
   return true;
 }
 
-function sensibleCardHTML(s, sc, stake) {
+function sensibleCardHTML(s, sc, stake, grouped = false) {
   const price = s.best_price, ret = stake*price, profit = ret-stake;
   const mkt = s.market==='totals'?'Over/Under':s.market==='spreads'?'Handicap':'1X2';
   const tierBadge = sc.tier==='strong'
@@ -2033,30 +2058,35 @@ function sensibleCardHTML(s, sc, stake) {
     : sc.tier==='solid'
     ? `<span class="badge" style="background:#1c2128;color:#c9d1d9;border:1px solid #30363d">Solid</span>`
     : `<span class="badge badge-muted">Speculative</span>`;
-  const iconf = s.intel?.intel_confidence;
-  const iconfBadge = iconf
-    ? `<span style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid ${iconf==='high'?'#3fb95066':iconf==='medium'?'#d2992266':'#6e767166'};color:${iconf==='high'?'#3fb950':iconf==='medium'?'#d29922':'#6e7681'}">analyst: ${iconf}</span>`
+  const rbConf = s.rb_confidence;
+  const rbBadge = rbConf
+    ? `<span style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid ${rbConf==='high'?'#3fb95066':rbConf==='medium'?'#d2992266':'#6e767166'};color:${rbConf==='high'?'#3fb950':rbConf==='medium'?'#d29922':'#6e7681'}">${rbConf}${s.rb_strength?' · '+s.rb_strength:''}</span>`
     : '';
   const tags = sc.reasons.map(r =>
     `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':r.t==='muted'?'#484f58':'#d29922'}">${r.x}</span>`).join('');
+  const reasoning = s.rb_reasoning
+    ? `<div style="margin-top:6px;font-size:0.81rem;color:#8b949e;line-height:1.5;border-left:2px solid #30363d;padding-left:8px">${s.rb_reasoning}</div>`
+    : '';
   const legId = `leg_${s.match.replace(/\W/g,'_')}_${s.outcome.replace(/\W/g,'_')}`;
   const checked = _accaLegs.has(legId) ? 'checked' : '';
-  return `<div class="single-card${sc.tier==='speculative'?' demoted':''}" id="card_${legId}">
+  const titleLine = grouped
+    ? `<div class="single-title">${s.outcome.toUpperCase()} <span style="color:#8b949e;font-weight:400;font-size:0.85rem">${mkt}</span></div>`
+    : `<div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
+       <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>`;
+  return `<div class="single-card${sc.tier==='speculative'?' demoted':''}" id="card_${legId}" style="${grouped?'margin:0;border-radius:6px;':''}">
     <div class="single-top">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <input type="checkbox" ${checked} onchange="toggleAccaLeg(this,'${legId}',${JSON.stringify(s).replace(/"/g,'&quot;')})"
           style="margin-top:3px;width:15px;height:15px;accent-color:#388bfd;cursor:pointer;flex-shrink:0">
-        <div>
-          <div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
-          <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>
-        </div>
+        <div>${titleLine}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         ${tierBadge}
-        ${iconfBadge}
+        ${rbBadge}
         <span style="font-size:0.78rem;color:#8b949e">@ <strong style="color:#f0f6fc">${price.toFixed(2)}</strong> ${s.best_book}</span>
       </div>
     </div>
+    ${reasoning}
     <div style="margin-top:6px;line-height:1.7">${tags}</div>
     <div style="margin-top:8px;font-size:0.8rem;color:#8b949e">€${stake.toFixed(2)} → <strong style="color:#3fb950">€${ret.toFixed(2)}</strong> (profit +€${profit.toFixed(2)})</div>
   </div>`;
@@ -2125,6 +2155,9 @@ function renderSensible() {
         weather:        match.weather,
         intel:          intel,
         analyst_confirms: true,
+        rb_reasoning:   rb.reasoning || '',
+        rb_confidence:  rb.confidence || '',
+        rb_strength:    rb.strength || '',
       });
     }
   }
@@ -2133,7 +2166,9 @@ function renderSensible() {
     .map(s => ({ s, sc: sensibleScore(s) }))
     .sort((a,b) => (a.s.commence || '').localeCompare(b.s.commence || '') || b.sc.score - a.sc.score);
 
-  let list = scored.filter(x => sensibleTimeFilter(x.s));
+  const roundFilter = document.getElementById('sensible-round-filter')?.value || '';
+  let list = scored;
+  if (roundFilter) list = list.filter(x => x.s.round?.label === roundFilter);
   if (tierFilter === 'strong')     list = list.filter(x => x.sc.tier === 'strong');
   else if (tierFilter === 'solid') list = list.filter(x => x.sc.tier !== 'speculative');
 
@@ -2171,7 +2206,29 @@ function renderSensible() {
     return;
   }
 
-  panel.innerHTML = intro + list.map(x => sensibleCardHTML(x.s, x.sc, stake)).join('');
+  // Group bets by match so multiple recs for the same game appear together
+  const byMatch = new Map();
+  for (const x of list) {
+    if (!byMatch.has(x.s.match)) byMatch.set(x.s.match, []);
+    byMatch.get(x.s.match).push(x);
+  }
+  const groupsHTML = [...byMatch.entries()].map(([label, items]) => {
+    const s0 = items[0].s;
+    const age = intelAge(s0.intel);
+    const roundBadge = s0.round ? `<span style="color:#88c0d0;font-size:0.78rem">${s0.round.label}</span>` : '';
+    const ageBadge = age ? `<span style="color:#484f58;font-size:0.75rem">${age}</span>` : '';
+    return `<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;overflow:hidden;margin-bottom:4px">
+      <div style="padding:9px 14px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <strong style="color:#f0f6fc;flex:1">${label}</strong>
+        <span style="color:#8b949e;font-size:0.8rem">${kickoffCountdown(s0.commence)}</span>
+        ${roundBadge} ${ageBadge}
+      </div>
+      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px">
+        ${items.map(x => sensibleCardHTML(x.s, x.sc, stake, true)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  panel.innerHTML = intro + groupsHTML;
 }
 
 // ---- acca builder ----
