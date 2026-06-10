@@ -79,12 +79,19 @@ async def _track_visitors(request, call_next):
     return await call_next(request)
 
 
-REGIONS = "uk"             # UK region covers all Irish-accessible bookmakers
+# Odds API regions. "uk" covers all Irish-accessible bookmakers (the default
+# focus). On the paid plan you can widen via env, e.g. ODDS_REGIONS=uk,eu —
+# remember to widen BOOKMAKER_WHITELIST too or the extra books are filtered out.
+REGIONS = os.environ.get("ODDS_REGIONS", "uk").strip() or "uk"
 
-# Only show prices from bookmakers the user has accounts with
+# Only show prices from bookmakers the user has accounts with (Irish focus by
+# default). Override with a comma-separated BOOKMAKER_WHITELIST env var, e.g.
+#   BOOKMAKER_WHITELIST=Paddy Power,Bet365,Unibet,Betsson
+_DEFAULT_BOOKS = ("Paddy Power, Betfair, Betfair Exchange, "
+                  "Bet365, BoyleSports, Ladbrokes, William Hill")
 BOOKMAKER_WHITELIST = {
-    "Paddy Power", "Betfair", "Betfair Exchange",
-    "Bet365", "BoyleSports", "Ladbrokes", "William Hill",
+    b.strip() for b in os.environ.get("BOOKMAKER_WHITELIST", _DEFAULT_BOOKS).split(",")
+    if b.strip()
 }
 # Exchanges: better prices on singles, but you CANNOT place accumulators on them.
 # So they're used for singles but excluded from accumulator leg pricing.
@@ -114,7 +121,19 @@ ACCA_GUARD_TOL_PCT = -4.0
 # Cache — one shared fetch for all endpoints
 # ---------------------------------------------------------------------------
 _cache = {"raw": None, "fetched_at": 0}
-_CACHE_TTL = 7200  # 2 hours — WC odds move slowly, no need to hammer the API
+
+# Odds refresh cadence. With the paid Odds API plan the cache refreshes every
+# ODDS_REFRESH_MINUTES (default 15) and a background thread keeps it warm while
+# the process is alive. Set ODDS_REFRESH_MINUTES=0 to disable auto-refresh and
+# fall back to the old frugal 2-hour request-driven TTL (free-tier behaviour).
+try:
+    ODDS_REFRESH_MINUTES = float(os.environ.get("ODDS_REFRESH_MINUTES", "15"))
+except ValueError:
+    ODDS_REFRESH_MINUTES = 15.0
+if ODDS_REFRESH_MINUTES > 0:
+    _CACHE_TTL = max(ODDS_REFRESH_MINUTES, 5) * 60   # floor 5 min — be deliberate with quota
+else:
+    _CACHE_TTL = 7200
 _ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
 _lock = threading.Lock()
 
@@ -1098,6 +1117,31 @@ def _intel_get(cache: dict, match_label: str):
     if result is None:
         result = cache.get(fintel._norm_label(match_label))
     return result
+
+
+# ---------------------------------------------------------------------------
+# Background odds auto-refresh (paid Odds API plan). Re-fetches on the
+# ODDS_REFRESH_MINUTES cadence while the process is alive, so the dashboard
+# always serves a snapshot at most one cycle old. get_raw() itself enforces the
+# TTL, so this loop never double-fetches: it just keeps the cache warm.
+# On Render free tier the process spins down on idle — the loop only runs (and
+# only spends quota) while someone is actually using the app.
+# ---------------------------------------------------------------------------
+
+def _odds_auto_refresh_loop():
+    interval = max(ODDS_REFRESH_MINUTES, 5) * 60
+    while True:
+        time.sleep(interval)
+        try:
+            get_raw()   # TTL-driven: fetches only if the cache has expired
+        except Exception as e:
+            print(f"[odds] auto-refresh failed: {e}", flush=True)
+
+
+if ODDS_REFRESH_MINUTES > 0:
+    threading.Thread(target=_odds_auto_refresh_loop, daemon=True).start()
+    print(f"[odds] auto-refresh every {max(ODDS_REFRESH_MINUTES, 5):g} min "
+          f"(set ODDS_REFRESH_MINUTES=0 to disable)")
 
 
 # ---------------------------------------------------------------------------

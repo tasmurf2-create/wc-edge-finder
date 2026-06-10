@@ -14,3 +14,7 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: "3.12.6"
+      - key: ODDS_REFRESH_MINUTES  # paid Odds API plan: background refresh cadence
+        value: "15"
+      # Optional widening (paid plan): ODDS_REGIONS=uk,eu and a wider
+      # BOOKMAKER_WHITELIST — see .env.example. Defaults keep the Irish focus.
