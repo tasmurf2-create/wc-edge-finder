@@ -632,6 +632,7 @@ let accaRound     = '';           // round filter ('' = all rounds)
 let roundsAvailable = [];         // round labels present in the schedule
 let accaSort      = 'chance';     // 'chance' | 'return'
 let _injuriesLoaded = false;      // Injuries tab loads once (cached digest); never auto-polls
+let _reanalysing    = new Set();  // match labels currently being re-analysed due to injury news
 
 // ---- tab switching ----
 function switchTab(tab) {
@@ -807,6 +808,8 @@ async function refreshInjuriesDigest() {
     btn.disabled = false; btn.textContent = 'Refresh injuries';
     return;
   }
+  // Restart the intel poll so re-analysis banners appear on match cards promptly
+  if (!_intelPollTimer) _intelPollTimer = setInterval(pollIntel, 8000);
   // Poll every 5s for up to 90s — web search + retries can take well over 30s
   let elapsed = 0;
   const pollId = setInterval(async () => {
@@ -939,10 +942,16 @@ async function pollIntel() {
       if (!l.intel && data.intel[l.match]) { l.intel = data.intel[l.match]; changed = true; }
     }));
 
-    if (changed) { renderBets(); renderTopPicks(); renderFixtures(); renderSensible(); }
+    // Track which matches are being re-analysed (injury-triggered re-run)
+    const newReanalysing = new Set(data.reanalysing || []);
+    const reanalysisChanged = [...newReanalysing].some(l => !_reanalysing.has(l))
+                           || [..._reanalysing].some(l => !newReanalysing.has(l));
+    _reanalysing = newReanalysing;
 
-    // Stop polling once intel is done loading
-    if (!data.intel_loading) {
+    if (changed || reanalysisChanged) { renderBets(); renderTopPicks(); renderFixtures(); renderSensible(); }
+
+    // Stop polling once intel is done loading AND no re-analysis in flight
+    if (!data.intel_loading && !_reanalysing.size) {
       clearInterval(_intelPollTimer);
       _intelPollTimer = null;
       if (!data.intel_ready) {
@@ -1852,6 +1861,12 @@ function analystMatchHTML(label, intel) {
   const parts = label.includes(' vs ') ? label.split(' vs ') : [label, ''];
   const home = parts[0], away = parts[1];
   const cc = c => c === 'high' ? '#3fb950' : c === 'medium' ? '#d29922' : '#8b949e';
+  const updatingBanner = _reanalysing.has(label)
+    ? `<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;padding:6px 10px;background:#1c2128;border:1px solid #d2992255;border-radius:6px;font-size:0.8rem;color:#d29922">
+         <div class="spinner" style="width:12px;height:12px;border-width:2px;border-color:#d29922;border-top-color:transparent;flex-shrink:0;margin:0"></div>
+         🩹 Injury news detected — updating analysis, check back in a moment
+       </div>`
+    : '';
   const recs = intel.recommended_bets || [];
   const book = picksChosenBook();
   const recsHTML = recs.length
@@ -1881,6 +1896,7 @@ function analystMatchHTML(label, intel) {
     : '';
   return `<div class="single-card">
     <div class="single-title">${label}</div>
+    ${updatingBanner}
     ${condNote}
     ${intel.overall_summary ? `<div style="font-size:0.85rem;color:#c9d1d9;margin:8px 0 2px;line-height:1.5">${intel.overall_summary}</div>` : ''}
     ${recsHTML}

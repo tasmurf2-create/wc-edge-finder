@@ -118,9 +118,10 @@ _ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
 _lock = threading.Lock()
 
 # Separate intel cache — populated by background thread
-_intel_cache = {}          # {match_label: intel_dict}
-_intel_lock  = threading.Lock()
-_intel_busy  = False       # True while background fetch is running
+_intel_cache    = {}   # {match_label: intel_dict}
+_intel_lock     = threading.Lock()
+_intel_busy     = False   # True while background fetch is running
+_intel_fetching = set()   # match labels actively being re-analysed right now
 _teams_busy  = False       # True while team snapshot fetches are running
 
 # Pre-load cached intel from disk so restarts don't lose analysis
@@ -347,6 +348,9 @@ def _build_intel_requests(singles):
 
 def _run_intel_bg(intel_requests):
     global _intel_busy
+    labels = [r["home"] + " vs " + r["away"] for r in intel_requests]
+    with _intel_lock:
+        _intel_fetching.update(labels)
     print(f"[intel] background fetch starting for {len(intel_requests)} match(es)...")
     try:
         raw_map = fintel.get_intel_batch(intel_requests, max_calls=MAX_INTEL_MATCHES)
@@ -359,9 +363,12 @@ def _run_intel_bg(intel_requests):
                     norm = fintel._norm_label(label)
                     if norm != label:
                         _intel_cache[norm] = raw_map[ck]
+                    _intel_fetching.discard(label)
         print(f"[intel] background fetch done — {len(_intel_cache)} match(es) cached")
     except Exception as e:
         print(f"[intel] background fetch failed: {e}")
+        with _intel_lock:
+            _intel_fetching.difference_update(labels)
     finally:
         _intel_busy = False
 
@@ -1209,10 +1216,14 @@ def intel():
         obj["recommended_bets"] = new_recs
         enriched[label] = obj
 
+    with _intel_lock:
+        fetching_now = list(_intel_fetching)
+
     return JSONResponse({
         "intel":         enriched,
         "intel_ready":   len(enriched),
         "intel_loading": _intel_busy,
+        "reanalysing":   fetching_now,
     })
 
 
