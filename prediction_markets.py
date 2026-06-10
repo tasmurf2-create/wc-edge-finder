@@ -83,6 +83,24 @@ def _is_draw(label: str) -> bool:
     return normalize_team(label) in ("draw", "tie", "draw tie")
 
 
+def _normalize_probs(probs: dict) -> dict:
+    """
+    Normalise a 3-way market's outcome probabilities to sum to 1.
+
+    Raw prediction-market quotes (bid/ask midpoints, last prices) rarely sum to
+    exactly 1 — typically 0.97-1.05 across the three outcomes. The bookmaker
+    side of every comparison IS de-vigged (sums to 1), so without this step up
+    to a couple of points of any reported "gap" is just the prediction market's
+    own spread, not signal. Only rescales when the raw sum is in a sane band;
+    a wildly off sum means bad data, which we pass through untouched so the
+    upstream shape checks can reject it.
+    """
+    total = sum(probs.values())
+    if 0.85 <= total <= 1.20 and total > 0:
+        return {k: v / total for k, v in probs.items()}
+    return probs
+
+
 # ---- Polymarket -------------------------------------------------------------
 def fetch_polymarket(max_pages: int = 4, page_size: int = 500) -> dict:
     """
@@ -126,7 +144,7 @@ def fetch_polymarket(max_pages: int = 4, page_size: int = 500) -> dict:
             if len(teams) == 2 and "draw" in probs:   # looks like a 3-way match
                 mk = frozenset(teams)
                 out[mk] = {"source": "polymarket",
-                           "teams": tuple(teams), "probs": probs}
+                           "teams": tuple(teams), "probs": _normalize_probs(probs)}
     return out
 
 
@@ -188,7 +206,7 @@ def fetch_kalshi(max_pages: int = 6) -> dict:
             if len(teams) == 2 and "draw" in probs:
                 mk = frozenset(teams)
                 out[mk] = {"source": "kalshi",
-                           "teams": tuple(teams), "probs": probs}
+                           "teams": tuple(teams), "probs": _normalize_probs(probs)}
         if not cursor:
             break
     return out

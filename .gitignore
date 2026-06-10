@@ -23,3 +23,6 @@ team_profiles.json
 
 # Local Claude tooling
 .claude/
+
+# Odds disk cache (runtime)
+odds_cache.json

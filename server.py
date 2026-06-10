@@ -12,6 +12,7 @@ Then open http://localhost:8000
 """
 import os
 import sys
+import json
 import time
 import pathlib
 import secrets
@@ -351,6 +352,8 @@ def _run_intel_bg(intel_requests):
     labels = [r["home"] + " vs " + r["away"] for r in intel_requests]
     with _intel_lock:
         _intel_fetching.update(labels)
+    # NB: _intel_busy was set (under _intel_lock) by _trigger_intel_bg before
+    # this thread started; this function is responsible for clearing it.
     print(f"[intel] background fetch starting for {len(intel_requests)} match(es)...")
     try:
         raw_map = fintel.get_intel_batch(intel_requests, max_calls=MAX_INTEL_MATCHES)
@@ -370,7 +373,8 @@ def _run_intel_bg(intel_requests):
         with _intel_lock:
             _intel_fetching.difference_update(labels)
     finally:
-        _intel_busy = False
+        with _intel_lock:
+            _intel_busy = False
 
 
 MAX_INTEL_MATCHES = 24  # current active round only (~24 group stage matches)
@@ -379,10 +383,22 @@ def _team_key(t):
     return t.lower().strip()
 
 
+def _parse_commence(iso):
+    """Parse an ISO commence string ('...Z' or offset form) to an aware datetime."""
+    try:
+        return datetime.fromisoformat((iso or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def _active_round(all_matches):
     """Return the lowest round order that still has upcoming matches."""
-    now = datetime.now(timezone.utc).isoformat()
-    upcoming = [m for m in (all_matches or []) if (m.get("commence") or "") > now]
+    now = datetime.now(timezone.utc)
+    upcoming = []
+    for m in (all_matches or []):
+        dt = _parse_commence(m.get("commence"))
+        if dt is not None and dt > now:
+            upcoming.append(m)
     if not upcoming:
         return None
     orders = [m["round"]["order"] for m in upcoming if m.get("round")]
@@ -398,10 +414,10 @@ def _trigger_intel_bg(singles, all_matches=None):
     global _intel_busy
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return
-    if _intel_busy:
-        return
 
     with _intel_lock:
+        if _intel_busy:
+            return
         cached_labels = set(_intel_cache.keys())
 
     # Determine which round is currently active
@@ -435,7 +451,10 @@ def _trigger_intel_bg(singles, all_matches=None):
     if not missing:
         return
 
-    _intel_busy = True
+    with _intel_lock:
+        if _intel_busy:   # another thread won the race since our first check
+            return
+        _intel_busy = True
     t = threading.Thread(target=_run_intel_bg, args=(missing,), daemon=True)
     t.start()
 
@@ -1260,11 +1279,30 @@ def injuries():
     return JSONResponse(fintel.injury_digest_info())
 
 
+# Cooldowns on the two cost-bearing endpoints. Both are unauthenticated (they
+# power UI buttons), so without a floor anyone — or a crawler — could drain the
+# Odds API monthly quota / burn Anthropic web searches by hammering them.
+_REFRESH_COOLDOWN          = 600   # /api/refresh: at most one forced odds fetch / 10 min
+_INJURY_REFRESH_COOLDOWN   = 300   # /api/refresh-injuries: at most one / 5 min
+_last_forced_refresh       = 0.0
+_last_injury_refresh       = 0.0
+_cooldown_lock             = threading.Lock()
+
+
 @app.get("/api/refresh-injuries")
 def refresh_injuries():
-    """Refresh the tournament-wide injury digest (ONE BBC search), then invalidate
+    """Refresh the tournament-wide injury digest (ONE web search), then invalidate
     only the analyst cards for matches whose team is named in the updated digest.
     Cards for teams the digest doesn't mention are kept as-is."""
+    global _last_injury_refresh
+    with _cooldown_lock:
+        wait = _INJURY_REFRESH_COOLDOWN - (time.time() - _last_injury_refresh)
+        if wait > 0:
+            return JSONResponse({"status": "cooldown",
+                                 "retry_in_s": int(wait) + 1,
+                                 "detail": "Injury digest was refreshed recently — using the cached digest."})
+        _last_injury_refresh = time.time()
+
     before = fintel.peek_injury_digest()
 
     def _do_refresh():
@@ -1303,8 +1341,17 @@ def refresh_injuries():
 
 @app.get("/api/refresh")
 def refresh():
-    d = get_raw(force=True)
-    return JSONResponse({"fetched_at": d["fetched_at"], "matches": d["matches"], "bets": d["bets"]})
+    global _last_forced_refresh
+    with _cooldown_lock:
+        wait = _REFRESH_COOLDOWN - (time.time() - _last_forced_refresh)
+        force = wait <= 0
+        if force:
+            _last_forced_refresh = time.time()
+    # During the cooldown we serve the cached snapshot instead of burning an
+    # Odds API request (500/month budget). The TTL refresh still happens.
+    d = get_raw(force=force)
+    return JSONResponse({"fetched_at": d["fetched_at"], "matches": d["matches"], "bets": d["bets"],
+                         "forced": force})
 
 
 @app.get("/")
