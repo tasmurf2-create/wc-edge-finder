@@ -1291,6 +1291,10 @@ function normalizeTeam(name) {
   return _TEAM_ALIASES[n] ?? n;
 }
 
+function normalizeMatchLabel(label) {
+  return (label || '').split(' vs ').map(normalizeTeam).join(' vs ');
+}
+
 function analystConfirms(single, intel) {
   if (!intel) return null;
   const recs = intel.recommended_bets;
@@ -2032,7 +2036,7 @@ function renderSensible() {
 
   // OPTION B: analyst-led gate — only show bets the analyst explicitly recommended
   const analystBacked = allSingles.filter(s => {
-    const intel = s.intel || allIntel[s.match];
+    const intel = s.intel || allIntel[s.match] || allIntel[normalizeMatchLabel(s.match)];
     if (!intel) return false;
     return analystConfirms(s, intel) === true;
   });

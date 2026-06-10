@@ -734,17 +734,32 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
         return None
 
 
+def _norm_label(label: str) -> str:
+    """Normalize both team names in 'Home vs Away' for cache-key matching."""
+    parts = label.split(" vs ", 1)
+    if len(parts) == 2:
+        from prediction_markets import normalize_team
+        return f"{normalize_team(parts[0])} vs {normalize_team(parts[1])}"
+    return label.lower()
+
+
 def load_intel_from_disk():
     """
     Return {match_label: intel_dict} from disk cache — call at server startup
     to pre-populate in-memory cache without re-running any API calls.
+    Stores each entry under both its original label and a normalised key so
+    Odds API spellings (Curacao vs Curaçao, Turkiye vs Turkey, etc.) all hit.
     """
     result = {}
     cache  = _load_cache()
     now    = time.time()
     for ck, entry in cache.items():
         if (now - entry.get("cached_at", 0)) < CACHE_TTL and "label" in entry:
-            result[entry["label"]] = entry["intel"]
+            label = entry["label"]
+            result[label] = entry["intel"]
+            norm = _norm_label(label)
+            if norm != label:
+                result[norm] = entry["intel"]
     return result
 
 

@@ -348,6 +348,9 @@ def _run_intel_bg(intel_requests):
                 if ck in raw_map:
                     label = req["home"] + " vs " + req["away"]
                     _intel_cache[label] = raw_map[ck]
+                    norm = fintel._norm_label(label)
+                    if norm != label:
+                        _intel_cache[norm] = raw_map[ck]
         print(f"[intel] background fetch done — {len(_intel_cache)} match(es) cached")
     except Exception as e:
         print(f"[intel] background fetch failed: {e}")
@@ -772,11 +775,11 @@ def _build_raw():
     with _intel_lock:
         cached_intel = dict(_intel_cache)
     for s in singles:
-        s["intel"] = cached_intel.get(s["match"])
+        s["intel"] = _intel_get(cached_intel, s["match"])
         s["analyst_confirms"] = _analyst_confirms(s) if s["intel"] else None
     for p in parlays:
         for leg in p["legs"]:
-            leg["intel"] = cached_intel.get(leg["match"])
+            leg["intel"] = _intel_get(cached_intel, leg["match"])
 
     # Kick off background intel fetch — prioritises R1, then value singles, then rest
     _trigger_intel_bg(singles, all_matches=matches)
@@ -1055,6 +1058,14 @@ def get_raw(force=False):
         return _cache["raw"]
 
 
+def _intel_get(cache: dict, match_label: str):
+    """Look up intel by match label, falling back to a normalised key."""
+    result = cache.get(match_label)
+    if result is None:
+        result = cache.get(fintel._norm_label(match_label))
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Routes
 
@@ -1096,10 +1107,10 @@ def bets(risk: str = "balanced", value_guard: bool = True, round: str = ""):
     pool = bets_data.get("acca_pool", [])
     parlays = _build_parlays(pool, risk=risk, value_guard=value_guard, round_filter=round_filter)
     for s in bets_data["singles"]:
-        s["intel"] = cached_intel.get(s["match"])
+        s["intel"] = _intel_get(cached_intel, s["match"])
     for p in parlays:
         for leg in p["legs"]:
-            leg["intel"] = cached_intel.get(leg["match"])
+            leg["intel"] = _intel_get(cached_intel, leg["match"])
     # Which markets the current odds feed actually offers, so the UI can be
     # honest about coverage (e.g. Asian handicaps aren't posted this far out).
     markets_available = sorted({p["market"] for p in pool})
