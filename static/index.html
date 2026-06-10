@@ -384,7 +384,7 @@ tr:last-child td { border-bottom: none; }
   <button class="tab-btn active" data-tab="today" onclick="switchTab('today'); renderToday()">📅 Today</button>
   <button class="tab-btn" data-tab="sensible" onclick="switchTab('sensible'); renderSensible()">★ Sensible Bets</button>
   <button class="tab-btn" data-tab="picks" onclick="switchTab('picks')">Bettor's Analysis</button>
-  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">The Maths</button>
+  <button class="tab-btn" data-tab="bets" onclick="switchTab('bets')">Prices &amp; EV</button>
   <button class="tab-btn" data-tab="injuries" onclick="switchTab('injuries')">🩹 Injuries</button>
   <button class="tab-btn" data-tab="fixtures" onclick="switchTab('fixtures'); renderFixtures()">🎰 Acca Builder</button>
   <button class="tab-btn" data-tab="divergence" onclick="switchTab('divergence')">Market Divergence</button>
@@ -432,9 +432,9 @@ tr:last-child td { border-bottom: none; }
     </span>
     <label>Confidence:</label>
     <select id="conf-filter" onchange="renderBets()">
-      <option value="all">All</option>
+      <option value="all">All (incl. speculative)</option>
+      <option value="high,medium" selected>High + Medium (default)</option>
       <option value="high">High only</option>
-      <option value="high,medium">High + Medium</option>
     </select>
     <label>Market:</label>
     <select id="market-filter" onchange="renderBets()">
@@ -481,7 +481,7 @@ tr:last-child td { border-bottom: none; }
   </div>
   <div class="legend">
     <span>The analyst's professional read + recommended bets per match — a second opinion, not fact</span>
-    <span style="color:#88c0d0">Cross-check with The Maths; agreement = strongest signal</span>
+    <span style="color:#88c0d0">Cross-check with Prices &amp; EV; agreement = strongest signal</span>
   </div>
   <div id="picks-panel" style="padding:18px 24px;display:flex;flex-direction:column;gap:28px">
     <div class="loading-inner"><div class="spinner"></div><span>Loading picks...</span></div>
@@ -779,6 +779,10 @@ function clearTeamSearch() {
 // ---- injuries (manual refresh only — never auto-polls, to control cost) ----
 function fmtInjuryDigest(text) {
   if (!text) return '<div class="empty">No injury data yet — hit "Refresh injuries".</div>';
+  // Strip AI preamble lines before the actual data starts
+  const lines = text.split('\n');
+  const startIdx = lines.findIndex(l => /^#+\s|^\*\*[A-Z]|\binjur|\bout\b|\bdoubtful\b/i.test(l));
+  if (startIdx > 0) text = lines.slice(startIdx).join('\n');
   // Light markdown: ## TEAM headers, **bold**, line breaks.
   const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc(text)
@@ -1297,7 +1301,7 @@ function renderBets() {
     panel.innerHTML = `
       <div style="padding:18px 24px 0">
         <div class="bets-section-title">
-          The Maths — positive-edge candidates
+          Prices &amp; EV — positive-edge candidates
           <small>${ranked.length} where the price beats fair (${solid} solid, ${ranked.length - solid} speculative) · ${book === 'best' ? 'best available price' : book}</small>
         </div>
       </div>
@@ -1505,7 +1509,7 @@ function intelHTML(intel) {
 
   // Conditions block
   const altWarn = cond.altitude_m > 800
-    ? `<span style="color:#f85149;font-weight:700"> ALTITUDE ${cond.altitude_m}m</span>` : '';
+    ? `<span style="color:#f85149;font-weight:700"> ALTITUDE ${Math.round(cond.altitude_m).toLocaleString()}m</span>` : '';
   const condLine = cond.city
     ? `<div style="margin-bottom:6px"><span style="color:#6e7681">Venue:</span> <strong>${cond.city}</strong>${altWarn} &nbsp;·&nbsp; <span style="color:#6e7681">Local KO:</span> <strong>${cond.local_kickoff}</strong> &nbsp;·&nbsp; ${cond.avg_high_c}°C feels ${cond.feels_like_c}°C, ${cond.humidity_pct}% humidity</div>`
     : '';
@@ -1910,7 +1914,7 @@ function analystMatchHTML(label, intel) {
     : `<div style="color:#8b949e;font-size:0.85rem;margin-top:6px">Analyst sees no clear edge — no bet recommended.</div>`;
   const cond = intel.conditions;
   const condNote = cond && cond.stadium
-    ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${cond.stadium}${cond.altitude_m > 800 ? ' · ' + cond.altitude_m + 'm altitude' : ''}</div>`
+    ? `<div style="font-size:0.74rem;color:#6e7681;margin-top:2px">${cond.stadium}${cond.altitude_m > 800 ? ' · ' + Math.round(cond.altitude_m).toLocaleString() + 'm venue altitude' : ''}</div>`
     : '';
   const ageNote = intelAge(intel) ? `<span style="color:#484f58;font-size:0.74rem;margin-left:8px">${intelAge(intel)}</span>` : '';
   return `<div class="single-card">
@@ -2024,27 +2028,28 @@ function markSeen(key) {
   } catch {}
 }
 function collapsibleBanner(key, shortText, fullHTML) {
+  const safeShort = shortText.replace(/"/g, '&quot;');
   if (hasSeen(key)) {
-    return `<div style="font-size:0.8rem;color:#6e7681;padding:8px 0;display:flex;align-items:center;gap:8px">
-      ${shortText}
-      <button onclick="localStorage.removeItem('wc26_seen');location.reload()"
-        style="background:none;border:none;color:#484f58;font-size:0.75rem;cursor:pointer;padding:0">ℹ️</button>
-    </div>`;
+    return `<div style="font-size:0.8rem;color:#6e7681;padding:8px 0">${shortText}</div>`;
   }
-  return `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;position:relative;margin-bottom:4px">
+  return `<div data-banner-key="${key}" data-short="${safeShort}" style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;position:relative">
     ${fullHTML}
-    <button onclick="markSeen('${key}');this.closest('div').outerHTML='<div style=\\"font-size:0.8rem;color:#6e7681;padding:8px 0\\">${shortText.replace(/"/g,"'")}</div>'"
-      style="position:absolute;top:8px;right:10px;background:none;border:none;color:#6e7681;font-size:1rem;cursor:pointer;line-height:1"
-      title="Got it — hide this explanation">×</button>
+    <button onclick="dismissBanner(this)" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#6e7681;font-size:1rem;cursor:pointer;line-height:1" title="Got it — hide this">×</button>
   </div>`;
+}
+function dismissBanner(btn) {
+  const b = btn.closest('[data-banner-key]');
+  markSeen(b.dataset.bannerKey);
+  b.setAttribute('style', 'padding:8px 0');
+  b.innerHTML = `<span style="font-size:0.8rem;color:#6e7681">${b.dataset.short}</span>`;
 }
 
 // ---- Verdict badge (single dominant signal per bet card) ----
-function verdictBadge(edge) {
-  if (edge == null) return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#1c2128;color:#6e7681;border:1px solid #30363d">No price</span>`;
-  if (edge >= 1.5)  return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#0d2818;color:#3fb950;border:1px solid #3fb950aa">✅ Value Bet</span>`;
-  if (edge >= 0)    return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2d2005;color:#d29922;border:1px solid #d29922aa">→ Lean Only</span>`;
-  if (edge >= -2)   return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#1c2128;color:#8b949e;border:1px solid #484f5888">≈ Fair Price</span>`;
+function verdictBadge(edge, rbStrength) {
+  if (edge == null) return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#1c2128;color:#6e7681;border:1px solid #30363d">Awaiting price</span>`;
+  if (edge >= 1.5)  return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#0d2818;color:#3fb950;border:1px solid #3fb950aa">🎯 Bet Now</span>`;
+  if (edge >= 0)    return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2d2005;color:#d29922;border:1px solid #d29922aa">→ Lean${rbStrength === 'strong' ? ' (analyst strong)' : ' Only'}</span>`;
+  if (edge >= -2)   return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#0d1a2e;color:#58a6ff;border:1px solid #388bfd66">⏳ Track Price</span>`;
   return `<span style="padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;background:#2a1010;color:#f85149;border:1px solid #f8514988">⚠ Avoid at Price</span>`;
 }
 
@@ -2110,11 +2115,17 @@ function sensibleTimeFilter(s) {
 function sensibleCardHTML(s, sc, stake, grouped = false) {
   const price = s.best_price, ret = stake*price, profit = ret-stake;
   const mkt = s.market==='totals'?'Over/Under':s.market==='spreads'?'Handicap':'1X2';
-  const vBadge  = verdictBadge(s.edge);
-  const rbConf  = s.rb_confidence;
-  const rbBadge = rbConf
-    ? `<span style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid ${rbConf==='high'?'#3fb95066':rbConf==='medium'?'#d2992266':'#6e767166'};color:${rbConf==='high'?'#3fb950':rbConf==='medium'?'#d29922':'#6e7681'}">${rbConf}${s.rb_strength?' · '+s.rb_strength:''}</span>`
-    : '';
+  const vBadge = verdictBadge(s.edge, s.rb_strength);
+
+  // Action note — plain English, no redundant signals
+  const actionNote = (() => {
+    if (s.edge == null) return '';
+    if (s.edge >= 1.5)  return `<span style="font-size:0.77rem;color:#3fb950">Bet with confidence — strong price relative to fair value</span>`;
+    if (s.edge >= 0)    return `<span style="font-size:0.77rem;color:#d29922">Odds are fair — small stake if you back the analyst view</span>`;
+    if (s.edge >= -2)   return `<span style="font-size:0.77rem;color:#58a6ff">Analyst likes it but price is tight — wait for ${(s.best_price + 0.05).toFixed(2)}+</span>`;
+    return `<span style="font-size:0.77rem;color:#f85149">Odds well below fair value — pass or wait</span>`;
+  })();
+
   const tags = sc.reasons.map(r =>
     `<span style="display:inline-block;margin:2px 10px 2px 0;font-size:0.75rem;color:${r.t==='good'?'#3fb950':r.t==='muted'?'#484f58':'#d29922'}">${r.x}</span>`).join('');
   const reasoning = s.rb_reasoning
@@ -2126,17 +2137,20 @@ function sensibleCardHTML(s, sc, stake, grouped = false) {
     ? `<div class="single-title">${s.outcome.toUpperCase()} <span style="color:#8b949e;font-weight:400;font-size:0.85rem">${mkt}</span></div>`
     : `<div class="single-title">${s.outcome.toUpperCase()} &mdash; ${s.match}</div>
        <div class="single-sub">${kickoffCountdown(s.commence)} &nbsp;&middot;&nbsp; ${mkt}${s.round?' &nbsp;&middot;&nbsp; <span style="color:#88c0d0">'+s.round.label+'</span>':''}</div>`;
+  const confLine = s.rb_confidence
+    ? `<div style="font-size:0.77rem;color:#6e7681;margin-top:3px">Football view: <span style="color:${s.rb_confidence==='high'?'#3fb950':s.rb_confidence==='medium'?'#d29922':'#8b949e'}">${s.rb_confidence} confidence${s.rb_strength?' · '+s.rb_strength:''}</span></div>`
+    : '';
   return `<div class="single-card${sc.tier==='speculative'?' demoted':''}" id="card_${legId}" style="${grouped?'margin:0;border-radius:6px;':''}">
     <div class="single-top">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <input type="checkbox" ${checked} onchange="toggleAccaLeg(this,'${legId}',${JSON.stringify(s).replace(/"/g,'&quot;')})"
           style="margin-top:3px;width:15px;height:15px;accent-color:#388bfd;cursor:pointer;flex-shrink:0">
-        <div>${titleLine}</div>
+        <div>${titleLine}${confLine}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         ${vBadge}
-        ${rbBadge}
         <span style="font-size:0.78rem;color:#8b949e">@ <strong style="color:#f0f6fc">${price.toFixed(2)}</strong> ${s.best_book}</span>
+        ${actionNote}
       </div>
     </div>
     ${reasoning}
@@ -2853,7 +2867,7 @@ function renderToday() {
                 display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div>
         <span style="font-size:1rem;font-weight:700;color:#f0f6fc">📅 ${dayLabel} — ${dayMatches.length} match${dayMatches.length>1?'es':''}</span>
-        <span style="font-size:0.78rem;color:#6e7681;margin-left:10px">${analysed}/${dayMatches.length} analysed · kickoffs UTC</span>
+        <span style="font-size:0.78rem;color:#6e7681;margin-left:10px">${analysed === dayMatches.length ? `All ${analysed} analysed` : `${analysed}/${dayMatches.length} analysed`}${analysed < dayMatches.length ? ' · more analysis running' : ''}</span>
       </div>
     </div>
     ${cards}`;
