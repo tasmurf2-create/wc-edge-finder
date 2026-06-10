@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict
 
-API_KEY = os.environ.get("ODDS_API_KEY")
+API_KEY = (os.environ.get("ODDS_API_KEY") or "").strip()
 BASE = "https://api.the-odds-api.com/v4"
 REGIONS = "uk,eu"        # decimal-friendly books for IE/UK; add ",us" for US books
 ODDS_FORMAT = "decimal"

@@ -1061,10 +1061,13 @@ def get_raw(force=False):
 @app.get("/api/status")
 def status():
     """Quick health-check: shows whether odds are loading and any error message."""
-    key_set = bool(os.environ.get("ODDS_API_KEY"))
+    raw_key = (os.environ.get("ODDS_API_KEY") or "").strip()
+    key_preview = f"{raw_key[:4]}...{raw_key[-4:]}" if len(raw_key) >= 8 else ("(empty)" if not raw_key else "(too short)")
     d = get_raw()
     return JSONResponse({
-        "odds_api_key_set": key_set,
+        "odds_api_key_set": bool(raw_key),
+        "key_preview":      key_preview,
+        "key_length":       len(raw_key),
         "sport_key":        _sport_key,
         "fetched_at":       d.get("fetched_at"),
         "match_count":      len(d.get("matches", [])),
