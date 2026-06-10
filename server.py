@@ -137,16 +137,26 @@ if _disk_intel:
 _sport_key: str | None = None  # cached for the lifetime of the process
 
 def _fetch_events():
-    """Pull h2h + totals + spreads (Asian handicap) in a single API call."""
+    """Pull h2h + totals + spreads (Asian handicap) in a single API call.
+    Falls back to h2h-only if spreads/totals aren't available on this plan."""
     global _sport_key
     if _sport_key is None:
         _sport_key = wc_odds.find_world_cup_key()
-    return wc_odds.get(
-        f"/sports/{_sport_key}/odds",
-        regions=REGIONS,
-        markets="h2h,totals,spreads",
-        oddsFormat=wc_odds.ODDS_FORMAT,
-    )
+    try:
+        return wc_odds.get(
+            f"/sports/{_sport_key}/odds",
+            regions=REGIONS,
+            markets="h2h,totals,spreads",
+            oddsFormat=wc_odds.ODDS_FORMAT,
+        )
+    except Exception as e:
+        print(f"[odds] full markets request failed ({e}), retrying h2h-only", flush=True)
+        return wc_odds.get(
+            f"/sports/{_sport_key}/odds",
+            regions=REGIONS,
+            markets="h2h",
+            oddsFormat=wc_odds.ODDS_FORMAT,
+        )
 
 
 def _devig(raw):

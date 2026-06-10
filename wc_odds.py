@@ -31,14 +31,23 @@ VALUE_THRESHOLD = 0.015  # flag when fair prob beats best price by >1.5 pts
 
 
 def get(path, **params):
+    import urllib.error
     params["apiKey"] = API_KEY
     url = f"{BASE}{path}?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={"User-Agent": "wc-odds/1.0"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        rem = resp.headers.get("x-requests-remaining")
-        if rem is not None:
-            print(f"[quota] requests remaining this month: {rem}", file=sys.stderr)
-        return json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            rem = resp.headers.get("x-requests-remaining")
+            if rem is not None:
+                print(f"[quota] requests remaining this month: {rem}", file=sys.stderr)
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode()
+        except Exception:
+            pass
+        raise RuntimeError(f"HTTP {e.code} {e.reason} — {body}") from e
 
 
 def find_world_cup_key():
