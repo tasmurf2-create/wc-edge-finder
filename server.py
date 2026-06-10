@@ -453,7 +453,7 @@ def _build_raw():
     try:
         events = _fetch_events()
     except Exception as e:
-        return {"error": str(e), "matches": [], "bets": {"singles": [], "parlays": []}}
+        return {"error": str(e), "fetched_at": int(time.time()), "matches": [], "bets": {"singles": [], "parlays": [], "acca_pool": []}}
 
     try:
         kal = pmkt.fetch_kalshi()
