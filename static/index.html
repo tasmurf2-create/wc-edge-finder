@@ -2030,20 +2030,71 @@ function sensibleCardHTML(s, sc, stake) {
 function renderSensible() {
   const panel = document.getElementById('sensible-panel');
   if (!panel) return;
-  if (!allSingles.length) { panel.innerHTML = '<div class="empty">No bets yet — data loading…</div>'; return; }
+  if (!allMatches.length && !allSingles.length) { panel.innerHTML = '<div class="empty">No bets yet — data loading…</div>'; return; }
 
   const stake = sensibleStake();
   const tierFilter = document.getElementById('sensible-tier-filter')?.value || 'all';
   const hasIntel = Object.keys(allIntel).length > 0;
 
-  // OPTION B: analyst-led gate — only show bets the analyst explicitly recommended
-  const analystBacked = allSingles.filter(s => {
-    const intel = s.intel || allIntel[s.match] || allIntel[normalizeMatchLabel(s.match)];
-    if (!intel) return false;
-    return analystConfirms(s, intel) === true;
-  });
+  // Build sensible bets from analyst recommendations + live prices from divergence data.
+  // The analyst recommends outcomes based on football logic (often favorites); the maths
+  // then scores how well-priced those picks are. Analyst = source. Maths = quality check.
+  const sensibleBets = [];
+  const seen = new Set();
 
-  const scored = analystBacked
+  for (const match of allMatches) {
+    const label = match.label;
+    const intel = allIntel[label] || allIntel[normalizeMatchLabel(label)];
+    if (!intel || !intel.recommended_bets || !intel.recommended_bets.length) continue;
+
+    const parts = label.split(' vs ');
+    if (parts.length !== 2) continue;
+    const homeNorm = normalizeTeam(parts[0]);
+    const awayNorm = normalizeTeam(parts[1]);
+
+    for (const rb of intel.recommended_bets) {
+      const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
+      const key = label + '|' + ao;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      // Map analyst outcome token → normalized outcome name used in match.outcomes
+      let targetOutcome = null;
+      if (ao === 'home_win') targetOutcome = homeNorm;
+      else if (ao === 'away_win') targetOutcome = awayNorm;
+      else if (ao === 'draw') targetOutcome = 'draw';
+      else continue; // totals/spreads tokens — no price in divergence outcomes array
+
+      const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
+      if (!priceData || !priceData.best_price) continue;
+
+      // diff = book_fair - pm_consensus; pm_gap = pm_consensus - book_fair = -diff
+      const pmGap = priceData.diff != null ? -priceData.diff : null;
+
+      sensibleBets.push({
+        match:          label,
+        commence:       match.commence,
+        market:         'h2h',
+        outcome:        targetOutcome,
+        fair_prob:      (priceData.book_fair || 0) / 100,
+        best_price:     priceData.best_price,
+        best_book:      priceData.best_book,
+        paddy:          priceData.paddy,
+        per_book:       priceData.per_book || {},
+        edge:           priceData.edge,
+        pm_gap:         pmGap,
+        kalshi:         priceData.kalshi,
+        poly:           priceData.poly,
+        confidence:     priceData.confidence || 'low',
+        round:          match.round,
+        weather:        match.weather,
+        intel:          intel,
+        analyst_confirms: true,
+      });
+    }
+  }
+
+  const scored = sensibleBets
     .map(s => ({ s, sc: sensibleScore(s) }))
     .sort((a,b) => (a.s.commence || '').localeCompare(b.s.commence || '') || b.sc.score - a.sc.score);
 
