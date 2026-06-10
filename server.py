@@ -134,11 +134,15 @@ if _disk_intel:
 # Bookmaker data helpers
 # ---------------------------------------------------------------------------
 
+_sport_key: str | None = None  # cached for the lifetime of the process
+
 def _fetch_events():
     """Pull h2h + totals + spreads (Asian handicap) in a single API call."""
-    key = wc_odds.find_world_cup_key()
+    global _sport_key
+    if _sport_key is None:
+        _sport_key = wc_odds.find_world_cup_key()
     return wc_odds.get(
-        f"/sports/{key}/odds",
+        f"/sports/{_sport_key}/odds",
         regions=REGIONS,
         markets="h2h,totals,spreads",
         oddsFormat=wc_odds.ODDS_FORMAT,
