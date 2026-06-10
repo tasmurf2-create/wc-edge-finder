@@ -52,6 +52,8 @@ ALIASES = {
     "turkey": "turkiye", "türkiye": "turkiye",
     "iran": "iran", "ir iran": "iran",
     "curacao": "curacao", "curaçao": "curacao",
+    "congo dr": "dr congo", "democratic republic of congo": "dr congo",
+    "democratic republic congo": "dr congo",
 }
 
 
