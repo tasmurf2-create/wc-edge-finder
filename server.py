@@ -818,14 +818,14 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
     # Extract home/away team names from match label "Home vs Away"
     match_label = single.get("match", "")
     parts       = match_label.split(" vs ", 1)
-    home_name   = parts[0].lower() if len(parts) == 2 else ""
-    away_name   = parts[1].lower() if len(parts) == 2 else ""
+    home_name   = pmkt.normalize_team(parts[0]) if len(parts) == 2 else ""
+    away_name   = pmkt.normalize_team(parts[1]) if len(parts) == 2 else ""
 
     ao = analyst_outcome.lower().replace(" ", "_")
 
     if s_market == "h2h":
         if ao == "home_win":   return s_outcome == home_name
-        if ao == "away_win":   return s_outcome not in (home_name, "draw") and s_outcome != ""
+        if ao == "away_win":   return s_outcome == away_name
         if ao == "draw":       return s_outcome == "draw"
 
     elif s_market == "totals":

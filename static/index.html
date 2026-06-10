@@ -1269,6 +1269,28 @@ function renderBets() {
   }
 }
 
+// Mirror of Python prediction_markets.normalize_team — must stay in sync.
+const _TEAM_ALIASES = {
+  "usa": "united states", "us": "united states", "u s a": "united states",
+  "korea republic": "south korea", "korea": "south korea",
+  "republic of korea": "south korea",
+  "czech republic": "czechia",
+  "cote divoire": "ivory coast", "cote d ivoire": "ivory coast",
+  "ivory coast": "ivory coast",
+  "bosnia and herzegovina": "bosnia", "bosnia herzegovina": "bosnia",
+  "bosnia-herzegovina": "bosnia",
+  "cabo verde": "cape verde", "cape verde": "cape verde",
+  "turkey": "turkiye", "ir iran": "iran",
+  "curacao": "curacao",
+};
+function normalizeTeam(name) {
+  if (!name) return "";
+  // NFKD decomposition + strip Unicode combining diacritics
+  let n = name.normalize("NFKD").replace(/\p{M}/gu, "");
+  n = n.replace(/[^a-z0-9 ]/gi, " ").toLowerCase().replace(/\s+/g, " ").trim();
+  return _TEAM_ALIASES[n] ?? n;
+}
+
 function analystConfirms(single, intel) {
   if (!intel) return null;
   const recs = intel.recommended_bets;
@@ -1276,8 +1298,8 @@ function analystConfirms(single, intel) {
   const sMarket  = single.market;
   const sOutcome = single.outcome.toLowerCase();
   const parts    = single.match.includes(' vs ') ? single.match.split(' vs ') : ['', ''];
-  const homeName = parts[0].toLowerCase();
-  const awayName = parts[1].toLowerCase();
+  const homeName = normalizeTeam(parts[0]);
+  const awayName = normalizeTeam(parts[1]);
 
   // Only compare against recs in the same market — a spread rec (Brazil -2)
   // doesn't contradict a 1X2 Draw bet; they're separate markets entirely.

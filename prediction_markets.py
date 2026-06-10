@@ -44,7 +44,7 @@ ALIASES = {
     "korea republic": "south korea", "korea": "south korea",
     "republic of korea": "south korea",
     "czech republic": "czechia",
-    "cote divoire": "ivory coast", "côte divoire": "ivory coast",
+    "cote divoire": "ivory coast", "cote d ivoire": "ivory coast",
     "ivory coast": "ivory coast",
     "bosnia and herzegovina": "bosnia", "bosnia herzegovina": "bosnia",
     "bosnia-herzegovina": "bosnia",
