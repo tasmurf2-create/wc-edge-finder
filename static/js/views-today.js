@@ -32,6 +32,13 @@ function resolveTodayRec(rb, match, parts, homeN, awayN) {
   return null;
 }
 
+// Filter the day's bets by verdict when a summary chip is clicked (null = show all).
+let _todayVerdict = null;
+function setTodayVerdict(v) {
+  _todayVerdict = (_todayVerdict === v) ? null : v;
+  renderToday();
+}
+
 function renderToday() {
   const panel = document.getElementById('today-panel');
   if (!panel) return;
@@ -71,6 +78,9 @@ function renderToday() {
     const recRows = recs.map(rb => {
       const r = resolveTodayRec(rb, match, parts, homeN, awayN);
       if (!r) return '';
+      // When a summary chip is active, show only rows matching that verdict.
+      const verdict = verdictMeta({ fair_prob: r.fairProb, best_price: r.price, edge: r.edge, rb_strength: rb.strength });
+      if (_todayVerdict && verdict.cls !== _todayVerdict) return '';
       const cCls = rb.confidence === 'high' ? 'badge--green' : rb.confidence === 'medium' ? 'badge--amber' : '';
       const edgeCol = (r.edge || 0) > 1.5 ? 'var(--green)' : (r.edge || 0) > 0 ? 'var(--amber)' : 'var(--tx-3)';
       const betKey = label + '|' + r.logOutcome;
@@ -107,6 +117,9 @@ function renderToday() {
            Injury news detected — updating analysis, check back in a moment
          </div>`
       : '';
+
+    // While filtering by verdict, drop matches that have no qualifying bet.
+    if (_todayVerdict && !recRows) return '';
 
     let bodyHTML;
     if (recRows) {
@@ -154,6 +167,17 @@ function renderToday() {
     ? new Date(_lastFetchedAt * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null;
   const chip = (val, lbl, col) =>
     `<div style="text-align:center;min-width:64px"><div style="font-size:1.3rem;font-weight:800;color:${col}">${val}</div><div style="font-size:var(--fs-xs);color:var(--tx-3)">${lbl}</div></div>`;
+  // Clickable verdict chip — filters the list below to that verdict (toggle).
+  const vchip = (val, lbl, col, key) => {
+    const active = _todayVerdict === key;
+    const on = val > 0 || active;
+    return `<button type="button" ${on ? '' : 'disabled'} onclick="setTodayVerdict('${key}')" title="${on ? 'Show only ' + lbl + ' bets' : 'No ' + lbl + ' bets'}"
+      style="text-align:center;min-width:64px;padding:4px 8px;border-radius:var(--radius-sm);cursor:${on ? 'pointer' : 'default'};
+             background:${active ? 'var(--bg-2)' : 'transparent'};border:1px solid ${active ? col : 'var(--line-1)'};opacity:${on ? 1 : 0.5}">
+      <div style="font-size:1.3rem;font-weight:800;color:${col}">${val}</div>
+      <div style="font-size:var(--fs-xs);color:var(--tx-3)">${lbl}</div>
+    </button>`;
+  };
   const summaryHTML = analysed ? `
     <div class="card" style="margin-bottom:14px">
       <div class="card__body">
@@ -161,9 +185,9 @@ function renderToday() {
           <div style="display:flex;gap:14px;flex-wrap:wrap">
             ${chip(dayMatches.length, 'Matches', 'var(--tx-1)')}
             ${chip(`${analysed}/${dayMatches.length}`, 'Analysed', 'var(--tx-1)')}
-            ${chip(vBet, 'Bet Now', vBet ? 'var(--green)' : 'var(--tx-4)')}
-            ${chip(vLean, 'Lean', vLean ? 'var(--amber)' : 'var(--tx-4)')}
-            ${chip(vTrack, 'Track', vTrack ? 'var(--blue)' : 'var(--tx-4)')}
+            ${vchip(vBet, 'Bet Now', vBet ? 'var(--green)' : 'var(--tx-4)', 'bet')}
+            ${vchip(vLean, 'Lean', vLean ? 'var(--amber)' : 'var(--tx-4)', 'lean')}
+            ${vchip(vTrack, 'Track', vTrack ? 'var(--blue)' : 'var(--tx-4)', 'track')}
           </div>
           <div style="text-align:right;min-width:0">
             ${bestEv ? `<div style="font-size:var(--fs-xs);color:var(--tx-3)">Best-EV pick</div>
@@ -175,11 +199,17 @@ function renderToday() {
       </div>
     </div>` : '';
 
+  const vLabel = { bet: 'Bet Now', lean: 'Lean', track: 'Track' };
+  const filterPill = _todayVerdict
+    ? `<div style="margin:0 0 12px"><button type="button" onclick="setTodayVerdict('${_todayVerdict}')" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--tx-2);cursor:pointer;font-size:var(--fs-sm)">Showing <strong style="color:var(--tx-1)">${vLabel[_todayVerdict]}</strong> only ✕</button></div>`
+    : '';
+
   panel.innerHTML = `
     <div class="section-title">
       📅 ${dayLabel} — ${dayMatches.length} match${dayMatches.length > 1 ? 'es' : ''}
       <small>${analysed === dayMatches.length ? `all ${analysed} analysed` : `${analysed}/${dayMatches.length} analysed · more analysis running`}</small>
     </div>
     ${summaryHTML}
+    ${filterPill}
     ${cards}`;
 }
