@@ -159,6 +159,19 @@ function onTeamSearch(q) {
   const summaryEl = document.getElementById('team-search-summary');
 
   q = q.trim();
+
+  // On Best Bets → Analyst Writeups the search is scoped to THIS page: filter
+  // the analyst cards in place (any match featuring the team) instead of the
+  // cross-section global overlay.
+  if (currentView === 'best' && bestSubTab === 'writeups') {
+    picksFilter = q;
+    clearEl.style.display = q ? '' : 'none';
+    summaryEl.style.display = 'none';
+    resultsEl.style.display = 'none';
+    renderTopPicks();
+    return;
+  }
+
   if (!q) { clearTeamSearch(); return; }
 
   clearEl.style.display = '';
@@ -257,4 +270,16 @@ function clearTeamSearch() {
   document.getElementById('team-search-results').style.display = 'none';
   document.getElementById('primary-nav').style.display = '';
   document.querySelectorAll('.view').forEach(p => p.style.display = '');
+  // Drop any page-scoped writeups filter and re-render the full list.
+  if (picksFilter) { picksFilter = ''; renderTopPicks(); }
+}
+
+// Reflect the search scope in the box's placeholder: page-scoped on the
+// Analyst Writeups tab, global everywhere else.
+function updateSearchScopeHint() {
+  const el = document.getElementById('team-search');
+  if (!el) return;
+  el.placeholder = (currentView === 'best' && bestSubTab === 'writeups')
+    ? 'Search this page… (e.g. Netherlands)'
+    : 'Search team…';
 }

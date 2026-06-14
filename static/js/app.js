@@ -37,6 +37,11 @@ function switchView(view) {
 
   try { history.replaceState(null, '', '#/' + view); } catch {}
 
+  // Reset any active search when changing views so a stale query never lingers,
+  // then reflect the new scope (page-scoped on Analyst Writeups) in the box.
+  clearTeamSearch();
+  updateSearchScopeHint();
+
   // render-on-entry (cheap — data is already in memory)
   if (view === 'today') renderToday();
   if (view === 'best') (bestSubTab === 'picks' ? renderSensible : renderTopPicks)();
@@ -57,6 +62,9 @@ function switchBestTab(tab) {
     p.classList.toggle('active', p.dataset.best === tab));
   document.getElementById('best-picks-wrap').style.display = tab === 'picks' ? '' : 'none';
   document.getElementById('best-writeups-wrap').style.display = tab === 'writeups' ? '' : 'none';
+  // Search is page-scoped only on Writeups — clear stale query + update the hint.
+  clearTeamSearch();
+  updateSearchScopeHint();
   (tab === 'picks' ? renderSensible : renderTopPicks)();
 }
 

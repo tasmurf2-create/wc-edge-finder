@@ -412,9 +412,24 @@ function renderTopPicks() {
   // Sort analysed matches by kick-off (looked up from the divergence list)
   const commenceBy = {};
   allMatches.forEach(m => { commenceBy[m.label] = m.commence; commenceBy[normalizeMatchLabel(m.label)] = m.commence; });
-  const items = entries
+  let items = entries
     .map(([l, intel]) => ({ label: l, intel, commence: commenceBy[l] || commenceBy[normalizeMatchLabel(l)] || '' }))
     .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
 
-  panel.innerHTML = intro + items.map(it => analystMatchHTML(it.label, it.intel)).join('');
+  // Page-scoped team search: keep only matches featuring the searched team.
+  const fq = (picksFilter || '').trim().toLowerCase();
+  if (fq) items = items.filter(it => it.label.toLowerCase().includes(fq));
+
+  const filterNote = fq
+    ? `<div class="note note--mini">${items.length} match${items.length !== 1 ? 'es' : ''} for “${esc(picksFilter)}” <button class="linklike" onclick="clearTeamSearch()">✕ clear</button></div>`
+    : '';
+
+  if (fq && !items.length) {
+    panel.innerHTML = intro + filterNote +
+      emptyState('🔍', `No analyst coverage for “${esc(picksFilter)}” yet`,
+        'Coverage grows as the analyst works through the schedule — try another team or check back shortly.');
+    return;
+  }
+
+  panel.innerHTML = intro + filterNote + items.map(it => analystMatchHTML(it.label, it.intel)).join('');
 }

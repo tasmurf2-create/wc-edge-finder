@@ -21,6 +21,7 @@ let roundsAvailable = [];
 let accaSort      = 'chance';    // 'chance' | 'return'
 let _injuriesLoaded = false;
 let _reanalysing    = new Set(); // match labels being re-analysed (injury news)
+let picksFilter     = '';        // team filter scoped to Best Bets → Analyst Writeups
 let _intelPollTimer = null;
 let _dataLoaded     = false;     // first successful /api load completed (distinguishes "loading" from "empty")
 
