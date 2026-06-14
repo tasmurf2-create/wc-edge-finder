@@ -927,8 +927,19 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
         if ao == "draw":       return s_outcome == "draw"
 
     elif s_market == "totals":
-        if ao.startswith("over"):   return "over" in s_outcome
-        if ao.startswith("under"):  return "under" in s_outcome
+        # Exact line match — "over_2.5" must NOT confirm an Over 1.5 / Over 3.5 single.
+        side = "over" if ao.startswith("over") else "under" if ao.startswith("under") else None
+        if side and s_outcome.startswith(side):
+            try:
+                ao_line = float(ao.split("_")[1])
+            except (IndexError, ValueError):
+                return False
+            s_digits = "".join(ch for ch in s_outcome if ch.isdigit() or ch == ".")
+            try:
+                return ao_line == float(s_digits)
+            except ValueError:
+                return False
+        return False
 
     elif s_market == "spreads":
         # analyst_outcome format: "home_-1.5" or "away_+1" etc.

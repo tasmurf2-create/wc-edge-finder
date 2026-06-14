@@ -133,8 +133,8 @@ function renderBets() {
       </div>
       ${(pageSearch || '').trim() ? '' : recommendedAccaHTML(allParlays, book, stake)}
       ${collapsibleBanner('acca-ev-warn',
-        '⚠ Accumulators are −EV — expected to lose money long-term.',
-        `⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong> Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than "Best available". The genuine edge is in <button class="linklike" onclick="switchMarketsTab('singles')">Value Singles →</button>`,
+        '⚠ Accumulators are usually −EV — treat as entertainment.',
+        `⚠ <strong>Accumulators are structurally worse than singles.</strong> Combining legs multiplies the bookmaker's margin, so most slips here are negative expected value. If a model-positive acca does appear, treat it as <strong>lower-confidence than a single</strong> — model error, stale lines and leg dependence all compound across legs too. These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than "Best available". The genuine edge is in <button class="linklike" onclick="switchMarketsTab('singles')">Value Singles →</button>`,
         'note--warn')}
       ${accaControlsHTML()}
       ${accaMarketsNote()}
@@ -476,7 +476,7 @@ function parlayHTML(p, book, stake) {
 
   const evAmt = Math.abs(evRaw / 100 * stake);
   const evLine = evRaw >= 0
-    ? `<span class="ev-num pos help" title="Long-run average result per €${stake} staked = (fair chance × combined price − 1) × stake.">Expected gain: +€${evAmt.toFixed(2)} per €${stake}</span>`
+    ? `<span class="ev-num pos help" title="The model rates this acca positive, but acca EV is far less reliable than a single bet: model error, stale lines and leg dependence all compound. Treat as low-confidence.">Model EV +${evRaw.toFixed(1)}% — high uncertainty</span>`
     : `<span class="ev-num neg help" title="Long-run average result per €${stake} staked = (fair chance × combined price − 1) × stake. Negative: the bookmaker margin compounds across legs.">Expected cost: −€${evAmt.toFixed(2)} per €${stake}</span>`;
 
   return `<div class="card">

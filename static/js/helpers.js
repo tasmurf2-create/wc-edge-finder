@@ -182,16 +182,22 @@ function analystConfirms(single, intel) {
       if (ao === 'away_win' && sOutcome === awayName) return true;
       if (ao === 'draw' && sOutcome === 'draw') return true;
     } else if (sMarket === 'totals') {
-      if (ao.startsWith('over')  && sOutcome.includes('over'))  return true;
-      if (ao.startsWith('under') && sOutcome.includes('under')) return true;
-    } else if (sMarket === 'spreads') {
-      if (ao.startsWith('home_')) {
-        const pt = ao.split('home_')[1];
-        if (sOutcome.includes(homeName) && sOutcome.includes(pt)) return true;
+      // Exact line match — "over_2.5" must NOT confirm an Over 1.5 / Over 3.5 single.
+      const side = ao.startsWith('over') ? 'over' : ao.startsWith('under') ? 'under' : null;
+      if (side && sOutcome.startsWith(side)) {
+        const aoLine = parseFloat(ao.split('_')[1]);
+        const sLine  = parseFloat((sOutcome.match(/[\d.]+/) || [])[0]);
+        if (!isNaN(aoLine) && aoLine === sLine) return true;
       }
-      if (ao.startsWith('away_')) {
-        const pt = ao.split('away_')[1];
-        if (sOutcome.includes(awayName) && sOutcome.includes(pt)) return true;
+    } else if (sMarket === 'spreads') {
+      // Exact handicap match — "+1" must NOT confirm "+1.5". The single carries the
+      // numeric handicap on spread_point; compare it, not a loose substring.
+      const sPoint = single.spread_point;
+      if (ao.startsWith('home_') && sOutcome.includes(homeName)) {
+        if (parseFloat(ao.split('home_')[1]) === sPoint) return true;
+      }
+      if (ao.startsWith('away_') && sOutcome.includes(awayName)) {
+        if (parseFloat(ao.split('away_')[1]) === sPoint) return true;
       }
     }
   }

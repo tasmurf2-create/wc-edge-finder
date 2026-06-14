@@ -167,36 +167,71 @@ function renderSensible() {
       if (ao === 'home_win') targetOutcome = homeNorm;
       else if (ao === 'away_win') targetOutcome = awayNorm;
       else if (ao === 'draw') targetOutcome = 'draw';
-      else continue; // totals/spreads tokens have no price in divergence outcomes
 
-      const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
-      if (!priceData || !priceData.best_price) continue;
+      if (targetOutcome) {
+        // 1X2 — price AND prediction-market data come from the divergence feed.
+        const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
+        if (!priceData || !priceData.best_price) continue;
 
-      const pmGap = priceData.diff != null ? -priceData.diff : null;
+        const pmGap = priceData.diff != null ? -priceData.diff : null;
 
-      sensibleBets.push({
-        match: label,
-        commence: match.commence,
-        market: 'h2h',
-        outcome: targetOutcome,
-        fair_prob: (priceData.book_fair || 0) / 100,
-        best_price: priceData.best_price,
-        best_book: priceData.best_book,
-        paddy: priceData.paddy,
-        per_book: priceData.per_book || {},
-        edge: priceData.edge,
-        pm_gap: pmGap,
-        kalshi: priceData.kalshi,
-        poly: priceData.poly,
-        confidence: priceData.confidence || 'low',
-        round: match.round,
-        weather: match.weather,
-        intel: intel,
-        analyst_confirms: true,
-        rb_reasoning: rb.reasoning || '',
-        rb_confidence: rb.confidence || '',
-        rb_strength: rb.strength || '',
-      });
+        sensibleBets.push({
+          match: label,
+          commence: match.commence,
+          market: 'h2h',
+          outcome: targetOutcome,
+          fair_prob: (priceData.book_fair || 0) / 100,
+          best_price: priceData.best_price,
+          best_book: priceData.best_book,
+          paddy: priceData.paddy,
+          per_book: priceData.per_book || {},
+          edge: priceData.edge,
+          pm_gap: pmGap,
+          kalshi: priceData.kalshi,
+          poly: priceData.poly,
+          confidence: priceData.confidence || 'low',
+          round: match.round,
+          weather: match.weather,
+          intel: intel,
+          analyst_confirms: true,
+          rb_reasoning: rb.reasoning || '',
+          rb_confidence: rb.confidence || '',
+          rb_strength: rb.strength || '',
+        });
+      } else if (rb.best_price) {
+        // Totals / Asian handicap — the analyst pick is priced server-side and
+        // enriched onto the rec by /api/intel (best_price/best_book/per_book/edge).
+        // There's no Kalshi/Polymarket line for these, so PM fields stay null.
+        const isTotals = ao.startsWith('over') || ao.startsWith('under');
+        // fair_prob is exactly recoverable from the edge: edge = (fair − 1/price)·100.
+        const fairProb = rb.edge != null ? (rb.edge / 100 + 1 / rb.best_price) : null;
+        const home = titleCase(parts[0]), away = titleCase(parts[1]);
+
+        sensibleBets.push({
+          match: label,
+          commence: match.commence,
+          market: rb.market || (isTotals ? 'totals' : 'spreads'),
+          outcome: fmtAnalystOutcome(rb, home, away),
+          fair_prob: fairProb,
+          best_price: rb.best_price,
+          best_book: rb.best_book,
+          per_book: rb.per_book || {},
+          edge: rb.edge,
+          pm_gap: null,
+          kalshi: null,
+          poly: null,
+          confidence: 'low',
+          round: match.round,
+          weather: match.weather,
+          intel: intel,
+          analyst_confirms: true,
+          rb_reasoning: rb.reasoning || '',
+          rb_confidence: rb.confidence || '',
+          rb_strength: rb.strength || '',
+        });
+      } else {
+        continue; // totals/handicap rec without a live price yet
+      }
     }
   }
 
