@@ -10,8 +10,8 @@
      More ▾       — Injuries & Suspensions, Methodology
    ============================================================ */
 
-const VIEWS = ['today', 'best', 'markets', 'mybets', 'injuries', 'method'];
-const MORE_VIEWS = ['injuries', 'method'];
+const VIEWS = ['today', 'best', 'markets', 'mybets', 'injuries', 'method', 'admin'];
+const MORE_VIEWS = ['injuries', 'method', 'admin'];
 
 let currentView = 'today';
 let bestSubTab = 'picks';       // 'picks' | 'writeups'
@@ -52,6 +52,7 @@ function switchView(view) {
   }
   if (view === 'mybets') renderMyBets();
   if (view === 'injuries' && !_injuriesLoaded) loadInjuries();
+  if (view === 'admin') renderAdmin();
 
   window.scrollTo({ top: 0 });
 }
@@ -135,6 +136,9 @@ function switchTab(tab) {
   document.getElementById('bets-panel').innerHTML = skeletonCards(3);
   document.getElementById('matches').innerHTML = skeletonCards(4);
   document.getElementById('picks-panel').innerHTML = skeletonCards(2);
+
+  // reveal the owner-only Admin entry if this device already holds a key
+  refreshAdminNav();
 
   // deep link: #/view
   const hashView = (location.hash.match(/^#\/(\w+)/) || [])[1];
