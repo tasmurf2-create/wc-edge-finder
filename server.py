@@ -675,31 +675,40 @@ def _build_raw():
         totals_list = []
         for line, td in sorted(totals_data.items()):
             for name, od in td["outcomes"].items():
-                edge = od["edge"]
-                if od.get("best_price") and od.get("fair") is not None:
-                    acca_pool.append({
-                        "match":      label,
-                        "commence":   comm,
-                        "market":     "totals",
-                        "outcome":    f"{name} {line}",
-                        "fair_prob":  od["fair"] / 100,
-                        "best_price": od["best_price"],
-                        "best_book":  od["best_book"],
-                        "per_book":   od.get("per_book", {}),
-                        "paddy":      None,
-                        "edge":       edge if edge is not None else 0.0,
-                        "confidence": "low",
-                    })
-                if edge is not None and edge > EDGE_MIN * 100:
+                # Whitelist filter (mirror h2h/spreads): only books the user can
+                # actually bet at. Recompute best price + edge from the filtered
+                # set so non-whitelisted books (e.g. Grosvenor) never appear.
+                pb = {k: v for k, v in (od.get("per_book") or {}).items()
+                      if k in BOOKMAKER_WHITELIST}
+                fair = od.get("fair")
+                if not pb or fair is None:
+                    continue
+                best_book  = max(pb, key=pb.get)
+                best_price = pb[best_book]
+                edge = round((fair / 100 - 1.0 / best_price) * 100, 2)
+                acca_pool.append({
+                    "match":      label,
+                    "commence":   comm,
+                    "market":     "totals",
+                    "outcome":    f"{name} {line}",
+                    "fair_prob":  fair / 100,
+                    "best_price": best_price,
+                    "best_book":  best_book,
+                    "per_book":   pb,
+                    "paddy":      None,
+                    "edge":       edge,
+                    "confidence": "low",
+                })
+                if edge > EDGE_MIN * 100:
                     singles.append({
                         "match":      label,
                         "commence":   comm,
                         "market":     "totals",
                         "outcome":    f"{name} {line}",
-                        "fair_prob":  od["fair"] / 100,
-                        "best_price": od["best_price"],
-                        "best_book":  od["best_book"],
-                        "per_book":   od.get("per_book", {}),
+                        "fair_prob":  fair / 100,
+                        "best_price": best_price,
+                        "best_book":  best_book,
+                        "per_book":   pb,
                         "paddy":      None,
                         "edge":       edge,
                         "pm_gap":     None,
