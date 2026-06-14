@@ -206,6 +206,22 @@ function singleHTML(s, book, stake, opts = {}) {
   const kalLine  = s.kalshi != null ? `<span style="color:var(--tx-3)">Kalshi <b style="color:var(--blue)">${s.kalshi}%</b></span>` : '';
   const polyLine = s.poly   != null ? `<span style="color:var(--tx-3)">Poly <b style="color:var(--blue)">${s.poly}%</b></span>` : '';
 
+  // Analyst section: only show the full match writeup when the analyst actually
+  // backs THIS selection. These are pure price-edge candidates, so when the
+  // analyst's read points elsewhere a one-line honest verdict (naming what it
+  // DOES back) beats dumping a writeup that argues for a different outcome.
+  const mp = s.match.includes(' vs ') ? s.match.split(' vs ') : [s.match, ''];
+  const homeNm = titleCase(mp[0]), awayNm = titleCase(mp[1]);
+  let analystSection = '';
+  if (confirmed === true) {
+    analystSection = intelHTML(intel);
+  } else if (intel) {
+    const recs = (intel.recommended_bets || []).slice(0, 3)
+      .map(rb => fmtAnalystOutcome(rb, homeNm, awayNm)).filter(Boolean);
+    const backs = recs.length ? ` The analyst backs ${esc(recs.join(' · '))}.` : '';
+    analystSection = `<div class="note note--mini" style="margin-top:8px;color:var(--tx-3)">⚠ <strong>Not an analyst pick — price-edge signal only.</strong>${backs} <button class="linklike" onclick="switchView('best');switchBestTab('writeups')">Full analyst read →</button></div>`;
+  }
+
   return `<div class="bet-card${speculative && context !== 'analyst' ? ' demoted' : ''}">
     <div class="bet-card__top">
       <div style="min-width:0">
@@ -235,7 +251,7 @@ function singleHTML(s, book, stake, opts = {}) {
       </div>
     </div>
     <div style="font-size:var(--fs-xs);color:var(--tx-3);background:var(--bg-2);border-radius:var(--radius-sm);padding:8px 12px;line-height:1.5">${buildWhy(s)}</div>
-    ${intelHTML(intel)}
+    ${analystSection}
   </div>`;
 }
 
