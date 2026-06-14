@@ -112,11 +112,15 @@ function renderBets() {
   const singles = allSingles.filter(s =>
     allowedConf.includes(s.confidence) &&
     (marketFilter === 'all' || s.market === marketFilter) &&
-    (accaRound === '' || (s.round && s.round.label === accaRound))
+    (accaRound === '' || (s.round && s.round.label === accaRound)) &&
+    teamMatches(s.match)   // page-scoped team search
   );
-  const parlays = [...allParlays].sort((a, b) =>
+  let parlays = [...allParlays].sort((a, b) =>
     accaSort === 'return' ? b.combined_price - a.combined_price
                           : b.combined_fair - a.combined_fair);
+  if ((pageSearch || '').trim()) {
+    parlays = parlays.filter(p => (p.legs || []).some(l => teamMatches(l.match) || teamMatches(l.outcome)));
+  }
 
   if (betsSubTab === 'parlays') {
     const body = !parlays.length
@@ -127,7 +131,7 @@ function renderBets() {
       <div class="section-title">High-Probability Accumulators
         <small>${parlays.length} slip${parlays.length !== 1 ? 's' : ''}, ranked by chance of landing · ${book === 'best' ? 'best available price' : esc(book)}</small>
       </div>
-      ${recommendedAccaHTML(allParlays, book, stake)}
+      ${(pageSearch || '').trim() ? '' : recommendedAccaHTML(allParlays, book, stake)}
       ${collapsibleBanner('acca-ev-warn',
         '⚠ Accumulators are −EV — expected to lose money long-term.',
         `⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong> Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than "Best available". The genuine edge is in <button class="linklike" onclick="switchMarketsTab('singles')">Value Singles →</button>`,
@@ -135,10 +139,14 @@ function renderBets() {
       ${accaControlsHTML()}
       ${accaMarketsNote()}
       ${accaLegendHTML()}
+      ${searchNoteHTML(parlays.length, 'slip')}
       ${body}`;
   } else {
     if (!singles.length) {
-      panel.innerHTML = emptyState('📈', 'No value singles under the current filters',
+      const noHit = (pageSearch || '').trim()
+        ? `No value singles for “${esc(pageSearch.trim())}”`
+        : 'No value singles under the current filters';
+      panel.innerHTML = searchNoteHTML(0, 'bet') + emptyState('📈', noHit,
         `Loosen the confidence filter, switch Market to <b>All markets</b>, or <button class="linklike" onclick="loadData(true)">refresh the odds</button>.`);
       return;
     }
@@ -156,6 +164,7 @@ function renderBets() {
         '✅ What the numbers say — candidates, not endorsements.',
         `✅ <strong>What the numbers say — candidates, not endorsements.</strong> Each one's best price beats the de-vigged fair probability (positive edge). Small edges on long-odds outcomes are greyed out as <em>speculative</em> (within the model's margin of error). For the football view, see <button class="linklike" onclick="switchView('best'); switchBestTab('writeups')">Analyst Writeups →</button>; bets marked <span style="color:var(--green)">★ Both agree</span> are the strongest.`,
         'note--good')}
+      ${searchNoteHTML(ranked.length, 'bet')}
       ${ranked.map(s => singleHTML(s, book, stake)).join('')}`;
   }
 }
@@ -758,17 +767,20 @@ function renderDivergence() {
   let list = allMatches.filter(m => {
     if (pmOnly && !m.has_pm_data) return false;
     if (Math.abs(m.max_gap) < threshold) return false;
-    return true;
+    return teamMatches(m.label);   // page-scoped team search
   });
 
   if (sortBy === 'time') list.sort((a, b) => a.commence.localeCompare(b.commence));
   else list.sort((a, b) => Math.abs(b.max_gap) - Math.abs(a.max_gap));
 
   if (!list.length) {
-    container.innerHTML = emptyState('🔍', 'No matches meet the current filters', 'Lower the minimum gap or show all matches.');
+    const noHit = (pageSearch || '').trim()
+      ? `No matches for “${esc(pageSearch.trim())}”`
+      : 'No matches meet the current filters';
+    container.innerHTML = searchNoteHTML(0, 'match') + emptyState('🔍', noHit, 'Lower the minimum gap or show all matches.');
     return;
   }
-  container.innerHTML = list.map(m => matchCardHTML(m)).join('');
+  container.innerHTML = searchNoteHTML(list.length, 'match') + list.map(m => matchCardHTML(m)).join('');
 }
 
 function matchCardHTML(m) {

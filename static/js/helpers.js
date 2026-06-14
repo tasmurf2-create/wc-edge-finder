@@ -21,7 +21,7 @@ let roundsAvailable = [];
 let accaSort      = 'chance';    // 'chance' | 'return'
 let _injuriesLoaded = false;
 let _reanalysing    = new Set(); // match labels being re-analysed (injury news)
-let picksFilter     = '';        // team filter scoped to Best Bets → Analyst Writeups
+let pageSearch      = '';        // team filter scoped to the current list page
 let _intelPollTimer = null;
 let _dataLoaded     = false;     // first successful /api load completed (distinguishes "loading" from "empty")
 
@@ -324,6 +324,26 @@ function sportsbookPerBook(s) {
     if (!EXCHANGE_BOOKS.has(bk)) out[bk] = price;
   }
   return out;
+}
+
+// ---- page-scoped team search ----
+// Views whose header search filters the page IN PLACE (vs the global overlay):
+// Best Bets (Picks + Analyst Writeups) and Markets (Singles/Accas/Divergence).
+function searchIsScoped() {
+  if (currentView === 'best') return true;
+  if (currentView === 'markets') return marketsSubTab !== 'builder';
+  return false;
+}
+// True when `text` matches the active page search (or no search is active).
+function teamMatches(text) {
+  const q = (pageSearch || '').trim().toLowerCase();
+  return !q || (text || '').toLowerCase().includes(q);
+}
+// Small "N results for 'x' ✕ clear" note shown above a filtered list.
+function searchNoteHTML(count, noun = 'result') {
+  const q = (pageSearch || '').trim();
+  if (!q) return '';
+  return `<div class="note note--mini">${count} ${esc(noun)}${count !== 1 ? 's' : ''} for “${esc(q)}” <button class="linklike" onclick="clearTeamSearch()">✕ clear</button></div>`;
 }
 
 // Like priceForBook but exchange-free, for acca legs. Never falls back to an

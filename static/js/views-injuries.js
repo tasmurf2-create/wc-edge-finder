@@ -160,15 +160,15 @@ function onTeamSearch(q) {
 
   q = q.trim();
 
-  // On Best Bets → Analyst Writeups the search is scoped to THIS page: filter
-  // the analyst cards in place (any match featuring the team) instead of the
-  // cross-section global overlay.
-  if (currentView === 'best' && bestSubTab === 'writeups') {
-    picksFilter = q;
+  // On list views (Best Bets, Markets) the search is scoped to THIS page:
+  // filter the page's odds/recommendations in place instead of showing the
+  // global cross-section overlay.
+  if (searchIsScoped()) {
+    pageSearch = q;
     clearEl.style.display = q ? '' : 'none';
     summaryEl.style.display = 'none';
     resultsEl.style.display = 'none';
-    renderTopPicks();
+    rerenderScopedView();
     return;
   }
 
@@ -270,16 +270,24 @@ function clearTeamSearch() {
   document.getElementById('team-search-results').style.display = 'none';
   document.getElementById('primary-nav').style.display = '';
   document.querySelectorAll('.view').forEach(p => p.style.display = '');
-  // Drop any page-scoped writeups filter and re-render the full list.
-  if (picksFilter) { picksFilter = ''; renderTopPicks(); }
+  // Drop any page-scoped filter and re-render the current list page.
+  if (pageSearch) { pageSearch = ''; rerenderScopedView(); }
 }
 
-// Reflect the search scope in the box's placeholder: page-scoped on the
-// Analyst Writeups tab, global everywhere else.
+// Re-render whichever scoped list view is active (so a page filter applies).
+function rerenderScopedView() {
+  if (currentView === 'best') {
+    (bestSubTab === 'picks' ? renderSensible : renderTopPicks)();
+  } else if (currentView === 'markets') {
+    if (marketsSubTab === 'divergence') renderDivergence();
+    else renderBets();   // Value Singles or Accumulators
+  }
+}
+
+// Reflect the search scope in the box's placeholder: "this page" on scoped
+// list views, generic "team" elsewhere.
 function updateSearchScopeHint() {
   const el = document.getElementById('team-search');
   if (!el) return;
-  el.placeholder = (currentView === 'best' && bestSubTab === 'writeups')
-    ? 'Search this page… (e.g. Netherlands)'
-    : 'Search team…';
+  el.placeholder = searchIsScoped() ? 'Search this page… (e.g. Brazil)' : 'Search team…';
 }

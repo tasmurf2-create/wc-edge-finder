@@ -209,6 +209,7 @@ function renderSensible() {
   if (roundFilter) list = list.filter(x => x.s.round?.label === roundFilter);
   if (tierFilter === 'strong')      list = list.filter(x => x.sc.tier === 'strong');
   else if (tierFilter === 'solid')  list = list.filter(x => x.sc.tier !== 'speculative');
+  if ((pageSearch || '').trim())    list = list.filter(x => teamMatches(x.s.match));   // page-scoped team search
 
   const nStrong = scored.filter(x => x.sc.tier === 'strong').length;
   const nTotal  = scored.length;
@@ -225,7 +226,10 @@ function renderSensible() {
     return;
   }
   if (!list.length) {
-    panel.innerHTML = intro + statsLine + emptyState('🔍', 'No analyst-backed bets match the current filters',
+    const noHit = (pageSearch || '').trim()
+      ? `No analyst-backed bets for “${esc(pageSearch.trim())}”`
+      : 'No analyst-backed bets match the current filters';
+    panel.innerHTML = intro + statsLine + searchNoteHTML(0, 'bet') + emptyState('🔍', noHit,
       `${tierFilter !== 'all' ? 'Try loosening the tier filter, or ' : 'Try '}switching Round to <b>All rounds</b>.`);
     return;
   }
@@ -254,7 +258,7 @@ function renderSensible() {
       </div>
     </div>`;
   }).join('');
-  panel.innerHTML = intro + statsLine + groupsHTML;
+  panel.innerHTML = intro + statsLine + searchNoteHTML(byMatch.size, 'match') + groupsHTML;
 }
 
 /* ---------------- acca tray (multi-select on Best Bets) ---------------- */
@@ -419,16 +423,13 @@ function renderTopPicks() {
     .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
 
   // Page-scoped team search: keep only matches featuring the searched team.
-  const fq = (picksFilter || '').trim().toLowerCase();
-  if (fq) items = items.filter(it => it.label.toLowerCase().includes(fq));
-
-  const filterNote = fq
-    ? `<div class="note note--mini">${items.length} match${items.length !== 1 ? 'es' : ''} for “${esc(picksFilter)}” <button class="linklike" onclick="clearTeamSearch()">✕ clear</button></div>`
-    : '';
+  const fq = (pageSearch || '').trim();
+  if (fq) items = items.filter(it => teamMatches(it.label));
+  const filterNote = searchNoteHTML(items.length, 'match');
 
   if (fq && !items.length) {
     panel.innerHTML = intro + filterNote +
-      emptyState('🔍', `No analyst coverage for “${esc(picksFilter)}” yet`,
+      emptyState('🔍', `No analyst coverage for “${esc(fq)}” yet`,
         'Coverage grows as the analyst works through the schedule — try another team or check back shortly.');
     return;
   }

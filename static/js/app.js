@@ -73,6 +73,9 @@ function switchMarketsTab(tab) {
   marketsSubTab = tab;
   document.querySelectorAll('#tab-markets .subnav .pill').forEach(p =>
     p.classList.toggle('active', p.dataset.mkt === tab));
+  // Reset any active page search + refresh the scope hint for the new sub-tab.
+  clearTeamSearch();
+  updateSearchScopeHint();
 
   const isBets = tab === 'singles' || tab === 'accas';
   document.getElementById('markets-toolbar').style.display = isBets ? '' : 'none';
