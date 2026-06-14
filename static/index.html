@@ -645,6 +645,7 @@ let roundsAvailable = [];         // round labels present in the schedule
 let accaSort      = 'chance';     // 'chance' | 'return'
 let _injuriesLoaded = false;      // Injuries tab loads once (cached digest); never auto-polls
 let _reanalysing    = new Set();  // match labels currently being re-analysed due to injury news
+let picksFilter   = '';           // team filter scoped to the Bettor's Analysis tab
 
 // ---- tab switching ----
 function switchTab(tab) {
@@ -653,6 +654,14 @@ function switchTab(tab) {
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
+  // Reset any active search when changing tabs so the box never shows a stale
+  // query that doesn't apply to the tab you're now on.
+  clearTeamSearch();
+  // The search box is page-scoped on Bettor's Analysis, global elsewhere — hint that.
+  const searchEl = document.getElementById('team-search');
+  if (searchEl) searchEl.placeholder = tab === 'picks'
+    ? 'Search this page… (e.g. Netherlands)'
+    : 'Search team… (e.g. Brazil)';
   if (tab === 'today')   renderToday();
   if (tab === 'picks')   renderTopPicks();
   if (tab === 'mybets')  renderMyBets();
@@ -668,6 +677,20 @@ function onTeamSearch(q) {
   const tabPanels = document.querySelectorAll('.tab-panel');
 
   q = q.trim();
+
+  // On the Bettor's Analysis tab, the search is scoped to THIS page: filter the
+  // analyst cards in place (any match featuring the team) rather than showing
+  // the cross-section global overlay.
+  const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (activeTab === 'picks') {
+    picksFilter = q;
+    clearEl.style.display = q ? '' : 'none';
+    summaryEl.textContent = '';
+    resultsEl.style.display = 'none';
+    renderTopPicks();
+    return;
+  }
+
   if (!q) { clearTeamSearch(); return; }
 
   clearEl.style.display = '';
@@ -774,6 +797,8 @@ function clearTeamSearch() {
   // Re-activate the current tab panel
   const activeBtn = document.querySelector('.tab-btn.active');
   if (activeBtn) document.getElementById('tab-' + activeBtn.dataset.tab).classList.add('active');
+  // Drop any page-scoped picks filter and re-render the full card list.
+  if (picksFilter) { picksFilter = ''; renderTopPicks(); }
 }
 
 // ---- injuries (manual refresh only — never auto-polls, to control cost) ----
@@ -1942,11 +1967,28 @@ function renderTopPicks() {
   // Sort analysed matches by kick-off (looked up from the divergence list)
   const commenceBy = {};
   allMatches.forEach(m => { commenceBy[m.label] = m.commence; });
-  const items = labels
+  let items = labels
     .map(l => ({ label: l, intel: allIntel[l], commence: commenceBy[l] || '' }))
     .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
 
-  panel.innerHTML = intro +
+  // Page-scoped team search: keep only matches featuring the searched team.
+  const fq = (picksFilter || '').trim().toLowerCase();
+  if (fq) items = items.filter(it => it.label.toLowerCase().includes(fq));
+
+  const filterNote = fq
+    ? `<div style="font-size:0.82rem;color:#8b949e;margin:2px 0 4px">
+         ${items.length} match${items.length !== 1 ? 'es' : ''} for “${picksFilter}”
+         <span onclick="clearTeamSearch()" style="margin-left:8px;color:#58a6ff;cursor:pointer">✕ clear</span>
+       </div>`
+    : '';
+
+  if (fq && !items.length) {
+    panel.innerHTML = intro + filterNote +
+      `<div class="empty" style="padding:24px">No analyst coverage for “${picksFilter}” yet.</div>`;
+    return;
+  }
+
+  panel.innerHTML = intro + filterNote +
     `<div style="display:flex;flex-direction:column;gap:14px">
        ${items.map(it => analystMatchHTML(it.label, it.intel)).join('')}
      </div>`;
