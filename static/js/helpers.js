@@ -378,7 +378,7 @@ function intelHTML(intel) {
   return `<div class="intel-block">
     <div class="intel-block__head">
       <span>ANALYST RESEARCH</span>
-      <span style="font-weight:400;color:${confColour}">analyst confidence: ${esc(conf)}</span>
+      <span style="font-weight:400;color:${confColour}" title="How confident the analyst is in its READ OF THE MATCH (squad, form, conditions) — NOT in this particular bet. The analyst's actual pick is shown below.">match-read confidence: ${esc(conf)}</span>
     </div>
     <div class="intel-block__body">
       ${condLine}

@@ -187,10 +187,18 @@ function singleHTML(s, book, stake, opts = {}) {
     ? `<span class="badge" title="Edge (+${s.edge.toFixed(1)}%) is small relative to the long price (${(s.best_price || 0).toFixed(2)}) — within the model's margin of error, so treat as noise, not value.">Speculative · longshot</span>`
     : `<span class="badge badge--${s.confidence === 'high' ? 'green' : s.confidence === 'medium' ? 'amber' : 'ghost'}">${s.confidence.charAt(0).toUpperCase() + s.confidence.slice(1)}</span>`;
 
+  // Contradiction warning — the maths flags a price edge but the analyst's
+  // football read points to a DIFFERENT outcome in this market. Important to
+  // surface on the maths tab too, so an analyst-opposed longshot (e.g. a Draw)
+  // doesn't look endorsed just because the research block shows high confidence.
+  const contradictBadge = confirmed === false
+    ? `<span class="badge badge--amber" title="The analyst's read backs a different outcome in this market — it does NOT support this selection. The edge here is a price signal only.">⚠ Analyst prefers other outcome</span>`
+    : '';
+
   const edgeBadge = `<span class="badge ${reliable || context === 'analyst' ? 'badge--green badge--ghost' : 'badge--ghost'}">edge +${s.edge.toFixed(1)}%</span>`;
   const topRight = context === 'analyst'
     ? `${analystBadge}${edgeBadge}`
-    : `${confBadge}${edgeBadge}${overlapBadge}`;
+    : `${confBadge}${edgeBadge}${overlapBadge}${contradictBadge}`;
 
   const fallbackNote = fallback
     ? `<span style="color:var(--amber);font-size:var(--fs-xs)"> ⚠ not at ${esc(book)}, using ${esc(bookLabel)}</span>` : '';
