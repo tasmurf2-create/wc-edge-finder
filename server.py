@@ -845,10 +845,25 @@ def _build_raw():
         book_list.remove("Paddy Power")
         book_list.insert(0, "Paddy Power")
 
+    # Full bookmaker inventory from the RAW feed (every book + the markets it
+    # priced), independent of the whitelist — powers the admin feed-books view.
+    feed_books = {}
+    for ev in events:
+        for bm in ev.get("bookmakers", []):
+            title = bm.get("title")
+            if not title:
+                continue
+            mkts = feed_books.setdefault(title, set())
+            for m in bm.get("markets", []):
+                if m.get("key"):
+                    mkts.add(m["key"])
+    feed_books = {k: sorted(v) for k, v in sorted(feed_books.items())}
+
     return {
         "fetched_at": int(time.time()),
         "matches":    matches,
         "bookmakers": book_list,
+        "feed_books": feed_books,
         "bets": {
             "singles": singles,
             "parlays": parlays,
@@ -1395,6 +1410,34 @@ def admin_stats(key: str = ""):
         "unique_visitors": len(visitors),
         "total_requests":  total,
         "visitors":        visitors,
+    })
+
+
+@app.get("/admin/feed-books")
+def admin_feed_books(key: str = ""):
+    """Every bookmaker present in the current odds snapshot, the markets it
+    priced, and whether it's whitelisted / an exchange. Requires ?key=<ADMIN_KEY>.
+    Reuses the cached feed — no extra Odds API call."""
+    if not secrets.compare_digest(key, _ADMIN_KEY):
+        return JSONResponse({"error": "forbidden — append ?key=<ADMIN_KEY>"}, status_code=403)
+
+    raw = get_raw()
+    feed_books = raw.get("feed_books", {})
+    books = [{
+        "book":        title,
+        "markets":     markets,
+        "whitelisted": title in BOOKMAKER_WHITELIST,
+        "exchange":    title in EXCHANGE_BOOKS,
+    } for title, markets in feed_books.items()]
+    # whitelisted first, then alphabetical
+    books.sort(key=lambda b: (not b["whitelisted"], b["book"].lower()))
+
+    return JSONResponse({
+        "fetched_at":        raw.get("fetched_at"),
+        "region":            REGIONS,
+        "total_books":       len(books),
+        "whitelisted_books": sorted(BOOKMAKER_WHITELIST),
+        "books":             books,
     })
 
 

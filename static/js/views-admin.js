@@ -75,6 +75,7 @@ async function renderAdmin() {
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     renderAdminStats(await res.json());
+    renderFeedBooks();   // fills the #admin-feed-books placeholder
   } catch (e) {
     panel.innerHTML = emptyState('⚠️', 'Could not load visitor stats',
       `${esc(String(e))} · <button class="linklike" onclick="renderAdmin()">retry</button>`);
@@ -142,5 +143,51 @@ function renderAdminStats(data) {
     name like M247, DigitalOcean, OVH or Mullvad usually means a VPN/proxy; a consumer ISP (e.g. Vodafone,
     Eir) usually means a real visitor. Distinct IP ≈ distinct network, not a precise person or VPN count.</p>
     ${table}
+    <div id="admin-feed-books" style="margin-top:28px"></div>
   </div>`;
+}
+
+async function renderFeedBooks() {
+  const host = document.getElementById('admin-feed-books');
+  if (!host) return;
+  const key = adminKey();
+  if (!key) return;
+  host.innerHTML = `<div style="color:var(--tx-3);font-size:var(--fs-sm)">Loading bookmakers in feed…</div>`;
+  try {
+    const res = await fetch('/admin/feed-books?key=' + encodeURIComponent(key));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const books = data.books || [];
+    const inApp = books.filter(b => b.whitelisted).length;
+
+    const rows = books.map(b => {
+      const exTag = b.exchange ? ` <span class="badge" style="color:var(--amber)">exchange</span>` : '';
+      const status = b.whitelisted
+        ? `<span class="badge badge--green">✓ in app</span>`
+        : `<span class="badge" style="color:var(--tx-4)">filtered out</span>`;
+      return `<tr style="border-top:1px solid var(--line-1)">
+        <td style="padding:6px 10px;color:var(--tx-1)">${esc(b.book)}${exTag}</td>
+        <td style="padding:6px 10px">${status}</td>
+        <td style="padding:6px 10px;color:var(--tx-3);font-family:monospace">${esc((b.markets || []).join(', '))}</td>
+      </tr>`;
+    }).join('');
+
+    host.innerHTML = `
+      <h2 style="margin:0 0 4px">Bookmakers in current feed</h2>
+      <p class="note note--mini">Region <strong>${esc(data.region || '')}</strong> · ${data.total_books} books in the live snapshot ·
+      <span style="color:var(--green)">${inApp} whitelisted (shown in your app)</span>, ${data.total_books - inApp} filtered out.
+      Markets: <code>h2h</code> = match result · <code>totals</code> = over/under · <code>spreads</code> = Asian handicap.</p>
+      <div style="overflow-x:auto;border:1px solid var(--line-1);border-radius:var(--radius);margin-top:10px">
+        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+          <thead><tr style="text-align:left;color:var(--tx-4);font-size:var(--fs-xs);text-transform:uppercase">
+            <th style="padding:8px 10px">Bookmaker</th>
+            <th style="padding:8px 10px">Status</th>
+            <th style="padding:8px 10px">Markets priced</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div style="color:var(--tx-3);font-size:var(--fs-sm)">Couldn't load bookmaker list: ${esc(String(e))}</div>`;
+  }
 }
