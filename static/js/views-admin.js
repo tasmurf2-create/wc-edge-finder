@@ -93,8 +93,15 @@ function renderAdminStats(data) {
   if (!panel) return;
   const visitors = data.visitors || [];
 
+  const fmtLoc = r => {
+    const place = [r.city, r.country_code || r.country].filter(Boolean).join(', ');
+    return place || '—';
+  };
+
   const rows = visitors.map(r => `<tr style="border-top:1px solid var(--line-1)">
     <td style="padding:6px 10px;color:var(--tx-1);font-family:monospace">${esc(r.ip)}</td>
+    <td style="padding:6px 10px;color:var(--tx-2);white-space:nowrap" title="${esc([r.city, r.region, r.country].filter(Boolean).join(', '))}">${esc(fmtLoc(r))}</td>
+    <td style="padding:6px 10px;color:var(--tx-3)">${esc(r.isp || r.org || '—')}</td>
     <td style="padding:6px 10px;text-align:right;color:var(--tx-2)">${r.hits}</td>
     <td style="padding:6px 10px;color:var(--tx-3);white-space:nowrap">${esc(r.first_seen)}</td>
     <td style="padding:6px 10px;color:var(--tx-3);white-space:nowrap">${esc(r.last_seen)}</td>
@@ -106,6 +113,8 @@ function renderAdminStats(data) {
       <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
         <thead><tr style="text-align:left;color:var(--tx-4);font-size:var(--fs-xs);text-transform:uppercase">
           <th style="padding:8px 10px">IP address</th>
+          <th style="padding:8px 10px">Location</th>
+          <th style="padding:8px 10px">ISP / Org</th>
           <th style="padding:8px 10px;text-align:right">Hits</th>
           <th style="padding:8px 10px">First seen</th>
           <th style="padding:8px 10px">Last seen</th>
@@ -128,9 +137,10 @@ function renderAdminStats(data) {
       ${statCard('Total requests', data.total_requests ?? '—')}
     </div>
     <p class="note note--mini" style="margin-top:12px">Counts are distinct IP addresses since the server last
-    restarted or redeployed — in-memory only, not persisted across deploys. A distinct IP is a distinct
-    network/device, which is the closest the server can get to “different sources” — it is not specifically
-    a VPN count (that needs an external IP-intelligence lookup).</p>
+    restarted or redeployed — in-memory only, not persisted across deploys. Location &amp; ISP are looked up
+    per IP via ip-api.com (cached). The <strong>ISP / Org</strong> column is the best VPN hint: a hosting
+    name like M247, DigitalOcean, OVH or Mullvad usually means a VPN/proxy; a consumer ISP (e.g. Vodafone,
+    Eir) usually means a real visitor. Distinct IP ≈ distinct network, not a precise person or VPN count.</p>
     ${table}
   </div>`;
 }

@@ -18,6 +18,7 @@ import pathlib
 import secrets
 import itertools
 import threading
+import urllib.request
 from datetime import datetime, timezone
 from collections import defaultdict
 
@@ -1290,9 +1291,85 @@ def intel():
     })
 
 
+# ---------------------------------------------------------------------------
+# IP geolocation for the admin tab. Uses ip-api.com's free batch endpoint
+# (no key, non-commercial, HTTP — fine since the call is server-side). Results
+# are cached per IP (a given IP's location is effectively static), so we only
+# ever look up IPs we haven't seen, and admin refreshes are then instant.
+# Private/local IPs are never sent off-box.
+# ---------------------------------------------------------------------------
+_GEO_FIELDS = "status,message,country,countryCode,regionName,city,isp,org,query"
+_geo_cache  = {}   # ip -> {country, country_code, region, city, isp, org}
+_geo_lock   = threading.Lock()
+_EMPTY_GEO  = {"country": "", "country_code": "", "region": "", "city": "", "isp": "", "org": ""}
+
+
+def _is_public_ip(ip):
+    """False for missing/private/loopback/link-local addresses (skip lookup)."""
+    if not ip or ip == "?":
+        return False
+    if ip.startswith(("10.", "127.", "192.168.", "169.254.", "::1", "fc", "fd")):
+        return False
+    if ip.startswith("172."):
+        try:
+            if 16 <= int(ip.split(".")[1]) <= 31:
+                return False
+        except (IndexError, ValueError):
+            pass
+    return True
+
+
+def _geo_enrich(ips):
+    """Populate _geo_cache for any of `ips` not already cached."""
+    todo = []
+    with _geo_lock:
+        for ip in ips:
+            if ip in _geo_cache:
+                continue
+            if _is_public_ip(ip):
+                todo.append(ip)
+            else:
+                _geo_cache[ip] = {**_EMPTY_GEO, "country": "Local/Private"}
+
+    for i in range(0, len(todo), 100):   # ip-api batch caps at 100 IPs/request
+        chunk = todo[i:i + 100]
+        results = []
+        try:
+            req = urllib.request.Request(
+                "http://ip-api.com/batch?fields=" + _GEO_FIELDS,
+                data=json.dumps(chunk).encode(),
+                headers={"Content-Type": "application/json",
+                         "User-Agent": "wc-edge-finder/1.0"},
+                method="POST")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                results = json.loads(resp.read().decode())
+        except Exception as e:
+            print(f"[geo] batch lookup failed: {e}")
+
+        by_ip = {}
+        for r in results:
+            if r.get("status") == "success":
+                by_ip[r.get("query")] = {
+                    "country":      r.get("country", ""),
+                    "country_code": r.get("countryCode", ""),
+                    "region":       r.get("regionName", ""),
+                    "city":         r.get("city", ""),
+                    "isp":          r.get("isp", ""),
+                    "org":          r.get("org", ""),
+                }
+        with _geo_lock:
+            for ip in chunk:
+                _geo_cache[ip] = by_ip.get(ip, dict(_EMPTY_GEO))
+
+
+def _geo_for(ip):
+    with _geo_lock:
+        return _geo_cache.get(ip, dict(_EMPTY_GEO))
+
+
 @app.get("/admin/stats")
 def admin_stats(key: str = ""):
-    """Visitor stats — unique IPs + per-IP hit counts. Requires ?key=<ADMIN_KEY>."""
+    """Visitor stats — unique IPs + per-IP hit counts + geo. Requires ?key=<ADMIN_KEY>."""
     if not secrets.compare_digest(key, _ADMIN_KEY):
         return JSONResponse({"error": "forbidden — append ?key=<ADMIN_KEY>"}, status_code=403)
 
@@ -1301,14 +1378,19 @@ def admin_stats(key: str = ""):
 
     with _access_lock:
         rows = sorted(_visitors.items(), key=lambda kv: -kv[1]["last"])
-        visitors = [{
-            "ip":         ip,
-            "hits":       v["hits"],
-            "first_seen": _iso(v["first"]),
-            "last_seen":  _iso(v["last"]),
-            "last_path":  v["last_path"],
-        } for ip, v in rows]
+        snapshot = [(ip, dict(v)) for ip, v in rows]
         total = sum(v["hits"] for v in _visitors.values())
+
+    _geo_enrich([ip for ip, _ in snapshot])   # network call — outside the lock
+
+    visitors = [{
+        "ip":         ip,
+        "hits":       v["hits"],
+        "first_seen": _iso(v["first"]),
+        "last_seen":  _iso(v["last"]),
+        "last_path":  v["last_path"],
+        **_geo_for(ip),
+    } for ip, v in snapshot]
     return JSONResponse({
         "unique_visitors": len(visitors),
         "total_requests":  total,
