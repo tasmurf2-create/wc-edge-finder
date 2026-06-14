@@ -88,7 +88,7 @@ REGIONS = os.environ.get("ODDS_REGIONS", "uk").strip() or "uk"
 # Only show prices from bookmakers the user has accounts with (Irish focus by
 # default). Override with a comma-separated BOOKMAKER_WHITELIST env var, e.g.
 #   BOOKMAKER_WHITELIST=Paddy Power,Bet365,Unibet,Betsson
-_DEFAULT_BOOKS = ("Paddy Power, Betfair, Betfair Exchange, "
+_DEFAULT_BOOKS = ("Paddy Power, Betfair, Betfair Exchange, Betfair Sportsbook, "
                   "Bet365, BoyleSports, Ladbrokes, William Hill")
 BOOKMAKER_WHITELIST = {
     b.strip() for b in os.environ.get("BOOKMAKER_WHITELIST", _DEFAULT_BOOKS).split(",")

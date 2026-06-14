@@ -254,7 +254,9 @@ function recommendedAccaHTML(parlays, book, stake) {
   const confirmedSingles = allSingles.filter(s => {
     const intel = s.intel || allIntel[s.match] || allIntel[s.match.split(' vs ').reverse().join(' vs ')];
     if (!intel) return false;
-    return analystConfirms(s, intel) === true;
+    if (analystConfirms(s, intel) !== true) return false;
+    // Acca-eligible only: must be priced at a sportsbook (exchanges can't host accas)
+    return Object.keys(sportsbookPerBook(s)).length > 0;
   });
 
   // Top 2-4 legs: earliest round first, then by fair_prob, no duplicate matches
@@ -281,25 +283,30 @@ function recommendedAccaHTML(parlays, book, stake) {
     </div></div>`;
   }
 
-  const slipBook = book === 'best' ? 'best' : book;
-  let combinedPrice = 1;
-  const legData = legs.map(s => {
-    const { price, bookLabel } = priceForBook(s, slipBook);
-    combinedPrice *= price;
-    return { match: s.match, outcome: s.outcome, commence: s.commence, round: s.round, usedPrice: price, usedBook: bookLabel };
-  });
+  // An acca is placed at ONE sportsbook (never an exchange). Find the single
+  // sportsbook that prices every leg best; honour the chosen book if it covers
+  // them all. If no one book covers all legs, fall back to each leg's best
+  // sportsbook and flag the slip as not placeable at a single book.
+  const sbPB = legs.map(s => sportsbookPerBook(s));
+  const candidateBooks = [...new Set(sbPB.flatMap(pb => Object.keys(pb)))];
+  const coveringAll = candidateBooks
+    .map(bk => ({ bk, combined: sbPB.reduce((p, pb) => p * (pb[bk] || 0), 1), covers: sbPB.every(pb => pb[bk] > 0) }))
+    .filter(x => x.covers);
 
-  // Best single book that prices all legs
-  const allBooksList = [...new Set(legs.flatMap(s => Object.keys(s.per_book || {})))];
-  let bestBook = slipBook !== 'best' ? slipBook : (legData[0]?.usedBook || 'your bookmaker');
-  if (slipBook === 'best') {
-    const bookTotals = allBooksList.map(bk => {
-      const prices = legs.map(s => (s.per_book || {})[bk]);
-      if (!prices.every(p => p > 0)) return null;
-      return { bk, combined: prices.reduce((a, b) => a * b, 1) };
-    }).filter(Boolean);
-    if (bookTotals.length) bestBook = bookTotals.sort((a, b) => b.combined - a.combined)[0].bk;
-  }
+  let accaBook = null;
+  if (book !== 'best' && coveringAll.some(x => x.bk === book)) accaBook = book;
+  else if (coveringAll.length) accaBook = coveringAll.sort((a, b) => b.combined - a.combined)[0].bk;
+
+  let combinedPrice = 1;
+  let mixedBooks = false;
+  const legData = legs.map((s, i) => {
+    let usedPrice, usedBook;
+    if (accaBook && sbPB[i][accaBook]) { usedPrice = sbPB[i][accaBook]; usedBook = accaBook; }
+    else { const r = accaPriceForBook(s, 'best'); usedPrice = r.price; usedBook = r.bookLabel; mixedBooks = true; }
+    combinedPrice *= usedPrice;
+    return { match: s.match, outcome: s.outcome, commence: s.commence, round: s.round, usedPrice, usedBook };
+  });
+  const bestBook = accaBook || (legData[0]?.usedBook || 'your bookmaker');
 
   const grossReturn = stake * combinedPrice;
   const fairProb = legs.reduce((p, s) => p * (s.fair_prob != null ? s.fair_prob : 0.5), 1);
@@ -361,6 +368,7 @@ function recommendedAccaHTML(parlays, book, stake) {
       <div style="font-size:var(--fs-sm);color:var(--tx-3);margin-bottom:10px">Every leg is backed by the analyst. Here's why:</div>
       ${whyHTML}
       ${legsHTML}
+      ${mixedBooks ? `<div style="font-size:var(--fs-xs);color:var(--amber);margin-top:8px">⚠ No single bookmaker prices all legs — odds shown are each leg's best sportsbook price, so this can't be placed as one acca slip.</div>` : ''}
     </div>
     <div class="card__foot">
       <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;align-items:center">

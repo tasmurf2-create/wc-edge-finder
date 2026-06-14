@@ -312,6 +312,31 @@ function priceForBook(s, book) {
   return { price: s.best_price, bookLabel: s.best_book, fallback: true };
 }
 
+// Exchanges (peer-to-peer) — you cannot place a multi-leg acca on them, so they
+// are excluded from every acca/slip price even when a single may quote them.
+// Mirrors server.py EXCHANGE_BOOKS.
+const EXCHANGE_BOOKS = new Set(['Betfair', 'Betfair Exchange', 'Matchbook', 'Smarkets']);
+
+// Per-book prices for a selection with exchanges stripped (acca-eligible books).
+function sportsbookPerBook(s) {
+  const out = {};
+  for (const [bk, price] of Object.entries(s.per_book || {})) {
+    if (!EXCHANGE_BOOKS.has(bk)) out[bk] = price;
+  }
+  return out;
+}
+
+// Like priceForBook but exchange-free, for acca legs. Never falls back to an
+// exchange; placeable=false means no sportsbook prices this selection at all.
+function accaPriceForBook(s, book) {
+  const pb = sportsbookPerBook(s);
+  const books = Object.keys(pb);
+  if (book !== 'best' && pb[book]) return { price: pb[book], bookLabel: book, fallback: false, placeable: true };
+  if (!books.length) return { price: null, bookLabel: null, fallback: true, placeable: false };
+  const best = books.reduce((a, b) => (pb[b] > pb[a] ? b : a));
+  return { price: pb[best], bookLabel: best, fallback: book !== 'best', placeable: true };
+}
+
 // ---- skeleton / empty-state building blocks ----
 function skeletonCards(n = 3) {
   const one = `<div class="skel-card">

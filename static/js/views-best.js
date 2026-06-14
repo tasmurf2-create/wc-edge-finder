@@ -292,13 +292,15 @@ function renderAccaTray() {
     ? `⚠ Same-match legs detected (${[...new Set(dupes)].map(titleCase).join(', ')}) — most books won't allow this`
     : '';
 
-  // Best single bookmaker covering all legs
-  const bookSets = legs.map(s => new Set(Object.keys(s.per_book || {})));
+  // Best single bookmaker covering all legs — sportsbooks only (an acca can't be
+  // placed on an exchange, so exchange prices are excluded here).
+  const sbPB = legs.map(s => sportsbookPerBook(s));
+  const bookSets = sbPB.map(pb => new Set(Object.keys(pb)));
   const common = bookSets.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
 
   let bestBook = null, bestCombined = 0;
   common.forEach(bk => {
-    const combined = legs.reduce((p, s) => p * (s.per_book[bk] || 0), 1);
+    const combined = sbPB.reduce((p, pb) => p * (pb[bk] || 0), 1);
     if (combined > bestCombined) { bestCombined = combined; bestBook = bk; }
   });
 
