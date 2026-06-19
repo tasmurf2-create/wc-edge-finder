@@ -238,6 +238,40 @@
       <h2>How this works — and what it can't do</h2>
       <p class="prose-sub">Plain-English methodology. If anything here sounds like a guarantee of profit, re-read it — it isn't.</p>
 
+      <style>
+        #md-explorer { margin: 6px 0 26px; }
+        #md-stage svg { width: 100%; height: auto; display: block; }
+        #md-explorer .md-node { cursor: pointer; outline: none; }
+        #md-explorer .md-node rect { transition: stroke .12s ease, fill .12s ease; }
+        #md-explorer .md-node:hover rect,
+        #md-explorer .md-node:focus-visible rect { stroke: var(--tx-1); }
+        #md-explorer .md-node.active rect { stroke: var(--green); stroke-width: 2.5; fill: var(--bg-2); }
+        #md-explorer .md-node text { pointer-events: none; user-select: none; }
+        #md-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+        .md-chip { background: var(--bg-1); border: 1px solid var(--line-2); color: var(--tx-2);
+                   border-radius: 999px; padding: 6px 13px; font-size: var(--fs-xs); font-weight: 550; cursor: pointer; }
+        .md-chip:hover { color: var(--tx-1); border-color: var(--tx-4); }
+        .md-chip.active { background: var(--green-bg); color: var(--green); border-color: var(--green-dim); }
+        #md-detail { background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 10px;
+                     padding: 16px 18px; font-size: var(--fs-sm); color: var(--tx-2); line-height: 1.55; min-height: 96px; }
+        #md-detail h4 { margin: 0 0 8px; color: var(--tx-1); font-size: var(--fs-md); }
+        #md-detail p { margin: 0; }
+        #md-detail b { color: var(--tx-1); font-weight: 650; }
+        #md-detail code { background: var(--bg-2); padding: 1px 5px; border-radius: 4px; color: var(--tx-1); font-size: .95em; }
+        #md-detail .md-meta { display: block; margin-top: 11px; padding-top: 9px; font-size: var(--fs-xs);
+                              color: var(--tx-3); border-top: 1px dashed var(--line-2); }
+      </style>
+
+      <h3>The map — click anything to see exactly what it is</h3>
+      <p>The site runs two independent layers — a <span style="color:var(--green)">price/maths</span> layer and an
+      <span style="color:var(--violet)">analyst/football</span> layer — that only meet at the output. Tap a source, a
+      layer, a tab, or a relationship chip below to read precisely what it does and how it links onward.</p>
+      <div id="md-explorer">
+        <div id="md-stage"></div>
+        <div id="md-links"></div>
+        <div id="md-detail">Select a box or a chip to see what it is.</div>
+      </div>
+
       <h3>1. Where the prices come from</h3>
       <p>Live decimal odds for every World Cup match from The Odds API, covering the Irish-accessible bookmakers
       (Paddy Power, Betfair, Bet365, BoyleSports, Ladbrokes, William Hill). The timestamp in the header is the truth
@@ -381,14 +415,15 @@
   </div>
 </div>
 
-<script src="/static/js/helpers.js?v=9"></script>
-<script src="/static/js/data.js?v=9"></script>
-<script src="/static/js/views-today.js?v=9"></script>
-<script src="/static/js/views-best.js?v=9"></script>
-<script src="/static/js/views-markets.js?v=9"></script>
-<script src="/static/js/views-journal.js?v=9"></script>
-<script src="/static/js/views-injuries.js?v=9"></script>
-<script src="/static/js/views-admin.js?v=9"></script>
-<script src="/static/js/app.js?v=9"></script>
+<script src="/static/js/helpers.js?v=10"></script>
+<script src="/static/js/data.js?v=10"></script>
+<script src="/static/js/views-today.js?v=10"></script>
+<script src="/static/js/views-best.js?v=10"></script>
+<script src="/static/js/views-markets.js?v=10"></script>
+<script src="/static/js/views-journal.js?v=10"></script>
+<script src="/static/js/views-injuries.js?v=10"></script>
+<script src="/static/js/views-admin.js?v=10"></script>
+<script src="/static/js/views-method.js?v=10"></script>
+<script src="/static/js/app.js?v=10"></script>
 </body>
 </html>
