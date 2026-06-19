@@ -450,11 +450,16 @@ function parlayHTML(p, book, stake) {
       + `• Implied chance ≈ ${impl}% (= 1 ÷ ${l.usedPrice.toFixed(2)}).\n`
       + `• A winning ${l.usedPrice.toFixed(2)} leg multiplies your stake by ${l.usedPrice.toFixed(2)} (on its own, ${eur(stake)} → ${ret}).\n`
       + `The lower the number, the bigger the favourite.`;
+    const disagrees = analystDisagrees(l, l.intel) === true;
+    const disagreeFlag = disagrees
+      ? `<div style="margin-top:3px"><span class="badge" style="background:rgba(245,158,11,0.13);color:var(--amber);font-size:var(--fs-xs)" title="The AI football analyst recommends an outcome that contradicts this leg. Accumulator legs are picked by price and probability, not by the analyst — so this is a caution to review, not a reason the leg was excluded.">⚠ Analyst disagrees</span></div>`
+      : '';
     return `<div class="parlay-leg">
       <div style="min-width:0">
         <div><strong title="Your selection for this match">${fmtPick(l.outcome)}</strong></div>
         <div style="font-size:var(--fs-xs);color:var(--tx-3)">${fmtLabel(l.match)} · ${fmt(l.commence)}${l.round ? ` · <span style="color:var(--cyan);font-weight:600">${esc(l.round.label.replace('Group Stage ', ''))}</span>` : ''}</div>
         ${weatherFlagHTML(l)}
+        ${disagreeFlag}
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         ${fallNote}

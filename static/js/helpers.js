@@ -204,6 +204,80 @@ function analystConfirms(single, intel) {
   return false;
 }
 
+// ---- analyst DISAGREES — soft flag on accumulator legs ----
+// True ONLY when the analyst's recommended_bets include an outcome that is
+// MUTUALLY EXCLUSIVE with this leg (a genuine contradiction) — never on the mere
+// absence of an endorsement (the analyst only names 1–3 picks per match, so most
+// legitimate banker legs are simply not mentioned). Conservative by design:
+// anything ambiguous returns false, so we never falsely claim the analyst
+// disagrees. Returns null when the match has no analyst card yet.
+function legToken(leg, homeName, awayName) {
+  const m = leg.market;
+  if (m === 'totals') return (leg.outcome || '').toLowerCase().replace(/ /g, '_');
+  if (m === 'h2h') {
+    const o = (leg.outcome || '').toLowerCase();
+    if (o === 'draw')     return 'draw';
+    if (o === homeName)   return 'home_win';
+    if (o === awayName)   return 'away_win';
+    return null;
+  }
+  if (m === 'spreads') {
+    const pt = leg.spread_point;
+    if (leg.spread_team == null || pt == null) return null;
+    const side = normalizeTeam(leg.spread_team) === homeName ? 'home'
+               : normalizeTeam(leg.spread_team) === awayName ? 'away' : null;
+    if (!side) return null;
+    return pt < 0 ? `${side}_${pt}` : `${side}_+${pt}`;   // home_-1.5 / away_+1
+  }
+  return null;
+}
+
+function tokKind(tok) {
+  if (tok === 'home_win' || tok === 'away_win' || tok === 'draw')
+    return { kind: 'h2h', side: tok === 'home_win' ? 'home' : tok === 'away_win' ? 'away' : 'draw' };
+  if (tok.startsWith('over') || tok.startsWith('under'))
+    return { kind: 'totals', dir: tok.startsWith('over') ? 'over' : 'under' };
+  const ms = tok.match(/^(home|away)_([+-]?\d+(?:\.\d+)?)$/);
+  if (ms) return { kind: 'spread', side: ms[1], point: parseFloat(ms[2]) };
+  return null;
+}
+
+// Which team (if any) an outcome REQUIRES to win the match outright.
+function mustWinSide(k) {
+  if (k.kind === 'h2h' && (k.side === 'home' || k.side === 'away')) return k.side;
+  if (k.kind === 'spread' && k.point < 0) return k.side;   // -0.5/-1/-1.5 ⇒ must win
+  return null;
+}
+
+// True only for clear, unambiguous contradictions between two outcome tokens.
+function tokensOppose(a, b) {
+  const ka = tokKind(a), kb = tokKind(b);
+  if (!ka || !kb) return false;
+  if (ka.kind === 'h2h'    && kb.kind === 'h2h')    return ka.side !== kb.side;   // 1X2 mutually exclusive
+  if (ka.kind === 'totals' && kb.kind === 'totals') return ka.dir  !== kb.dir;    // over vs under
+  const wa = mustWinSide(ka), wb = mustWinSide(kb);
+  if (wa && wb && wa !== wb) return true;                      // both need different teams to win
+  if (ka.kind === 'h2h' && ka.side === 'draw' && wb) return true;   // draw vs a must-win
+  if (kb.kind === 'h2h' && kb.side === 'draw' && wa) return true;
+  return false;
+}
+
+function analystDisagrees(leg, intel) {
+  if (!intel) return null;
+  const recs = intel.recommended_bets;
+  if (!recs || !recs.length) return false;
+  const parts    = leg.match && leg.match.includes(' vs ') ? leg.match.split(' vs ') : ['', ''];
+  const homeName = normalizeTeam(parts[0]);
+  const awayName = normalizeTeam(parts[1]);
+  const legTok   = legToken(leg, homeName, awayName);
+  if (!legTok) return false;
+  for (const rb of recs) {
+    const ao = (rb.outcome || '').toLowerCase().replace(/ /g, '_');
+    if (ao && tokensOppose(ao, legTok)) return true;
+  }
+  return false;
+}
+
 // A small edge on a long-priced outcome is within the de-vig's own margin of
 // error — noise, not value. Require the edge to grow with the price.
 function edgeReliable(s) {

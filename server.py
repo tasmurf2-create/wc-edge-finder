@@ -1121,6 +1121,10 @@ def _leg_summary(s):
         "confidence": s["confidence"],
         "weather":    s.get("weather"),
         "round":      s.get("round"),
+        # carried so the client can evaluate the analyst-disagrees soft flag on
+        # handicap legs (needs the team + numeric point, not just the label)
+        "spread_team":  s.get("spread_team"),
+        "spread_point": s.get("spread_point"),
     }
 
 
