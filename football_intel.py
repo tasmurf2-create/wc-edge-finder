@@ -36,6 +36,10 @@ INJURY_DOMAINS  = ["skysports.com", "goal.com", "espn.com", "fifa.com"]
 WEATHER_TTL     = 21600    # 6 hours — weather forecast (refreshes a few times daily)
 WEATHER_HORIZON_DAYS = 15  # Open-Meteo forecasts ~16 days ahead; use live data inside this
 MODEL           = "claude-sonnet-4-6"          # match analysis (reasoning)
+# Bump when the analyst prompt changes in a way that should invalidate cached
+# cards (it's part of the cache key, so old entries miss and re-analyse).
+#   v1 -> v2 (2026-06-20): lead form read with / name in-tournament WC results.
+PROMPT_VERSION  = 2
 SEARCH_MODEL    = "claude-haiku-4-5-20251001"  # web-search snapshots — cheaper +
                                                # a SEPARATE rate-limit bucket, so
                                                # token-heavy searches don't starve
@@ -412,7 +416,7 @@ def _save_cache(cache):
 
 
 def _cache_key(home, away):
-    return hashlib.md5(f"{home.lower()}|{away.lower()}".encode()).hexdigest()
+    return hashlib.md5(f"{home.lower()}|{away.lower()}|v{PROMPT_VERSION}".encode()).hexdigest()
 
 
 def invalidate_match_cache(pairs):
@@ -697,6 +701,13 @@ detailed per-player statistics. So:
   or formations (you weren't given them).
 - Weigh form in context of the COMPETITION shown (a 7-0 in a friendly or vs a minnow means less
   than a competitive result vs a peer).
+- RESULTS AT THIS WORLD CUP carry the MOST weight. A team's in-tournament matches (tagged
+  "FIFA World Cup" in the form list) are the freshest, most decision-relevant evidence of current
+  level — far more telling than any friendly. If a team has already played World Cup matches:
+  LEAD your form read with them, NAME them explicitly as World Cup results (never describe a WC
+  match as a friendly or blur it together with one), and let a competitive WC draw or defeat
+  visibly temper an otherwise-strong favourite. A 1-1 draw in their World Cup opener is a headline
+  fact, not a footnote.
 - Judge strength from the FIFA RANKING + SQUAD + the provided RECENT FORM.
 - Reason about likely style from squad profile, but keep it general and flag uncertainty in
   knowledge_caveat rather than inventing detail.
@@ -765,8 +776,8 @@ Examples of good thinking:
 
 Using the squad and injury data above, output ONLY this JSON:
 {{
-  "home_form": "{home}'s form read using the RECENT FORM provided (cite the real results/scores and their competition) plus FIFA ranking and squad. Do NOT invent results beyond those listed. 2 sentences.",
-  "away_form": "Same for {away}, using its provided recent form + ranking + squad. 2 sentences.",
+  "home_form": "{home}'s form read using the RECENT FORM provided. LEAD with any 'FIFA World Cup' results — name them explicitly as World Cup matches and weight them most heavily — THEN other recent form, plus FIFA ranking and squad. Cite real results/scores and their competition; do NOT invent results beyond those listed, and do NOT call a World Cup result a friendly. 2-3 sentences.",
+  "away_form": "Same for {away}: lead with its World Cup results (named as such and weighted most), then other recent form + ranking + squad. Do NOT mislabel a World Cup match. 2-3 sentences.",
   "key_absences": "From the injury digest only — relevant injuries/suspensions, or 'none reported'. Do not invent.",
   "conditions_impact": "How heat/altitude/kickoff time affects each team specifically. Which team benefits?",
   "tactical_matchup": "Likely stylistic matchup inferred from squad profile + ranking. Do NOT assert specific formations or manager names. Who does it favour? 2 sentences.",
