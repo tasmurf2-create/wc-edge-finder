@@ -598,6 +598,49 @@ def peek_injury_digest():
     return (_load_json(INJURY_DIGEST_FILE) or {}).get("digest")
 
 
+# --- Recent form: rebuilt from the international-results dataset --------------
+
+def form_as_of():
+    """The date of the latest result currently in team_form.csv ('' if unknown).
+    Cheap — reads the small CSV, no network. Lets the server decide whether the
+    form snapshot is stale (predates today's WC matches) at startup."""
+    import build_form
+    rows = build_form.read_form_csv()
+    for r in rows.values():
+        return r.get("as_of", "")
+    return ""
+
+
+def refresh_team_form():
+    """Rebuild data/team_form.csv from the live international-results dataset and
+    report which teams' form changed, so the server can re-analyse only those
+    matches. Network-bound (downloads the dataset). On failure the existing CSV
+    is left untouched.
+
+    Returns {"ok": bool, "as_of": str|None, "changed": [fifa_code, ...]}.
+    A team is "changed" when a new result has appeared since the last build
+    (its form string or most-recent-results list differs)."""
+    import build_form
+    try:
+        old = build_form.read_form_csv()           # {code: row} (may be {})
+        as_of, new = build_form.compute_form()     # network download
+    except Exception as e:
+        print(f"[form] refresh failed: {e}")
+        return {"ok": False, "as_of": None, "changed": []}
+
+    changed = [
+        code for code, row in new.items()
+        if (code not in old
+            or old[code].get("recent") != row["recent"]
+            or old[code].get("form") != row["form"])
+    ]
+
+    build_form.write_form_csv(as_of, new)
+    static_data.reload_form()
+    print(f"[form] rebuilt to {as_of} — {len(new)} teams, {len(changed)} changed")
+    return {"ok": True, "as_of": as_of, "changed": changed}
+
+
 def injury_digest_info():
     """Cached digest (text + structured items when available) + fetch timestamp
     for the Injuries tab — no network. items is None for legacy text digests."""

@@ -136,6 +136,16 @@ if ODDS_REFRESH_MINUTES > 0:
 else:
     _CACHE_TTL = 7200
 _ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
+
+# Team-form refresh cadence. During the tournament a background thread rebuilds
+# data/team_form.csv from the international-results dataset every FORM_REFRESH_HOURS
+# (default 12) so freshly played WC matches feed the analyst. The dataset download
+# is free (public GitHub); only the matches whose form CHANGED get re-analysed,
+# so the Anthropic spend is bounded. Set FORM_REFRESH_HOURS=0 to disable.
+try:
+    FORM_REFRESH_HOURS = float(os.environ.get("FORM_REFRESH_HOURS", "12"))
+except ValueError:
+    FORM_REFRESH_HOURS = 12.0
 _lock = threading.Lock()
 
 # Separate intel cache — populated by background thread
@@ -1181,6 +1191,81 @@ if ODDS_REFRESH_MINUTES > 0:
 
 
 # ---------------------------------------------------------------------------
+# Background team-form auto-refresh. Rebuilds data/team_form.csv from the live
+# international-results dataset, then invalidates + re-analyses ONLY the matches
+# whose team's form changed (a new result appeared). Mirrors the injury-refresh
+# flow. The dataset pull is free; analyst spend is bounded to changed teams.
+# ---------------------------------------------------------------------------
+
+def _do_form_refresh():
+    """Rebuild team form, then invalidate/re-analyse only the affected matches.
+    Safe to call from the auto-refresh loop, startup, or the manual endpoint."""
+    res = fintel.refresh_team_form()
+    if not res["ok"]:
+        return res
+    changed = set(res["changed"])
+    if not changed:
+        print("[form] no form change — analyst cache kept intact")
+        return res
+
+    with _intel_lock:
+        labels = list(_intel_cache.keys())
+    affected_pairs, affected_labels = [], []
+    for label in labels:
+        parts = label.split(" vs ", 1)
+        if len(parts) != 2:
+            continue
+        home, away = parts
+        hc, ac = static_data.team_code(home), static_data.team_code(away)
+        if (hc and hc in changed) or (ac and ac in changed):
+            affected_pairs.append((home, away))
+            affected_labels.append(label)
+
+    fintel.invalidate_match_cache(affected_pairs)
+    with _intel_lock:
+        for label in affected_labels:
+            _intel_cache.pop(label, None)
+    print(f"[form] form changed for {len(changed)} team(s) — "
+          f"{len(affected_labels)} analyst card(s) invalidated, rest kept")
+
+    # Re-analyse the invalidated matches promptly (same path injuries use).
+    raw = get_raw()
+    _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
+    return res
+
+
+def _form_auto_refresh_loop():
+    interval = max(FORM_REFRESH_HOURS, 1) * 3600
+    while True:
+        time.sleep(interval)
+        try:
+            _do_form_refresh()
+        except Exception as e:
+            print(f"[form] auto-refresh failed: {e}", flush=True)
+
+
+def _startup_form_refresh():
+    """If the form snapshot predates today (i.e. WC matches have been played since
+    the last build), rebuild it once in the background at startup so a freshly
+    woken instance is current. Cheap — one free dataset download."""
+    try:
+        as_of = fintel.form_as_of()
+        today = datetime.now(timezone.utc).date().isoformat()
+        if as_of and as_of < today:
+            print(f"[form] snapshot is from {as_of} (< {today}) — refreshing at startup")
+            _do_form_refresh()
+    except Exception as e:
+        print(f"[form] startup refresh failed: {e}", flush=True)
+
+
+if FORM_REFRESH_HOURS > 0:
+    threading.Thread(target=_startup_form_refresh, daemon=True).start()
+    threading.Thread(target=_form_auto_refresh_loop, daemon=True).start()
+    print(f"[form] auto-refresh every {max(FORM_REFRESH_HOURS, 1):g}h "
+          f"(set FORM_REFRESH_HOURS=0 to disable)")
+
+
+# ---------------------------------------------------------------------------
 # Routes
 
 @app.get("/api/status")
@@ -1473,8 +1558,10 @@ def injuries():
 # Odds API monthly quota / burn Anthropic web searches by hammering them.
 _REFRESH_COOLDOWN          = 600   # /api/refresh: at most one forced odds fetch / 10 min
 _INJURY_REFRESH_COOLDOWN   = 300   # /api/refresh-injuries: at most one / 5 min
+_FORM_REFRESH_COOLDOWN     = 600   # /api/refresh-form: at most one dataset rebuild / 10 min
 _last_forced_refresh       = 0.0
 _last_injury_refresh       = 0.0
+_last_form_refresh         = 0.0
 _cooldown_lock             = threading.Lock()
 
 
@@ -1525,6 +1612,24 @@ def refresh_injuries():
         _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
 
     threading.Thread(target=_do_refresh, daemon=True).start()
+    return JSONResponse({"status": "refreshing"})
+
+
+@app.get("/api/refresh-form")
+def refresh_form():
+    """Rebuild team form from the international-results dataset, then re-analyse
+    only the matches whose team's recent form changed. Cards for teams with no
+    new result are kept as-is. Free dataset pull; bounded analyst spend."""
+    global _last_form_refresh
+    with _cooldown_lock:
+        wait = _FORM_REFRESH_COOLDOWN - (time.time() - _last_form_refresh)
+        if wait > 0:
+            return JSONResponse({"status": "cooldown",
+                                 "retry_in_s": int(wait) + 1,
+                                 "detail": "Team form was refreshed recently — using the current snapshot."})
+        _last_form_refresh = time.time()
+
+    threading.Thread(target=_do_form_refresh, daemon=True).start()
     return JSONResponse({"status": "refreshing"})
 
 

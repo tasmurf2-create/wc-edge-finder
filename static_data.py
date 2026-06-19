@@ -79,6 +79,15 @@ def team_rank(name):
 _form = {r["fifa_code"]: r for r in _read("team_form.csv")}
 
 
+def reload_form():
+    """Re-read team_form.csv into the in-memory cache. Called by the server's
+    form auto-refresh after it rewrites the CSV mid-tournament, so team_form_text
+    serves the new results without a process restart."""
+    global _form
+    _form = {r["fifa_code"]: r for r in _read("team_form.csv")}
+    return _form
+
+
 def team_form_text(name):
     """Sourced recent-form summary for the analyst prompt, or '' if unknown.
     Built offline from the international-results dataset (no live query)."""
