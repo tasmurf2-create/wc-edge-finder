@@ -208,7 +208,7 @@ def get_conditions_for_match(home, away, commence):
     forecast (within 16 days), else the venue's June/July climate normal. Roofed
     stadiums are treated as climate-controlled. Falls back to the legacy hand
     tables only if the fixture isn't in the static schedule."""
-    info = static_data.venue_for_teams(home, away)
+    info = static_data.venue_for_teams(home, away, commence)
     if info:
         v = info["venue"]
         tz = v.get("timezone") or "UTC"
@@ -849,6 +849,7 @@ def get_match_intel(home, away, commence, price_notes="No price signal."):
         intel = json.loads(raw.strip())
         intel["conditions"] = cond
         intel["cached_at"]  = int(time.time())
+        intel["commence"]   = commence
 
         with _io_lock:
             cache = _load_cache()

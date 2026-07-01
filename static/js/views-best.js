@@ -450,12 +450,15 @@ function renderTopPicks() {
     return;
   }
 
-  // Sort analysed matches by kick-off (looked up from the divergence list)
+  // Sort analysed matches by kick-off. The live odds feed (allMatches) drops a
+  // fixture once bookmakers pull its markets (around kickoff), so fall back to
+  // the commence time stored on the intel itself — kept even after the match
+  // is no longer live-priced.
   const commenceBy = {};
   allMatches.forEach(m => { commenceBy[m.label] = m.commence; commenceBy[normalizeMatchLabel(m.label)] = m.commence; });
+  const now = new Date();
   let items = entries
-    .map(([l, intel]) => ({ label: l, intel, commence: commenceBy[l] || commenceBy[normalizeMatchLabel(l)] || '' }))
-    .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
+    .map(([l, intel]) => ({ label: l, intel, commence: commenceBy[l] || commenceBy[normalizeMatchLabel(l)] || intel.commence || '' }));
 
   // Page-scoped team search: keep only matches featuring the searched team.
   const fq = (pageSearch || '').trim();
@@ -469,5 +472,17 @@ function renderTopPicks() {
     return;
   }
 
-  panel.innerHTML = intro + filterNote + items.map(it => analystMatchHTML(it.label, it.intel)).join('');
+  // Upcoming fixtures first (soonest first); already-played / unknown-kickoff
+  // matches sink to the bottom (most recently played first).
+  const isUpcoming = it => it.commence && new Date(it.commence) >= now;
+  const upcoming = items.filter(isUpcoming).sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
+  const played   = items.filter(it => !isUpcoming(it)).sort((a, b) => String(b.commence).localeCompare(String(a.commence)));
+
+  const playedDivider = played.length && upcoming.length
+    ? `<div class="section-title" style="margin-top:18px"><small>Played</small></div>` : '';
+
+  panel.innerHTML = intro + filterNote
+    + upcoming.map(it => analystMatchHTML(it.label, it.intel)).join('')
+    + playedDivider
+    + played.map(it => analystMatchHTML(it.label, it.intel)).join('');
 }
