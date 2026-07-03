@@ -1710,19 +1710,25 @@ def gaa():
     except Exception as e:
         print(f"[gaa] sportbex failed: {e}")
 
-    # 2. assemble one game per PP event (PP covers both codes; Betfair is the
-    #    fair-line overlay where available)
+    # 2. assemble from the UNION of both sources, keyed by normalised event name.
+    #    Either source may be missing (e.g. Paddy Power is blocked from cloud/non-IE
+    #    IPs, so on Render only the Betfair fair line may return) — a game shows with
+    #    whatever it has: PP-only (no edge), Betfair-only (fair line + intel, no soft
+    #    price), or both (full edge).
+    keys = list(dict.fromkeys(list(soft.keys()) + [sm["event"] for sm in sharp.values()]))
     games, intel_games = [], []
-    for ev_name, s in soft.items():
+    for ev_name in keys:
         key = _norm_event(ev_name)
+        s = soft.get(ev_name, {})
         sm = sharp.get(key)
-        competition = s.get("competition", "")
+        competition = s.get("competition") or (sm.get("competition") if sm else "")
+        throw_in = s.get("throw_in") or (sm.get("throw_in") if sm else "")
         sport = _gaa_sport(competition)
-        # edges: PP price vs Betfair fair for the same runner
+        # edges: PP price vs Betfair fair for the same runner (only when both exist)
         edges = []
-        if sm:
+        if sm and s.get("match_odds"):
             fair = sm["fair"]
-            for runner, pp_odds in s.get("match_odds", {}).items():
+            for runner, pp_odds in s["match_odds"].items():
                 fr = fair.get(runner) or next(
                     (v for k, v in fair.items() if k.lower() == runner.lower()), None)
                 if not fr or not pp_odds:
@@ -1735,7 +1741,7 @@ def gaa():
                     "back": fr["back"], "lay": fr["lay"],
                     "edge_pct": edge_pct, "value": bool(edge_pct and edge_pct > 0),
                 })
-        # runner order for the header (home / draw / away as PP lists them)
+        # team names from the event label (both sources use "Home v Away")
         parts = [p.strip() for p in ev_name.replace(" vs ", " v ").split(" v ")]
         home, away = (parts + ["", ""])[:2]
         ck = gaa_intel.intel_key(home, away, sport)
@@ -1743,10 +1749,10 @@ def gaa():
             intel = _gaa_intel_cache.get(ck)
         if intel is None:
             intel_games.append({"home": home, "away": away, "sport": sport,
-                                "competition": competition, "throw_in": s.get("throw_in", "")})
+                                "competition": competition, "throw_in": throw_in})
         games.append({
             "match": ev_name, "competition": competition, "sport": sport,
-            "throw_in": s.get("throw_in", ""),
+            "throw_in": throw_in,
             "soft": s.get("match_odds", {}), "handicap": s.get("handicap", {}),
             "sharp": (sm["fair"] if sm else None),
             "edges": edges, "intel": intel,

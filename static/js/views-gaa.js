@@ -83,8 +83,8 @@ function _gaaOddsTable(game) {
         <td style="text-align:right;font-weight:700;color:${col}">${edgeTxt}</td>
       </tr>`);
     }
-  } else {
-    // No Betfair fair line (e.g. football before the exchange opens) — show PP only
+  } else if (Object.keys(soft).length) {
+    // PP but no Betfair fair line (e.g. football before the exchange opens)
     for (const [runner, price] of Object.entries(soft)) {
       rows.push(`<tr>
         <td style="font-weight:600">${esc(runner)}</td>
@@ -92,9 +92,26 @@ function _gaaOddsTable(game) {
         <td colspan="4" style="text-align:right;color:var(--tx-4)">no exchange fair line yet</td>
       </tr>`);
     }
+  } else if (game.sharp) {
+    // Betfair fair line only — e.g. Paddy Power blocked from this server's IP
+    for (const [runner, fr] of Object.entries(game.sharp)) {
+      rows.push(`<tr>
+        <td style="font-weight:600">${esc(runner)}</td>
+        <td style="text-align:right;color:var(--tx-4)">—</td>
+        <td style="text-align:right;color:var(--tx-3)">${fr.back}/${fr.lay}</td>
+        <td style="text-align:right;color:var(--tx-3)">${fr.fair_pct}%</td>
+        <td style="text-align:right;color:var(--tx-3)">${(100 / fr.fair_pct).toFixed(2)}</td>
+        <td style="text-align:right;color:var(--tx-4)">—</td>
+      </tr>`);
+    }
   }
 
   if (!rows.length) return '<div style="color:var(--tx-4)">No odds posted yet.</div>';
+
+  const ppMissing = !Object.keys(soft).length && game.sharp;
+  const note = ppMissing
+    ? `<div style="font-size:var(--fs-xs);color:var(--amber);margin-top:6px">Paddy Power price unavailable from this server (Cloudflare/geo block) — showing the Betfair fair line only.</div>`
+    : `<div style="font-size:var(--fs-xs);color:var(--tx-4);margin-top:6px">Edge = how much Paddy Power's price beats (+) or trails (−) the vig-free Betfair fair odds.</div>`;
 
   return `<table class="gaa-odds" style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
     <thead><tr style="color:var(--tx-4);font-size:var(--fs-xs);text-align:right">
@@ -103,9 +120,7 @@ function _gaaOddsTable(game) {
     </tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>
-  <div style="font-size:var(--fs-xs);color:var(--tx-4);margin-top:6px">
-    Edge = how much Paddy Power's price beats (+) or trails (−) the vig-free Betfair fair odds.
-  </div>`;
+  ${note}`;
 }
 
 // GAA analyst block — mirrors the soccer intel card but for GAA fields/markets.
