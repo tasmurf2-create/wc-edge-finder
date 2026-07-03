@@ -25,7 +25,7 @@ from football_intel import (
 
 CACHE_FILE = Path("gaa_intel_cache.json")
 CACHE_TTL = 43200          # 12h — GAA news moves slowly; re-analyse twice a day
-PROMPT_VERSION = 3         # bumped: lean single-Haiku-search research (was Sonnet x4)
+PROMPT_VERSION = 4         # bumped: temperature 0 + 2 Haiku searches/game (form + news)
 
 # Irish GAA sources accessible to Anthropic's web-search crawler. NB: independent.ie
 # and irishmirror.ie are blocked by the crawler (confirmed 400) — excluded, else the
@@ -68,15 +68,15 @@ def _cache_key(home, away, sport):
 
 
 def _web_search(prompt, max_uses, max_tokens):
-    """One web search over the GAA domain whitelist, on the cheap SEARCH_MODEL
-    (Haiku) — a SEPARATE rate-limit bucket from the Sonnet analysis, so the
-    token-heavy search results don't starve (or 429) the analysis budget. This
-    mirrors how the soccer analyst keeps searches off the Sonnet bucket."""
+    """Web search over the GAA domain whitelist, on the cheap SEARCH_MODEL (Haiku)
+    — a SEPARATE rate-limit bucket from the Sonnet analysis, so the token-heavy
+    search results don't starve (or 429) the analysis budget. temperature=0 keeps
+    the synthesis of results consistent run-to-run."""
     client = _get_search_client()
     tool = {"type": "web_search_20250305", "name": "web_search",
             "max_uses": max_uses, "allowed_domains": GAA_DOMAINS}
     resp = client.messages.create(
-        model=SEARCH_MODEL, max_tokens=max_tokens, tools=[tool],
+        model=SEARCH_MODEL, max_tokens=max_tokens, temperature=0, tools=[tool],
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(b.text for b in resp.content
@@ -84,26 +84,36 @@ def _web_search(prompt, max_uses, max_tokens):
 
 
 def _research(home, away, sport):
-    """ONE lean Haiku web search covering both counties' recent form + team news.
-    Replaces the old 4-Sonnet-searches-per-game design that was ~5x soccer's cost
-    and stalled/drained credits. Runs only on an intel cache miss (result cached
-    12h), so cost per game ≈ 1 Haiku search + 1 Sonnet analysis — soccer-level."""
+    """TWO focused Haiku searches per game — one for results/form/H2H, one for
+    team news/injuries — so the analysis sees the FULL picture and stops flipping
+    conclusions between runs. Both on cheap Haiku (separate rate bucket); runs only
+    on an intel cache miss (result cached 12h + persisted in Upstash)."""
     today = datetime.now().strftime("%d %B %Y")
     year = datetime.now().year
-    q = (
-        f"As of {today}, brief both sides of the {year} All-Ireland senior {sport} "
-        f"championship match {home} v {away}.\n"
-        f"For EACH county ({home} and {away}) give:\n"
-        f"- recent championship results this season with scores (most recent first),\n"
-        f"- any confirmed injuries, suspensions, doubts or notable returns,\n"
-        f"- one line on their main strength and one on their main weakness.\n"
-        f"Only state what you can source; if something is unknown, say so. Be concise."
+    form_q = (
+        f"As of {today}, for the {year} All-Ireland senior {sport} championship match "
+        f"{home} v {away}, give for EACH county:\n"
+        f"- their championship results this season with scores (most recent first),\n"
+        f"- current form and their main strength and main weakness,\n"
+        f"and the recent head-to-head record between {home} and {away}.\n"
+        f"Only state what you can source; if unknown, say so. Be concise."
     )
-    try:
-        return _web_search(q, max_uses=3, max_tokens=1200)
-    except Exception as e:
-        print(f"[gaa_intel] research failed for {home} v {away}: {e}")
-        return ""
+    news_q = (
+        f"As of {today}, latest team news for both {home} and {away} senior {sport} "
+        f"panels ahead of their {year} All-Ireland championship match: confirmed "
+        f"injuries, suspensions, doubts, and any players returning to fitness or the "
+        f"starting line-up. One line per player with the source's wording. If no news "
+        f"is reported for a county, say so."
+    )
+    parts = []
+    for label, q in (("FORM, RESULTS & HEAD-TO-HEAD", form_q), ("TEAM NEWS & INJURIES", news_q)):
+        try:
+            txt = _web_search(q, max_uses=3, max_tokens=1200)
+            if txt:
+                parts.append(f"### {label}\n{txt}")
+        except Exception as e:
+            print(f"[gaa_intel] {label} search failed for {home} v {away}: {e}")
+    return "\n\n".join(parts)
 
 
 def _build_prompt(home, away, sport, competition, throw_in, research):
@@ -162,7 +172,7 @@ def get_gaa_intel(home, away, sport, competition="", throw_in=""):
     try:
         client = _get_client()
         resp = client.messages.create(
-            model=MODEL, max_tokens=2200, system=SYSTEM_PROMPT,
+            model=MODEL, max_tokens=2200, temperature=0, system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": _build_prompt(
                 home, away, sport, competition, throw_in, research)}],
         )
