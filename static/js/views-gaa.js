@@ -163,6 +163,21 @@ function _gaaIntel(intel) {
   </div>`;
 }
 
+// Freshness banner for the pushed Paddy Power snapshot (Option B). Shows how long
+// ago the residential-IP fetcher last pushed, and flags it stale (>30 min).
+function _gaaSoftFreshness() {
+  const src = _gaaData?.soft_source;
+  const ts = _gaaData?.soft_updated_at;
+  if (src !== 'push' || !ts) return '';   // only relevant for the hosted push path
+  const ageMin = Math.round((Date.now() / 1000 - ts) / 60);
+  const stale = ageMin > 30;
+  const col = stale ? 'var(--amber)' : 'var(--green)';
+  const ageTxt = ageMin < 1 ? 'just now' : `${ageMin} min ago`;
+  return `<div class="legend" style="margin-bottom:12px">
+    <span style="color:${col}">● Paddy Power odds updated ${ageTxt}${stale ? ' — stale (fetcher offline?)' : ''}</span>
+  </div>`;
+}
+
 function renderGaa() {
   const panel = document.getElementById('gaa-panel');
   if (!panel) return;
@@ -178,7 +193,7 @@ function renderGaa() {
     ? `<div class="legend" style="margin-bottom:12px"><span style="color:var(--amber)">Analyst offline — set ANTHROPIC_API_KEY to enable form/injury analysis. Odds &amp; edges still live.</span></div>`
     : '';
 
-  panel.innerHTML = intelNote + games.map(game => `
+  panel.innerHTML = intelNote + _gaaSoftFreshness() + games.map(game => `
     <div class="bet-card" style="margin-bottom:16px">
       <div class="bet-card__top">
         <div>

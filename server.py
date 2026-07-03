@@ -39,7 +39,7 @@ import sportbex
 import paddypower
 import gaa_intel
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -1690,6 +1690,93 @@ def _gaa_build_intel_bg(games):
             _gaa_intel_busy = False
 
 
+# --- Paddy Power soft-odds snapshot store (Option B) ---------------------------
+# Paddy Power is Cloudflare/geo-blocked from cloud IPs, so on the hosted app it
+# can't be fetched directly. Instead a script on a residential Irish machine
+# (pp_push.py) POSTs snapshots to /api/gaa/push; we store the latest and serve it.
+# Storage is pluggable: Upstash Redis (survives Render spin-downs) if configured,
+# else an in-memory fallback (lost on restart, repopulated by the next push).
+_gaa_pp_mem = {"odds": {}, "pushed_at": None}
+
+
+def _upstash_creds():
+    return (os.environ.get("UPSTASH_REDIS_REST_URL"),
+            os.environ.get("UPSTASH_REDIS_REST_TOKEN"))
+
+
+def _upstash_cmd(url, tok, cmd):
+    req = urllib.request.Request(
+        url.rstrip("/"), data=json.dumps(cmd).encode(),
+        headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode())
+
+
+_PP_KEY = "gaa_pp_snapshot"
+
+
+def _gaa_store_set(payload):
+    url, tok = _upstash_creds()
+    if url and tok:
+        try:
+            _upstash_cmd(url, tok, ["SET", _PP_KEY, json.dumps(payload)])
+            return
+        except Exception as e:
+            print(f"[gaa] upstash set failed, using memory: {e}")
+    global _gaa_pp_mem
+    _gaa_pp_mem = payload
+
+
+def _gaa_store_get():
+    url, tok = _upstash_creds()
+    if url and tok:
+        try:
+            r = _upstash_cmd(url, tok, ["GET", _PP_KEY])
+            val = r.get("result")
+            return json.loads(val) if val else None
+        except Exception as e:
+            print(f"[gaa] upstash get failed, using memory: {e}")
+    return _gaa_pp_mem if _gaa_pp_mem.get("odds") else None
+
+
+def _get_pp_odds():
+    """Paddy Power soft odds + freshness meta. Prefers the pushed snapshot (the
+    hosted path); falls back to a direct fetch (works locally, fails on cloud IPs)."""
+    snap = _gaa_store_get()
+    if snap and snap.get("odds"):
+        return snap["odds"], {"source": "push", "updated_at": snap.get("pushed_at")}
+    try:
+        odds = paddypower.get_gaa_odds()
+        if odds:
+            return odds, {"source": "direct", "updated_at": int(time.time())}
+    except Exception as e:
+        print(f"[gaa] direct PP fetch failed: {e}")
+    return {}, {"source": "none", "updated_at": None}
+
+
+@app.post("/api/gaa/push")
+async def gaa_push(request: Request):
+    """Receive a Paddy Power odds snapshot from the residential-IP fetcher
+    (pp_push.py). Secret-protected via the X-Push-Secret header == GAA_PUSH_SECRET."""
+    secret = os.environ.get("GAA_PUSH_SECRET")
+    if not secret:
+        return JSONResponse({"error": "push not configured (GAA_PUSH_SECRET unset)"},
+                            status_code=503)
+    if request.headers.get("x-push-secret") != secret:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400)
+    odds = body.get("odds")
+    if not isinstance(odds, dict) or not odds:
+        # Reject empty pushes so a bad/blocked fetch can't wipe a good snapshot.
+        return JSONResponse({"error": "body must be a non-empty {\"odds\": {...}}"},
+                            status_code=400)
+    _gaa_store_set({"odds": odds, "pushed_at": int(time.time())})
+    return JSONResponse({"ok": True, "events": len(odds)})
+
+
 @app.get("/api/gaa")
 def gaa():
     """Consolidated GAA payload: per-game soft (PP) + sharp (Betfair fair) odds,
@@ -1701,14 +1788,11 @@ def gaa():
     #    Capture per-source status so the hosted endpoint can be diagnosed without
     #    log access (Paddy Power is expected to fail from non-IE cloud IPs).
     sources = {}
-    soft = {}
-    try:
-        soft = paddypower.get_gaa_odds()
-        sources["paddypower"] = f"ok ({len(soft)} events)" if soft \
-            else "empty (likely Cloudflare/geo block from this server's IP)"
-    except Exception as e:
-        sources["paddypower"] = f"error: {type(e).__name__}: {e}"
-        print(f"[gaa] paddypower failed: {e}")
+    soft, soft_meta = _get_pp_odds()
+    if soft:
+        sources["paddypower"] = f"ok via {soft_meta['source']} ({len(soft)} events)"
+    else:
+        sources["paddypower"] = "empty (no pushed snapshot; direct fetch blocked from this IP)"
     sharp = {}
     try:
         markets = sportbex.get_gaa_markets()
@@ -1785,6 +1869,8 @@ def gaa():
         "intel_loading": bool(intel_loading),
         "intel_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "sportbex_key_set": bool(os.environ.get("SPORTBEX_API_KEY")),
+        "soft_source": soft_meta["source"],
+        "soft_updated_at": soft_meta["updated_at"],
         "sources": sources,
     })
 

@@ -14,6 +14,12 @@ services:
         sync: false
       - key: SPORTBEX_API_KEY      # GAA tab: Betfair fair line. Set in dashboard.
         sync: false
+      - key: GAA_PUSH_SECRET       # GAA: auth for pp_push.py odds pushes. Set in dashboard.
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL   # optional: persist pushed PP snapshot across spin-downs
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
       - key: ADMIN_KEY             # unlocks the owner-only Admin tab (#/admin)
         sync: false                # set a stable secret in dashboard; else it's random per restart
       - key: PYTHON_VERSION
