@@ -32,7 +32,11 @@ import urllib.error
 import paddypower
 
 
-def _load_env(path=".env"):
+def _load_env(path=None):
+    # Resolve .env next to this script so it works under Task Scheduler/cron
+    # regardless of the current working directory.
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if os.path.exists(path):
         for line in open(path):
             line = line.strip()
