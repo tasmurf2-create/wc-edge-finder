@@ -24,10 +24,8 @@ from football_intel import (
 )
 
 CACHE_FILE = Path("gaa_intel_cache.json")
-RESEARCH_FILE = Path("gaa_research_cache.json")   # per-team research, reused across fixtures
 CACHE_TTL = 43200          # 12h — GAA news moves slowly; re-analyse twice a day
-RESEARCH_TTL = 43200       # 12h — team form + injury news
-PROMPT_VERSION = 2
+PROMPT_VERSION = 3         # bumped: lean single-Haiku-search research (was Sonnet x4)
 
 # Irish GAA sources accessible to Anthropic's web-search crawler. NB: independent.ie
 # and irishmirror.ie are blocked by the crawler (confirmed 400) — excluded, else the
@@ -69,73 +67,43 @@ def _cache_key(home, away, sport):
     return hashlib.sha1(base.encode()).hexdigest()[:16]
 
 
-def _web_search(prompt, max_uses, max_tokens, model):
-    """Web search over the GAA domain whitelist, on the chosen model. Returns text."""
-    client = _get_client() if model == MODEL else _get_search_client()
+def _web_search(prompt, max_uses, max_tokens):
+    """One web search over the GAA domain whitelist, on the cheap SEARCH_MODEL
+    (Haiku) — a SEPARATE rate-limit bucket from the Sonnet analysis, so the
+    token-heavy search results don't starve (or 429) the analysis budget. This
+    mirrors how the soccer analyst keeps searches off the Sonnet bucket."""
+    client = _get_search_client()
     tool = {"type": "web_search_20250305", "name": "web_search",
             "max_uses": max_uses, "allowed_domains": GAA_DOMAINS}
     resp = client.messages.create(
-        model=model, max_tokens=max_tokens, tools=[tool],
+        model=SEARCH_MODEL, max_tokens=max_tokens, tools=[tool],
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(b.text for b in resp.content
                    if getattr(b, "type", None) == "text").strip()
 
 
-def _research_team(team, sport):
-    """Deep, cached research for ONE county: two focused searches (championship
-    form/results, then team news/injuries), synthesised on Sonnet. Cached per
-    team (RESEARCH_TTL) so a county is researched once and reused across fixtures.
-    Cheap given the tiny field (~8 counties)."""
-    tk = f"{team.lower().strip()}|{sport}|v{PROMPT_VERSION}"
-    with _io_lock:
-        cache = _load_json(RESEARCH_FILE) or {}
-    entry = cache.get(tk)
-    if entry and (time.time() - entry.get("cached_at", 0)) < RESEARCH_TTL:
-        return entry["text"]
-
+def _research(home, away, sport):
+    """ONE lean Haiku web search covering both counties' recent form + team news.
+    Replaces the old 4-Sonnet-searches-per-game design that was ~5x soccer's cost
+    and stalled/drained credits. Runs only on an intel cache miss (result cached
+    12h), so cost per game ≈ 1 Haiku search + 1 Sonnet analysis — soccer-level."""
     today = datetime.now().strftime("%d %B %Y")
     year = datetime.now().year
-    form_q = (
-        f"As of {today}, list {team}'s results in the {year} All-Ireland senior {sport} "
-        f"championship so far this season: opponent, competition round, and final score for "
-        f"each game, most recent first. Then one line on their current form and their main "
-        f"attacking and defensive strengths/weaknesses. Only state results you can source; "
-        f"if you cannot find a result, say so rather than inventing one."
+    q = (
+        f"As of {today}, brief both sides of the {year} All-Ireland senior {sport} "
+        f"championship match {home} v {away}.\n"
+        f"For EACH county ({home} and {away}) give:\n"
+        f"- recent championship results this season with scores (most recent first),\n"
+        f"- any confirmed injuries, suspensions, doubts or notable returns,\n"
+        f"- one line on their main strength and one on their main weakness.\n"
+        f"Only state what you can source; if something is unknown, say so. Be concise."
     )
-    news_q = (
-        f"As of {today}, what is the latest team news for the {team} senior {sport} panel "
-        f"ahead of their next {year} All-Ireland championship game: confirmed injuries, "
-        f"suspensions, doubts, and any players returning to fitness or the starting fifteen? "
-        f"One line per player with the source's wording. If no news is reported, say so."
-    )
-    parts = []
-    for label, q in (("FORM & RESULTS", form_q), ("TEAM NEWS & INJURIES", news_q)):
-        try:
-            txt = _web_search(q, max_uses=5, max_tokens=1800, model=MODEL)
-            if txt:
-                parts.append(f"### {label}\n{txt}")
-        except Exception as e:
-            print(f"[gaa_intel] {team} {label} search failed: {e}")
-    text = "\n\n".join(parts)
-    if text:
-        with _io_lock:
-            cache = _load_json(RESEARCH_FILE) or {}
-            cache[tk] = {"text": text, "cached_at": int(time.time()), "team": team}
-            _save_json(RESEARCH_FILE, cache)
-    return text
-
-
-def _research(home, away, sport):
-    """Compose per-team deep research for both counties in a fixture."""
-    h = _research_team(home, sport)
-    a = _research_team(away, sport)
-    blocks = []
-    if h:
-        blocks.append(f"===== {home.upper()} =====\n{h}")
-    if a:
-        blocks.append(f"===== {away.upper()} =====\n{a}")
-    return "\n\n".join(blocks)
+    try:
+        return _web_search(q, max_uses=3, max_tokens=1200)
+    except Exception as e:
+        print(f"[gaa_intel] research failed for {home} v {away}: {e}")
+        return ""
 
 
 def _build_prompt(home, away, sport, competition, throw_in, research):
@@ -235,11 +203,10 @@ def intel_key(home, away, sport):
 
 
 def clear_cache():
-    """Delete the intel + research disk caches so the next run re-fetches fresh
-    form/injury news (used by the manual 'Refresh analysis' action)."""
-    for f in (CACHE_FILE, RESEARCH_FILE):
-        try:
-            if f.exists():
-                f.unlink()
-        except Exception as e:
-            print(f"[gaa_intel] could not clear {f}: {e}")
+    """Delete the intel disk cache so the next run re-fetches fresh form/injury
+    news (used by the manual 'Refresh analysis' action)."""
+    try:
+        if CACHE_FILE.exists():
+            CACHE_FILE.unlink()
+    except Exception as e:
+        print(f"[gaa_intel] could not clear {CACHE_FILE}: {e}")
