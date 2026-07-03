@@ -184,9 +184,11 @@ function _gaaSoftFreshness() {
   const ts = _gaaData?.soft_updated_at;
   if (src !== 'push' || !ts) return '';   // only relevant for the hosted push path
   const ageMin = Math.round((Date.now() / 1000 - ts) / 60);
-  const stale = ageMin > 30;
+  const stale = ageMin > 300;   // pusher runs every 4h; only warn if a cycle was missed
   const col = stale ? 'var(--amber)' : 'var(--green)';
-  const ageTxt = ageMin < 1 ? 'just now' : `${ageMin} min ago`;
+  const ageTxt = ageMin < 1 ? 'just now'
+    : ageMin < 90 ? `${ageMin} min ago`
+    : `${(ageMin / 60).toFixed(1)}h ago`;
   return `<div class="legend" style="margin-bottom:12px">
     <span style="color:${col}">● Paddy Power odds updated ${ageTxt}${stale ? ' — stale (fetcher offline?)' : ''}</span>
   </div>`;
