@@ -1693,6 +1693,7 @@ def _gaa_build_intel_bg(games):
                 ck = gaa_intel.intel_key(g["home"], g["away"], g.get("sport", "hurling"))
                 with _gaa_intel_lock:
                     _gaa_intel_cache[ck] = intel
+                _persist_intel()   # survive redeploys/spin-downs (Upstash)
     finally:
         with _gaa_intel_lock:
             _gaa_intel_busy = False
@@ -1705,6 +1706,7 @@ def gaa_refresh():
     global _gaa_intel_busy
     with _gaa_intel_lock:
         _gaa_intel_cache.clear()
+    _kv_set(_INTEL_KEY, {})       # clear persisted copy too
     gaa_intel.clear_cache()
     return JSONResponse({"ok": True})
 
@@ -1715,7 +1717,10 @@ def gaa_refresh():
 # (pp_push.py) POSTs snapshots to /api/gaa/push; we store the latest and serve it.
 # Storage is pluggable: Upstash Redis (survives Render spin-downs) if configured,
 # else an in-memory fallback (lost on restart, repopulated by the next push).
-_gaa_pp_mem = {"odds": {}, "pushed_at": None}
+# Generic key/value store: Upstash Redis if configured (persists across Render
+# redeploys/spin-downs), else an in-memory fallback (lost on restart). Used for
+# both the pushed PP odds snapshot AND the analyst intel cache.
+_kv_mem = {}
 
 
 def _upstash_creds():
@@ -1731,37 +1736,58 @@ def _upstash_cmd(url, tok, cmd):
         return json.loads(resp.read().decode())
 
 
-_PP_KEY = "gaa_pp_snapshot"
-
-
-def _gaa_store_set(payload):
+def _kv_set(key, payload):
     url, tok = _upstash_creds()
     if url and tok:
         try:
-            _upstash_cmd(url, tok, ["SET", _PP_KEY, json.dumps(payload)])
+            _upstash_cmd(url, tok, ["SET", key, json.dumps(payload)])
             return
         except Exception as e:
-            print(f"[gaa] upstash set failed, using memory: {e}")
-    global _gaa_pp_mem
-    _gaa_pp_mem = payload
+            print(f"[gaa] upstash set {key} failed, using memory: {e}")
+    _kv_mem[key] = payload
 
 
-def _gaa_store_get():
+def _kv_get(key):
     url, tok = _upstash_creds()
     if url and tok:
         try:
-            r = _upstash_cmd(url, tok, ["GET", _PP_KEY])
+            r = _upstash_cmd(url, tok, ["GET", key])
             val = r.get("result")
             return json.loads(val) if val else None
         except Exception as e:
-            print(f"[gaa] upstash get failed, using memory: {e}")
-    return _gaa_pp_mem if _gaa_pp_mem.get("odds") else None
+            print(f"[gaa] upstash get {key} failed, using memory: {e}")
+    return _kv_mem.get(key)
+
+
+_PP_KEY = "gaa_pp_snapshot"
+_INTEL_KEY = "gaa_intel_cache"
+_gaa_intel_store_loaded = False
+
+
+def _load_intel_from_store():
+    """One-time pull of the persisted intel cache into memory so analyst write-ups
+    survive redeploys/spin-downs (when Upstash is configured)."""
+    global _gaa_intel_store_loaded
+    if _gaa_intel_store_loaded:
+        return
+    snap = _kv_get(_INTEL_KEY)
+    if isinstance(snap, dict) and snap:
+        with _gaa_intel_lock:
+            for k, v in snap.items():
+                _gaa_intel_cache.setdefault(k, v)
+    _gaa_intel_store_loaded = True
+
+
+def _persist_intel():
+    with _gaa_intel_lock:
+        snapshot = dict(_gaa_intel_cache)
+    _kv_set(_INTEL_KEY, snapshot)
 
 
 def _get_pp_odds():
     """Paddy Power soft odds + freshness meta. Prefers the pushed snapshot (the
     hosted path); falls back to a direct fetch (works locally, fails on cloud IPs)."""
-    snap = _gaa_store_get()
+    snap = _kv_get(_PP_KEY)
     if snap and snap.get("odds"):
         return snap["odds"], {"source": "push", "updated_at": snap.get("pushed_at")}
     try:
@@ -1792,7 +1818,7 @@ async def gaa_push(request: Request):
         # Reject empty pushes so a bad/blocked fetch can't wipe a good snapshot.
         return JSONResponse({"error": "body must be a non-empty {\"odds\": {...}}"},
                             status_code=400)
-    _gaa_store_set({"odds": odds, "pushed_at": int(time.time())})
+    _kv_set(_PP_KEY, {"odds": odds, "pushed_at": int(time.time())})
     return JSONResponse({"ok": True, "events": len(odds)})
 
 
@@ -1802,6 +1828,8 @@ def gaa():
     computed edges, and cached Claude intel. Odds return immediately; intel fills
     in via a background thread (poll again while intel_loading is true)."""
     global _gaa_intel_busy
+
+    _load_intel_from_store()   # restore persisted write-ups after a restart
 
     # 1. odds from both sources (each self-caches; degrade gracefully on failure).
     #    Capture per-source status so the hosted endpoint can be diagnosed without
