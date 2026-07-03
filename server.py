@@ -1699,6 +1699,24 @@ def _gaa_build_intel_bg(games):
             _gaa_intel_busy = False
 
 
+@app.get("/api/gaa/diag")
+def gaa_diag():
+    """Upstash health check — is it configured and does a SET/GET round-trip work?"""
+    url, tok = _upstash_creds()
+    status = {"url_set": bool(url), "token_set": bool(tok),
+              "url_prefix": (url[:22] + "…") if url else None}
+    if url and tok:
+        try:
+            _upstash_cmd(url, tok, ["SET", "gaa_healthcheck", "ok"])
+            r = _upstash_cmd(url, tok, ["GET", "gaa_healthcheck"])
+            status["roundtrip"] = "ok" if r.get("result") == "ok" else f"unexpected: {r}"
+        except Exception as e:
+            status["roundtrip"] = f"error: {type(e).__name__}: {str(e)[:180]}"
+    pp = _kv_get(_PP_KEY)
+    status["pp_snapshot_present"] = bool(pp and pp.get("odds"))
+    return JSONResponse(status)
+
+
 @app.post("/api/gaa/refresh")
 def gaa_refresh():
     """Manual 'Refresh analysis': clear the intel + research caches so the next
