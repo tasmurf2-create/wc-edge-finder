@@ -1869,6 +1869,7 @@ def gaa():
         "intel_loading": bool(intel_loading),
         "intel_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "sportbex_key_set": bool(os.environ.get("SPORTBEX_API_KEY")),
+        "push_configured": bool(os.environ.get("GAA_PUSH_SECRET")),
         "soft_source": soft_meta["source"],
         "soft_updated_at": soft_meta["updated_at"],
         "sources": sources,
