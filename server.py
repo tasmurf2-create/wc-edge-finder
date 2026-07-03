@@ -1697,17 +1697,27 @@ def gaa():
     in via a background thread (poll again while intel_loading is true)."""
     global _gaa_intel_busy
 
-    # 1. odds from both sources (each self-caches; degrade gracefully on failure)
+    # 1. odds from both sources (each self-caches; degrade gracefully on failure).
+    #    Capture per-source status so the hosted endpoint can be diagnosed without
+    #    log access (Paddy Power is expected to fail from non-IE cloud IPs).
+    sources = {}
     soft = {}
     try:
         soft = paddypower.get_gaa_odds()
+        sources["paddypower"] = f"ok ({len(soft)} events)" if soft \
+            else "empty (likely Cloudflare/geo block from this server's IP)"
     except Exception as e:
+        sources["paddypower"] = f"error: {type(e).__name__}: {e}"
         print(f"[gaa] paddypower failed: {e}")
     sharp = {}
     try:
-        for m in sportbex.get_gaa_markets():
+        markets = sportbex.get_gaa_markets()
+        for m in markets:
             sharp[_norm_event(m["event"])] = m
+        sources["sportbex"] = f"ok ({len(markets)} markets)" if markets \
+            else "empty (no live markets returned)"
     except Exception as e:
+        sources["sportbex"] = f"error: {type(e).__name__}: {e}"
         print(f"[gaa] sportbex failed: {e}")
 
     # 2. assemble from the UNION of both sources, keyed by normalised event name.
@@ -1774,6 +1784,8 @@ def gaa():
         "games": games,
         "intel_loading": bool(intel_loading),
         "intel_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "sportbex_key_set": bool(os.environ.get("SPORTBEX_API_KEY")),
+        "sources": sources,
     })
 
 
