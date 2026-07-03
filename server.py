@@ -1677,17 +1677,36 @@ def _norm_event(name: str) -> str:
 
 
 def _gaa_build_intel_bg(games):
-    """Background: run Claude analysis for the given games, fill the cache."""
+    """Background: run Claude analysis per game, publishing each to the in-memory
+    cache as soon as it finishes so cards fill in one-by-one (not all-at-once)."""
     global _gaa_intel_busy
     try:
-        raw = gaa_intel.get_gaa_intel_batch(games)
-        with _gaa_intel_lock:
-            _gaa_intel_cache.update(raw)
-    except Exception as e:
-        print(f"[gaa] background intel failed: {e}")
+        for g in games:
+            try:
+                intel = gaa_intel.get_gaa_intel(
+                    g["home"], g["away"], g.get("sport", "hurling"),
+                    g.get("competition", ""), g.get("throw_in", ""))
+            except Exception as e:
+                print(f"[gaa] intel {g['home']} v {g['away']} failed: {e}")
+                intel = None
+            if intel:
+                ck = gaa_intel.intel_key(g["home"], g["away"], g.get("sport", "hurling"))
+                with _gaa_intel_lock:
+                    _gaa_intel_cache[ck] = intel
     finally:
         with _gaa_intel_lock:
             _gaa_intel_busy = False
+
+
+@app.post("/api/gaa/refresh")
+def gaa_refresh():
+    """Manual 'Refresh analysis': clear the intel + research caches so the next
+    /api/gaa re-fetches fresh form/injury news for every game."""
+    global _gaa_intel_busy
+    with _gaa_intel_lock:
+        _gaa_intel_cache.clear()
+    gaa_intel.clear_cache()
+    return JSONResponse({"ok": True})
 
 
 # --- Paddy Power soft-odds snapshot store (Option B) ---------------------------

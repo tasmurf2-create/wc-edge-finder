@@ -232,3 +232,14 @@ def get_gaa_intel_batch(games):
 def intel_key(home, away, sport):
     """Public cache-key helper so the server can look up cached intel per game."""
     return _cache_key(home, away, sport)
+
+
+def clear_cache():
+    """Delete the intel + research disk caches so the next run re-fetches fresh
+    form/injury news (used by the manual 'Refresh analysis' action)."""
+    for f in (CACHE_FILE, RESEARCH_FILE):
+        try:
+            if f.exists():
+                f.unlink()
+        except Exception as e:
+            print(f"[gaa_intel] could not clear {f}: {e}")

@@ -39,6 +39,20 @@ async function loadGaa(force = false) {
   }
 }
 
+async function refreshGaa() {
+  const btn = document.getElementById('gaa-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing analysis…'; }
+  try {
+    await fetch('/api/gaa/refresh', { method: 'POST' });
+    _gaaData = null;                 // force a fresh fetch + re-render
+    await loadGaa(true);
+    if (!_gaaPollTimer) _gaaPollTimer = setInterval(pollGaa, 8000);
+  } catch { /* ignore */ }
+  finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh analysis'; }
+  }
+}
+
 async function pollGaa() {
   try {
     const res = await fetch('/api/gaa');
@@ -193,7 +207,12 @@ function renderGaa() {
     ? `<div class="legend" style="margin-bottom:12px"><span style="color:var(--amber)">Analyst offline — set ANTHROPIC_API_KEY to enable form/injury analysis. Odds &amp; edges still live.</span></div>`
     : '';
 
-  panel.innerHTML = intelNote + _gaaSoftFreshness() + games.map(game => `
+  const toolbar = `<div class="toolbar" style="justify-content:flex-end">
+    <button id="gaa-refresh-btn" class="btn btn--sm" onclick="refreshGaa()"
+      title="Re-run the analyst research to pick up the latest form &amp; injury news">↻ Refresh analysis</button>
+  </div>`;
+
+  panel.innerHTML = toolbar + intelNote + _gaaSoftFreshness() + games.map(game => `
     <div class="bet-card" style="margin-bottom:16px">
       <div class="bet-card__top">
         <div>
