@@ -35,6 +35,9 @@ import wc_odds
 import prediction_markets as pmkt
 import football_intel as fintel
 import static_data
+import sportbex
+import paddypower
+import gaa_intel
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -1650,6 +1653,122 @@ def refresh():
     d = get_raw(force=force)
     return JSONResponse({"fetched_at": d["fetched_at"], "matches": d["matches"], "bets": d["bets"],
                          "forced": force})
+
+
+# ---------------------------------------------------------------------------
+# GAA (hurling + gaelic football) — a self-contained consolidated tab.
+# Odds: Paddy Power (soft, paddypower.py) vs Betfair Exchange fair line
+# (sharp, sportbex.py). Intel: gaa_intel.py (Claude, web-search team context).
+# Nothing here touches the soccer pipeline.
+# ---------------------------------------------------------------------------
+_gaa_intel_cache = {}          # {intel_key: intel_dict}
+_gaa_intel_lock  = threading.Lock()
+_gaa_intel_busy  = False
+
+
+def _gaa_sport(competition: str) -> str:
+    return "football" if "football" in (competition or "").lower() else "hurling"
+
+
+def _norm_event(name: str) -> str:
+    """Normalise 'Cork v Galway' for cross-source matching (order-independent)."""
+    parts = name.lower().replace(" vs ", " v ").split(" v ")
+    return " v ".join(sorted(p.strip() for p in parts))
+
+
+def _gaa_build_intel_bg(games):
+    """Background: run Claude analysis for the given games, fill the cache."""
+    global _gaa_intel_busy
+    try:
+        raw = gaa_intel.get_gaa_intel_batch(games)
+        with _gaa_intel_lock:
+            _gaa_intel_cache.update(raw)
+    except Exception as e:
+        print(f"[gaa] background intel failed: {e}")
+    finally:
+        with _gaa_intel_lock:
+            _gaa_intel_busy = False
+
+
+@app.get("/api/gaa")
+def gaa():
+    """Consolidated GAA payload: per-game soft (PP) + sharp (Betfair fair) odds,
+    computed edges, and cached Claude intel. Odds return immediately; intel fills
+    in via a background thread (poll again while intel_loading is true)."""
+    global _gaa_intel_busy
+
+    # 1. odds from both sources (each self-caches; degrade gracefully on failure)
+    soft = {}
+    try:
+        soft = paddypower.get_gaa_odds()
+    except Exception as e:
+        print(f"[gaa] paddypower failed: {e}")
+    sharp = {}
+    try:
+        for m in sportbex.get_gaa_markets():
+            sharp[_norm_event(m["event"])] = m
+    except Exception as e:
+        print(f"[gaa] sportbex failed: {e}")
+
+    # 2. assemble one game per PP event (PP covers both codes; Betfair is the
+    #    fair-line overlay where available)
+    games, intel_games = [], []
+    for ev_name, s in soft.items():
+        key = _norm_event(ev_name)
+        sm = sharp.get(key)
+        competition = s.get("competition", "")
+        sport = _gaa_sport(competition)
+        # edges: PP price vs Betfair fair for the same runner
+        edges = []
+        if sm:
+            fair = sm["fair"]
+            for runner, pp_odds in s.get("match_odds", {}).items():
+                fr = fair.get(runner) or next(
+                    (v for k, v in fair.items() if k.lower() == runner.lower()), None)
+                if not fr or not pp_odds:
+                    continue
+                fair_odds = 100.0 / fr["fair_pct"] if fr["fair_pct"] else None
+                edge_pct = round((pp_odds - fair_odds) / fair_odds * 100, 1) if fair_odds else None
+                edges.append({
+                    "runner": runner, "pp": pp_odds,
+                    "fair_pct": fr["fair_pct"], "fair_odds": round(fair_odds, 2) if fair_odds else None,
+                    "back": fr["back"], "lay": fr["lay"],
+                    "edge_pct": edge_pct, "value": bool(edge_pct and edge_pct > 0),
+                })
+        # runner order for the header (home / draw / away as PP lists them)
+        parts = [p.strip() for p in ev_name.replace(" vs ", " v ").split(" v ")]
+        home, away = (parts + ["", ""])[:2]
+        ck = gaa_intel.intel_key(home, away, sport)
+        with _gaa_intel_lock:
+            intel = _gaa_intel_cache.get(ck)
+        if intel is None:
+            intel_games.append({"home": home, "away": away, "sport": sport,
+                                "competition": competition, "throw_in": s.get("throw_in", "")})
+        games.append({
+            "match": ev_name, "competition": competition, "sport": sport,
+            "throw_in": s.get("throw_in", ""),
+            "soft": s.get("match_odds", {}), "handicap": s.get("handicap", {}),
+            "sharp": (sm["fair"] if sm else None),
+            "edges": edges, "intel": intel,
+        })
+
+    games.sort(key=lambda g: g.get("throw_in", ""))
+
+    # 3. kick off background intel for any game missing it
+    with _gaa_intel_lock:
+        loading = bool(intel_games) and os.environ.get("ANTHROPIC_API_KEY")
+        if intel_games and not _gaa_intel_busy and os.environ.get("ANTHROPIC_API_KEY"):
+            _gaa_intel_busy = True
+            threading.Thread(target=_gaa_build_intel_bg, args=(intel_games,),
+                             daemon=True).start()
+        intel_loading = _gaa_intel_busy
+
+    return JSONResponse({
+        "fetched_at": int(time.time()),
+        "games": games,
+        "intel_loading": bool(intel_loading),
+        "intel_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
+    })
 
 
 @app.get("/")
