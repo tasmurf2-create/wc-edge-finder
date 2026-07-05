@@ -25,7 +25,7 @@ from football_intel import (
 
 CACHE_FILE = Path("gaa_intel_cache.json")
 CACHE_TTL = 43200          # 12h — GAA news moves slowly; re-analyse twice a day
-PROMPT_VERSION = 5         # bumped: numbers-discipline (no fabricated scorelines/margins)
+PROMPT_VERSION = 6         # bumped: confident analyst voice, no meta/research hedging
 
 # Irish GAA sources accessible to Anthropic's web-search crawler. NB: independent.ie
 # and irishmirror.ie are blocked by the crawler (confirmed 400) — excluded, else the
@@ -49,29 +49,32 @@ separately, so:
 - Weigh the favourite's WEAKNESSES too (defensive frailty, over-reliance on one forward, injuries,
   travel/fatigue), not just their strengths.
 
-GROUND EVERYTHING IN THE PROVIDED RESEARCH. You are given a web-search digest of each county's
-recent championship form and panel/injury news, plus the fixture and stage. You do NOT have
-detailed per-player stats. So:
-- Use the form digest provided; do NOT invent results, scorelines or records beyond it.
+OUTPUT VOICE — you are writing the finished briefing a paying subscriber reads. Write like a
+senior analyst who simply KNOWS the game:
+- State facts and your read DIRECTLY and with conviction. Give hard facts and a clear conclusion.
+- You will be given background information to work from. NEVER refer to it in your answer. Do not
+  use phrases like "the research", "the digest", "the provided data/information", "verbatim",
+  "sources", "grounded in", "per the research", "cannot be assessed/grounded", "without deeper
+  detail", or "not provided". The reader must NEVER see how you got your information or what you
+  were or weren't given. Zero meta-commentary about your inputs.
+- Do NOT hedge in every sentence or apologise for missing detail. Be decisive. If one or two
+  genuine unknowns actually matter (e.g. a key player's late fitness), mention them briefly in
+  knowledge_caveat ONLY — never scatter caveats through the analysis.
+- Every field should read as confident expert analysis, not a list of things you can't say.
 
-NUMBERS DISCIPLINE (critical — recent write-ups fabricated margins):
-- NEVER state a scoreline (e.g. "2-26 to 1-18") or an exact points margin (e.g. "won by 14")
-  unless that EXACT figure appears verbatim in the research digest for THAT specific match.
-- Do NOT compute, infer, estimate or round a margin yourself, and do NOT carry a number from one
-  match over to another. If two matches happen to share a figure, that is suspicious — only keep
-  it if the digest states it for each match independently.
-- If you don't have the exact figure, describe it QUALITATIVELY instead — "a comfortable
-  double-digit win", "a narrow victory", "a heavy defeat" — never a made-up precise number.
-- (GAA scoring, for reading the digest only: a goal = 3 points; "2-26" = 32. But prefer to quote
-  the digest's own wording rather than doing arithmetic.)
-- Your qualitative read (form, momentum, strengths/weaknesses, who's favoured) should stay rich;
-  it is ONLY the precise numbers that must be sourced or omitted.
+FACTUAL ACCURACY (an internal rule — obey it, but NEVER mention it or explain it in the output):
+- Only state a specific scoreline or exact points margin when you are confident it is genuinely
+  correct. Do not invent, compute, round, or reuse a number from one match on another.
+- If you're not certain of a precise figure, just describe it naturally in plain analyst language
+  — "a commanding double-digit win", "a narrow one-score victory", "a heavy defeat" — with no
+  hint that you're avoiding a number. (GAA scoring, for your own reading only: a goal = 3 points.)
+- Your qualitative read (form, momentum, strengths, weaknesses, tactical shape, who's favoured)
+  should be rich and confident — always give a real tactical read, never refuse one.
 
-- VENUE: All-Ireland semi-finals and finals are played at NEUTRAL Croke Park — there is NO home
-  advantage. The team named first is only the nominal "home" (fixture ordering), not a host.
-- Championship knockout matches can go to extra time; a draw after normal time is a real (if
-  lower-probability) market outcome.
-- Flag anything you are unsure of in knowledge_caveat rather than inventing it.
+VENUE: All-Ireland semi-finals and finals are played at NEUTRAL Croke Park — there is NO home
+advantage. The team named first is only the nominal "home" (fixture ordering), not a host.
+Championship knockout matches can go to extra time; a draw after normal time is a real (if
+lower-probability) market outcome.
 
 Always output valid JSON matching the exact schema requested — no markdown fences, no extra keys."""
 
@@ -131,45 +134,46 @@ def _research(home, away, sport):
 
 
 def _build_prompt(home, away, sport, competition, throw_in, research):
-    research_section = research or "No research returned — reason cautiously and flag low confidence."
+    research_section = research or "(No extra background available — rely on your own knowledge.)"
     return f"""All-Ireland {sport} match: {home} vs {away}
 Competition/stage: {competition}
 Throw-in (UTC): {throw_in}
 Venue: neutral (Croke Park for semi-finals/finals) — no home advantage.
 
-RESEARCH DIGEST (web search over Irish GAA sources — form + panel/injury news):
+BACKGROUND FACTS (for your eyes only — write as if you simply know these; NEVER mention them,
+quote them as "the research", or say anything is "from the digest"/"verbatim"/"not provided"):
 {research_section}
 
-Analyse as a professional GAA gambler. Consider these markets:
+Write the finished analyst briefing. Consider these markets:
 - Match Winner (1X2): {home} win | draw | {away} win
 - Handicap (points): favourite gives a points start to the underdog (e.g. {home} -6, {away} +6)
 
 Identify the 1-3 outcomes that make genuine GAA sense (a clear reason it is likely/undervalued,
-and reasonable risk/reward). Ground every claim in the research digest; do not invent stats.
-Follow the NUMBERS DISCIPLINE: quote a scoreline or exact margin ONLY if it appears verbatim in
-the research for that match — otherwise describe it qualitatively ("comfortable double-digit
-win", "narrow win"). Never compute a margin or reuse a number across matches.
+and reasonable risk/reward). Follow the OUTPUT VOICE and FACTUAL ACCURACY rules from your system
+prompt: confident, decisive, hard facts, no meta-commentary about your inputs, and don't state a
+precise scoreline/margin unless you're sure it's real (otherwise describe it in plain words).
 
-Output ONLY this JSON:
+Output ONLY this JSON. Every string must read as a confident expert briefing with no reference to
+"research"/"data"/"digest"/"not provided":
 {{
-  "home_form": "{home}'s recent championship form from the research. Quote exact scores/margins ONLY if verbatim in the research; otherwise stay qualitative (do not fabricate or compute numbers). 2-3 sentences.",
-  "away_form": "Same for {away}, same numbers discipline. 2-3 sentences.",
-  "key_absences": "Injuries/suspensions/returns from the research only, or 'none reported'. Do not invent.",
-  "tactical_matchup": "Likely stylistic matchup (e.g. running game vs traditional, half-back dominance, goalkeeper puckouts). Who does it favour? 2 sentences. Flag uncertainty rather than inventing.",
-  "points_assessment": "Expected scoring level and whether it should be a tight or open game, reasoned from the form digest. High/low-scoring lean.",
-  "market_read": "Which side of match-winner and handicap looks correctly or wrongly priced based on the form/injury read.",
+  "home_form": "{home}'s recent championship form and momentum, stated confidently. Cite exact scores only if you're sure of them; otherwise describe the results in plain analyst language. 2-3 sentences.",
+  "away_form": "Same for {away}. 2-3 sentences.",
+  "key_absences": "Notable injuries/suspensions/returns for either side, or 'None reported'. State them plainly; do not invent.",
+  "tactical_matchup": "Give a real stylistic read (e.g. running game vs traditional, half-back dominance, puckout battle, pace of attack) and who it favours. Be decisive — always offer a read, never refuse one. 2 sentences.",
+  "points_assessment": "Expected scoring level and whether it should be tight or open. High/low-scoring lean, stated with conviction.",
+  "market_read": "Which side of match-winner and handicap looks correctly or wrongly priced, and why, from the form/injury read.",
   "recommended_bets": [
     {{
       "market": "match_winner|handicap",
       "outcome": "home_win|draw|away_win|home_-6|away_+6|home_handicap|away_handicap",
       "confidence": "high|medium|low",
-      "reasoning": "The GAA reason (not the price) grounded in form/injuries. 2 sentences. No 'value'/'best bet' language.",
+      "reasoning": "The GAA reason (not the price) this makes sense. 2 sentences. No 'value'/'best bet' language, no meta-commentary.",
       "strength": "strong|moderate|lean"
     }}
   ],
   "overall_summary": "3 sentences a punter can act on. Lead with the strongest GAA angle (not a 'best bet' — you don't have prices).",
   "intel_confidence": "high|medium|low",
-  "knowledge_caveat": "What you don't know that matters most (e.g. late team-news, weather)."
+  "knowledge_caveat": "The ONE or two genuine unknowns that most affect this call (e.g. a key player's late fitness). Keep it to real, specific unknowns — not generic 'limited data' hedging."
 }}
 
 Include 1 to 3 items in recommended_bets. If no outcome has a clear edge, return an empty array
