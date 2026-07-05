@@ -194,6 +194,98 @@ function _gaaSoftFreshness() {
   </div>`;
 }
 
+// ---- Suggested Bets: one pick per game (analyst-led, priced on Paddy Power) + a parlay ----
+function _gaaTeams(match) {
+  const p = match.replace(/ vs /i, ' v ').split(' v ');
+  return { home: (p[0] || '').trim(), away: (p[1] || '').trim() };
+}
+
+// Choose a suggested bet for one game and price it on Paddy Power.
+function _gaaPick(game) {
+  const { home, away } = _gaaTeams(game.match);
+  const soft = game.soft || {}, hcap = game.handicap || {};
+  const recs = (game.intel && game.intel.recommended_bets) || [];
+
+  const mw = recs.find(r => r.market === 'match_winner');
+  const hc = recs.find(r => r.market === 'handicap');
+
+  // 1. analyst match-winner pick
+  if (mw) {
+    const sel = mw.outcome === 'home_win' ? home : mw.outcome === 'away_win' ? away
+              : mw.outcome === 'draw' ? 'Draw' : null;
+    const price = sel && soft[sel];
+    if (price) {
+      const edge = (game.edges || []).find(e => e.runner === sel);
+      return { market: 'Match Winner', label: sel === 'Draw' ? 'Draw' : `${sel} to win`,
+               price, strength: mw.strength, mw: true,
+               edge: edge && edge.edge_pct, value: edge && edge.value };
+    }
+  }
+  // 2. analyst handicap pick
+  if (hc) {
+    const side = hc.outcome.startsWith('away') ? away : home;
+    const price = hcap[side];
+    if (price) return { market: 'Handicap', label: `${side} (handicap)`, price, strength: hc.strength };
+  }
+  // 3. fallback: market favourite (shortest match-winner price)
+  const runners = Object.entries(soft).filter(([k]) => k !== 'Draw');
+  if (runners.length) {
+    runners.sort((a, b) => a[1] - b[1]);
+    const [sel, price] = runners[0];
+    return { market: 'Match Winner', label: `${sel} to win`, price, strength: 'market favourite', mw: true };
+  }
+  return null;
+}
+
+function _gaaSuggestions(games) {
+  const upcoming = games.filter(g => g.soft && Object.keys(g.soft).length);
+  if (!upcoming.length) return '';
+
+  const picks = upcoming.map(g => ({ game: g, pick: _gaaPick(g) })).filter(x => x.pick);
+  if (!picks.length) return '';
+
+  const singleRows = picks.map(({ game, pick }) => {
+    const sc = pick.strength === 'strong' ? 'var(--green)' : pick.strength === 'moderate' ? 'var(--amber)' : 'var(--tx-3)';
+    const edgeTxt = pick.edge != null
+      ? ` · <span style="color:${pick.value ? 'var(--green)' : 'var(--tx-4)'}">edge ${pick.edge > 0 ? '+' : ''}${pick.edge}%</span>` : '';
+    return `<tr>
+      <td style="color:var(--tx-3)">${esc(game.match)}</td>
+      <td style="font-weight:600">${esc(pick.label)} <span style="font-weight:400;color:var(--tx-4);font-size:var(--fs-xs)">${esc(pick.market)}</span></td>
+      <td style="text-align:right;font-weight:700">${(+pick.price).toFixed(2)}</td>
+      <td style="text-align:right;color:${sc};font-size:var(--fs-xs)">${esc(pick.strength || '')}${edgeTxt}</td>
+    </tr>`;
+  }).join('');
+
+  // Parlay from the match-winner legs (cleanest to combine)
+  const legs = picks.filter(p => p.pick.mw).map(p => ({ match: p.game.match, label: p.pick.label, price: +p.pick.price }));
+  let parlayHTML = '';
+  if (legs.length >= 2) {
+    const combined = legs.reduce((a, l) => a * l.price, 1);
+    const ret = combined * 10;
+    parlayHTML = `<div style="margin-top:12px;border-top:1px solid var(--line-1);padding-top:10px">
+      <div style="font-weight:700;margin-bottom:4px">${legs.length}-fold parlay <span style="font-weight:400;color:var(--tx-4);font-size:var(--fs-xs)">(match winners)</span></div>
+      <div style="color:var(--tx-3);font-size:var(--fs-sm)">${legs.map(l => `${esc(l.label)} @ ${l.price.toFixed(2)}`).join(' &nbsp;+&nbsp; ')}</div>
+      <div style="margin-top:6px">Combined odds <strong>${combined.toFixed(2)}</strong> · €10 returns <strong style="color:var(--green)">€${ret.toFixed(2)}</strong></div>
+    </div>`;
+  }
+
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="card__body">
+      <div style="font-weight:800;font-size:var(--fs-md);margin-bottom:8px">💡 Suggested Bets</div>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead><tr style="color:var(--tx-4);font-size:var(--fs-xs);text-align:left">
+          <th>Game</th><th>Selection</th><th style="text-align:right">PP odds</th><th style="text-align:right">Analyst</th>
+        </tr></thead>
+        <tbody>${singleRows}</tbody>
+      </table>
+      ${parlayHTML}
+      <div style="font-size:var(--fs-xs);color:var(--tx-4);margin-top:10px">
+        Analyst-led picks priced on Paddy Power. Over/Under (total points) isn't posted for GAA on Paddy Power, so it's not shown. Not advice — check the reasoning on each card below.
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderGaa() {
   const panel = document.getElementById('gaa-panel');
   if (!panel) return;
@@ -214,7 +306,7 @@ function renderGaa() {
       title="Re-run the analyst research to pick up the latest form &amp; injury news">↻ Refresh analysis</button>
   </div>`;
 
-  panel.innerHTML = toolbar + intelNote + _gaaSoftFreshness() + games.map(game => `
+  panel.innerHTML = toolbar + intelNote + _gaaSoftFreshness() + _gaaSuggestions(games) + games.map(game => `
     <div class="bet-card" style="margin-bottom:16px">
       <div class="bet-card__top">
         <div>
