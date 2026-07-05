@@ -25,7 +25,7 @@ from football_intel import (
 
 CACHE_FILE = Path("gaa_intel_cache.json")
 CACHE_TTL = 43200          # 12h — GAA news moves slowly; re-analyse twice a day
-PROMPT_VERSION = 4         # bumped: temperature 0 + 2 Haiku searches/game (form + news)
+PROMPT_VERSION = 5         # bumped: numbers-discipline (no fabricated scorelines/margins)
 
 # Irish GAA sources accessible to Anthropic's web-search crawler. NB: independent.ie
 # and irishmirror.ie are blocked by the crawler (confirmed 400) — excluded, else the
@@ -53,6 +53,20 @@ GROUND EVERYTHING IN THE PROVIDED RESEARCH. You are given a web-search digest of
 recent championship form and panel/injury news, plus the fixture and stage. You do NOT have
 detailed per-player stats. So:
 - Use the form digest provided; do NOT invent results, scorelines or records beyond it.
+
+NUMBERS DISCIPLINE (critical — recent write-ups fabricated margins):
+- NEVER state a scoreline (e.g. "2-26 to 1-18") or an exact points margin (e.g. "won by 14")
+  unless that EXACT figure appears verbatim in the research digest for THAT specific match.
+- Do NOT compute, infer, estimate or round a margin yourself, and do NOT carry a number from one
+  match over to another. If two matches happen to share a figure, that is suspicious — only keep
+  it if the digest states it for each match independently.
+- If you don't have the exact figure, describe it QUALITATIVELY instead — "a comfortable
+  double-digit win", "a narrow victory", "a heavy defeat" — never a made-up precise number.
+- (GAA scoring, for reading the digest only: a goal = 3 points; "2-26" = 32. But prefer to quote
+  the digest's own wording rather than doing arithmetic.)
+- Your qualitative read (form, momentum, strengths/weaknesses, who's favoured) should stay rich;
+  it is ONLY the precise numbers that must be sourced or omitted.
+
 - VENUE: All-Ireland semi-finals and finals are played at NEUTRAL Croke Park — there is NO home
   advantage. The team named first is only the nominal "home" (fixture ordering), not a host.
 - Championship knockout matches can go to extra time; a draw after normal time is a real (if
@@ -132,11 +146,14 @@ Analyse as a professional GAA gambler. Consider these markets:
 
 Identify the 1-3 outcomes that make genuine GAA sense (a clear reason it is likely/undervalued,
 and reasonable risk/reward). Ground every claim in the research digest; do not invent stats.
+Follow the NUMBERS DISCIPLINE: quote a scoreline or exact margin ONLY if it appears verbatim in
+the research for that match — otherwise describe it qualitatively ("comfortable double-digit
+win", "narrow win"). Never compute a margin or reuse a number across matches.
 
 Output ONLY this JSON:
 {{
-  "home_form": "{home}'s recent championship form from the research. Cite real results/scores where given; do not invent. 2-3 sentences.",
-  "away_form": "Same for {away}. 2-3 sentences.",
+  "home_form": "{home}'s recent championship form from the research. Quote exact scores/margins ONLY if verbatim in the research; otherwise stay qualitative (do not fabricate or compute numbers). 2-3 sentences.",
+  "away_form": "Same for {away}, same numbers discipline. 2-3 sentences.",
   "key_absences": "Injuries/suspensions/returns from the research only, or 'none reported'. Do not invent.",
   "tactical_matchup": "Likely stylistic matchup (e.g. running game vs traditional, half-back dominance, goalkeeper puckouts). Who does it favour? 2 sentences. Flag uncertainty rather than inventing.",
   "points_assessment": "Expected scoring level and whether it should be a tight or open game, reasoned from the form digest. High/low-scoring lean.",
