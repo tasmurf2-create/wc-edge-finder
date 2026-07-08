@@ -20,6 +20,8 @@ intel_cache.json
 weather_cache.json
 injury_digest.json
 team_profiles.json
+gaa_intel_cache.json
+gaa_research_cache.json
 
 # Local Claude tooling
 .claude/

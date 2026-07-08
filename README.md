@@ -8,16 +8,26 @@ A betting edge finder for the 2026 FIFA World Cup. It combines bookmaker odds, p
 - **Compares** that fair prob against Kalshi and Polymarket implied prices — divergence is the edge signal
 - **AI analyst** (Claude Sonnet) gives a football read grounded **only in sourced data** — squad, FIFA ranking, recent form, injuries, venue/conditions, prices — and is explicitly forbidden from inventing stats, records, managers or formations
 - **Confirms or contradicts** each price-edge bet with the analyst — agreement between the maths and the football view (★ Both agree) is the strongest signal
+- **Tracks your bets** in a built-in journal (My Bets) — logs odds, stake and book, and stores the model's fair prob + EV at the moment you bet for later closing-line-value review
 
-## Tabs
+## Navigation
+
+The app opens on **Today** and has a primary tab bar (a bottom tab bar on mobile), plus a **More ⋯** menu for the secondary pages.
 
 | Tab | What it shows |
 |---|---|
-| **Market Divergence** | Every match ranked by bookmaker vs prediction-market gap. Green = PM rates it higher than books (possible value); Red = books shorter (possible trap). |
-| **★ Sensible Bets** | One shortlist scoring each bet on edge + PM agreement + conditions + analyst, graded **Strong / Solid / Speculative**. |
-| **The Maths** | Value singles (1X2, Over/Under, Asian Handicap) + accumulators, with the analyst-confirmation badge on each card. |
-| **Bettor's Analysis** | The analyst's football read + recommended bets (with live odds) per match. A second opinion, not fact. |
-| **🩹 Injuries** | Tournament-wide injury/suspension digest in one place. Manual refresh only (no auto-poll). |
+| 📅 **Today** | The next matchday at a glance — the soonest day with fixtures (Today / Tomorrow / upcoming within 7 days), each match with the analyst's read and recommended bets. Bets you've already logged are flagged. |
+| ★ **Best Bets** | Analyst-led picks with the odds quality scored. Every pick passed two gates: **①** the AI analyst studied the match and recommended that outcome, **②** the bookmaker price was checked for fair-or-better value. Graded **★ Strong** (great price + Kalshi agrees) / **Solid** (fair price) / **Speculative** (analyst backed, odds tight). Multi-select picks here to build accumulators. |
+| 📊 **Markets** | Every match ranked by bookmaker vs prediction-market divergence. Green = PM rates it higher than books (possible value); Red = books shorter (possible trap). |
+| 📒 **My Bets** | A personal betting journal saved in your browser (localStorage). Log each bet's odds, stake and book; it tracks the result and records the model's fair probability + EV **at the moment you bet** (closing-line-value groundwork). |
+
+**More ⋯ menu:**
+
+| Item | What it shows |
+|---|---|
+| 🩹 **Injuries & Suspensions** | Tournament-wide injury/suspension digest in one place. Manual refresh only (no auto-poll). |
+| 📖 **Methodology** | How the edge logic, de-vig, prediction-market comparison and grounded analyst work. |
+| 🔒 **Admin** | Hidden by default — visitor stats (requires the admin key). |
 
 ## Bet types covered
 
@@ -54,7 +64,9 @@ static_data.py        — sourced reference data (squads, venues, FIFA ranking, 
 football_intel.py     — Claude analyst (grounded) + injury digest + weather
 build_form.py         — (manual) rebuild data/team_form.csv from the open results dataset
 server.py             — FastAPI backend, caching, background intel, visitor stats
-static/index.html     — single-page dashboard (5 tabs)
+static/index.html     — single-page dashboard shell (Today · Best Bets · Markets · My Bets · More)
+static/js/            — views (today, best, markets, journal, injuries, admin) + helpers/data/app wiring
+static/css/app.css    — styling (responsive: top tab bar on desktop, bottom tab bar on mobile)
 data/                 — players.csv, teams.csv, venues.csv, matches.csv, team_facts.csv, team_form.csv
 ```
 

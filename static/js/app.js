@@ -10,7 +10,7 @@
      More ▾       — Injuries & Suspensions, Methodology
    ============================================================ */
 
-const VIEWS = ['today', 'best', 'markets', 'mybets', 'injuries', 'method', 'admin'];
+const VIEWS = ['today', 'best', 'markets', 'gaa', 'mybets', 'injuries', 'method', 'admin'];
 const MORE_VIEWS = ['injuries', 'method', 'admin'];
 
 let currentView = 'today';
@@ -50,6 +50,7 @@ function switchView(view) {
     else if (marketsSubTab === 'divergence') renderDivergence();
     else renderBets();
   }
+  if (view === 'gaa') loadGaa();
   if (view === 'mybets') renderMyBets();
   if (view === 'injuries' && !_injuriesLoaded) loadInjuries();
   if (view === 'admin') renderAdmin();

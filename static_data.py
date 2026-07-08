@@ -79,6 +79,15 @@ def team_rank(name):
 _form = {r["fifa_code"]: r for r in _read("team_form.csv")}
 
 
+def reload_form():
+    """Re-read team_form.csv into the in-memory cache. Called by the server's
+    form auto-refresh after it rewrites the CSV mid-tournament, so team_form_text
+    serves the new results without a process restart."""
+    global _form
+    _form = {r["fifa_code"]: r for r in _read("team_form.csv")}
+    return _form
+
+
 def team_form_text(name):
     """Sourced recent-form summary for the analyst prompt, or '' if unknown.
     Built offline from the international-results dataset (no live query)."""
@@ -140,6 +149,24 @@ for m in _read("matches.csv"):
     if h and a:
         _match_venue[frozenset((h, a))] = m
 
+# Knockout rows have no team codes (the bracket isn't resolved when the schedule
+# is sourced) — only a venue + kickoff time per bracket slot. Once the live odds
+# feed reports which two teams actually fill that slot, fall back to matching by
+# kickoff time so venue/altitude/weather still resolve in the knockout rounds.
+def _norm_iso(s):
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00")).isoformat()
+    except Exception:
+        return None
+
+
+_match_by_kickoff = {}   # normalised kickoff ISO -> match row
+for m in _read("matches.csv"):
+    ku = _norm_iso(m.get("kickoff_utc"))
+    if ku:
+        _match_by_kickoff[ku] = m
+
 
 # ---- rounds (sourced from matches.csv stage + derived group matchday) -------
 _match_round = {}   # frozenset({home_code, away_code}) -> (label, order)
@@ -182,12 +209,15 @@ def match_round(home, away):
     return _match_round.get(frozenset((hc, ac)))
 
 
-def venue_for_teams(home, away):
-    """Real fixture + stadium conditions for a match, or None if unmatched."""
+def venue_for_teams(home, away, commence=None):
+    """Real fixture + stadium conditions for a match, or None if unmatched.
+    Group-stage fixtures match by team code; knockout fixtures (whose team codes
+    aren't known in the sourced schedule) fall back to matching by kickoff time
+    when `commence` (the live odds feed's kickoff) is given."""
     hc, ac = team_code(home), team_code(away)
-    if not hc or not ac:
-        return None
-    m = _match_venue.get(frozenset((hc, ac)))
+    m = _match_venue.get(frozenset((hc, ac))) if hc and ac else None
+    if not m and commence:
+        m = _match_by_kickoff.get(_norm_iso(commence))
     if not m:
         return None
     v = _venues.get(m["venue_key"])

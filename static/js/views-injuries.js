@@ -110,43 +110,58 @@ async function loadInjuries() {
 
 async function refreshInjuriesDigest() {
   const btn = document.getElementById('injuries-refresh-btn');
-  const panel = document.getElementById('injuries-panel');
+  const upd = document.getElementById('injuries-updated');
+  // Remember the current digest time so we can detect when a genuinely NEW one
+  // lands. (Old bug: polled for "any digest exists" — always true — so it
+  // "finished" in ~5s showing the stale digest, with no sign work was happening.)
+  const prevFetchedAt = (_injuryInfo && _injuryInfo.fetched_at) || 0;
+  const spin = `<span class="spinner" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:6px"></span>`;
+  const setStatus = (html) => { if (upd) upd.innerHTML = html; };
+
   btn.disabled = true; btn.textContent = 'Refreshing…';
+  setStatus(`${spin}<span style="color:var(--amber)">Searching the web for the latest injury &amp; suspension news… this usually takes 20–40s.</span>`);
+
+  let r;
   try {
-    const r = await (await fetch('/api/refresh-injuries')).json();
-    if (r.status === 'cooldown') {
-      // Server-side cooldown protects the search budget — cached digest is current.
-      btn.disabled = false; btn.textContent = '🩹 Refresh injuries';
-      const upd = document.getElementById('injuries-updated');
-      if (upd) upd.textContent = `Refreshed recently — try again in ~${Math.ceil((r.retry_in_s || 60) / 60)} min`;
-      return;
-    }
+    r = await (await fetch('/api/refresh-injuries')).json();
   } catch {
     btn.disabled = false; btn.textContent = '🩹 Refresh injuries';
+    setStatus(`<span style="color:var(--red)">Couldn't start the refresh — check your connection and try again.</span>`);
     return;
   }
-  // Restart the intel poll so re-analysis banners appear on match cards promptly
+  if (r.status === 'cooldown') {
+    // Server-side cooldown protects the search budget — the cached digest is current.
+    btn.disabled = false; btn.textContent = '🩹 Refresh injuries';
+    setStatus(`Already up to date — the news digest refreshes at most once every few minutes. Try again in ~${Math.ceil((r.retry_in_s || 60) / 60)} min.`);
+    return;
+  }
+
+  // Restart the intel poll so re-analysis banners appear on match cards promptly.
   if (!_intelPollTimer) _intelPollTimer = setInterval(pollIntel, 8000);
-  // Poll every 5s for up to 90s — web search + retries can take well over 30s
+
+  // Poll until the digest's fetched_at ADVANCES — the true "done" signal (the
+  // web search completed, whether or not the news actually changed). Up to 90s:
+  // the search + SDK retries can run well over 30s.
   let elapsed = 0;
   const pollId = setInterval(async () => {
     elapsed += 5;
     btn.textContent = `Refreshing… (${elapsed}s)`;
+    setStatus(`${spin}<span style="color:var(--amber)">Searching for the latest injury &amp; suspension news… (${elapsed}s)</span>`);
     try {
-      const res = await fetch('/api/injuries');
-      const info = await res.json();
-      if (info.digest) {
+      const info = await (await fetch('/api/injuries')).json();
+      if (info.fetched_at && info.fetched_at > prevFetchedAt) {
         clearInterval(pollId);
         _injuriesLoaded = true;
-        renderInjuries(info);
+        renderInjuries(info);   // re-renders the digest + writes its "Last refreshed" time
         btn.disabled = false; btn.textContent = '🩹 Refresh injuries';
+        setStatus(`<span style="color:var(--green)">✓ Updated just now — analyst cards for affected teams are re-checking in the background.</span>`);
         return;
       }
-    } catch { /* keep polling */ }
+    } catch { /* transient — keep polling */ }
     if (elapsed >= 90) {
       clearInterval(pollId);
-      panel.innerHTML = emptyState('⏳', 'Injury refresh is taking longer than expected', 'Check back in a moment or try again.');
       btn.disabled = false; btn.textContent = '🩹 Refresh injuries';
+      setStatus(`<span style="color:var(--tx-3)">Still searching — the news refresh can be slow or rate-limited. It'll update on its own when ready; you can keep using the app.</span>`);
     }
   }, 5000);
 }

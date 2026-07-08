@@ -35,8 +35,11 @@ import wc_odds
 import prediction_markets as pmkt
 import football_intel as fintel
 import static_data
+import sportbex
+import paddypower
+import gaa_intel
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -136,6 +139,16 @@ if ODDS_REFRESH_MINUTES > 0:
 else:
     _CACHE_TTL = 7200
 _ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
+
+# Team-form refresh cadence. During the tournament a background thread rebuilds
+# data/team_form.csv from the international-results dataset every FORM_REFRESH_HOURS
+# (default 12) so freshly played WC matches feed the analyst. The dataset download
+# is free (public GitHub); only the matches whose form CHANGED get re-analysed,
+# so the Anthropic spend is bounded. Set FORM_REFRESH_HOURS=0 to disable.
+try:
+    FORM_REFRESH_HOURS = float(os.environ.get("FORM_REFRESH_HOURS", "12"))
+except ValueError:
+    FORM_REFRESH_HOURS = 12.0
 _lock = threading.Lock()
 
 # Separate intel cache — populated by background thread
@@ -927,8 +940,19 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
         if ao == "draw":       return s_outcome == "draw"
 
     elif s_market == "totals":
-        if ao.startswith("over"):   return "over" in s_outcome
-        if ao.startswith("under"):  return "under" in s_outcome
+        # Exact line match — "over_2.5" must NOT confirm an Over 1.5 / Over 3.5 single.
+        side = "over" if ao.startswith("over") else "under" if ao.startswith("under") else None
+        if side and s_outcome.startswith(side):
+            try:
+                ao_line = float(ao.split("_")[1])
+            except (IndexError, ValueError):
+                return False
+            s_digits = "".join(ch for ch in s_outcome if ch.isdigit() or ch == ".")
+            try:
+                return ao_line == float(s_digits)
+            except ValueError:
+                return False
+        return False
 
     elif s_market == "spreads":
         # analyst_outcome format: "home_-1.5" or "away_+1" etc.
@@ -1100,6 +1124,10 @@ def _leg_summary(s):
         "confidence": s["confidence"],
         "weather":    s.get("weather"),
         "round":      s.get("round"),
+        # carried so the client can evaluate the analyst-disagrees soft flag on
+        # handicap legs (needs the team + numeric point, not just the label)
+        "spread_team":  s.get("spread_team"),
+        "spread_point": s.get("spread_point"),
     }
 
 
@@ -1167,6 +1195,81 @@ if ODDS_REFRESH_MINUTES > 0:
     threading.Thread(target=_odds_auto_refresh_loop, daemon=True).start()
     print(f"[odds] auto-refresh every {max(ODDS_REFRESH_MINUTES, 5):g} min "
           f"(set ODDS_REFRESH_MINUTES=0 to disable)")
+
+
+# ---------------------------------------------------------------------------
+# Background team-form auto-refresh. Rebuilds data/team_form.csv from the live
+# international-results dataset, then invalidates + re-analyses ONLY the matches
+# whose team's form changed (a new result appeared). Mirrors the injury-refresh
+# flow. The dataset pull is free; analyst spend is bounded to changed teams.
+# ---------------------------------------------------------------------------
+
+def _do_form_refresh():
+    """Rebuild team form, then invalidate/re-analyse only the affected matches.
+    Safe to call from the auto-refresh loop, startup, or the manual endpoint."""
+    res = fintel.refresh_team_form()
+    if not res["ok"]:
+        return res
+    changed = set(res["changed"])
+    if not changed:
+        print("[form] no form change — analyst cache kept intact")
+        return res
+
+    with _intel_lock:
+        labels = list(_intel_cache.keys())
+    affected_pairs, affected_labels = [], []
+    for label in labels:
+        parts = label.split(" vs ", 1)
+        if len(parts) != 2:
+            continue
+        home, away = parts
+        hc, ac = static_data.team_code(home), static_data.team_code(away)
+        if (hc and hc in changed) or (ac and ac in changed):
+            affected_pairs.append((home, away))
+            affected_labels.append(label)
+
+    fintel.invalidate_match_cache(affected_pairs)
+    with _intel_lock:
+        for label in affected_labels:
+            _intel_cache.pop(label, None)
+    print(f"[form] form changed for {len(changed)} team(s) — "
+          f"{len(affected_labels)} analyst card(s) invalidated, rest kept")
+
+    # Re-analyse the invalidated matches promptly (same path injuries use).
+    raw = get_raw()
+    _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
+    return res
+
+
+def _form_auto_refresh_loop():
+    interval = max(FORM_REFRESH_HOURS, 1) * 3600
+    while True:
+        time.sleep(interval)
+        try:
+            _do_form_refresh()
+        except Exception as e:
+            print(f"[form] auto-refresh failed: {e}", flush=True)
+
+
+def _startup_form_refresh():
+    """If the form snapshot predates today (i.e. WC matches have been played since
+    the last build), rebuild it once in the background at startup so a freshly
+    woken instance is current. Cheap — one free dataset download."""
+    try:
+        as_of = fintel.form_as_of()
+        today = datetime.now(timezone.utc).date().isoformat()
+        if as_of and as_of < today:
+            print(f"[form] snapshot is from {as_of} (< {today}) — refreshing at startup")
+            _do_form_refresh()
+    except Exception as e:
+        print(f"[form] startup refresh failed: {e}", flush=True)
+
+
+if FORM_REFRESH_HOURS > 0:
+    threading.Thread(target=_startup_form_refresh, daemon=True).start()
+    threading.Thread(target=_form_auto_refresh_loop, daemon=True).start()
+    print(f"[form] auto-refresh every {max(FORM_REFRESH_HOURS, 1):g}h "
+          f"(set FORM_REFRESH_HOURS=0 to disable)")
 
 
 # ---------------------------------------------------------------------------
@@ -1462,8 +1565,10 @@ def injuries():
 # Odds API monthly quota / burn Anthropic web searches by hammering them.
 _REFRESH_COOLDOWN          = 600   # /api/refresh: at most one forced odds fetch / 10 min
 _INJURY_REFRESH_COOLDOWN   = 300   # /api/refresh-injuries: at most one / 5 min
+_FORM_REFRESH_COOLDOWN     = 600   # /api/refresh-form: at most one dataset rebuild / 10 min
 _last_forced_refresh       = 0.0
 _last_injury_refresh       = 0.0
+_last_form_refresh         = 0.0
 _cooldown_lock             = threading.Lock()
 
 
@@ -1517,6 +1622,24 @@ def refresh_injuries():
     return JSONResponse({"status": "refreshing"})
 
 
+@app.get("/api/refresh-form")
+def refresh_form():
+    """Rebuild team form from the international-results dataset, then re-analyse
+    only the matches whose team's recent form changed. Cards for teams with no
+    new result are kept as-is. Free dataset pull; bounded analyst spend."""
+    global _last_form_refresh
+    with _cooldown_lock:
+        wait = _FORM_REFRESH_COOLDOWN - (time.time() - _last_form_refresh)
+        if wait > 0:
+            return JSONResponse({"status": "cooldown",
+                                 "retry_in_s": int(wait) + 1,
+                                 "detail": "Team form was refreshed recently — using the current snapshot."})
+        _last_form_refresh = time.time()
+
+    threading.Thread(target=_do_form_refresh, daemon=True).start()
+    return JSONResponse({"status": "refreshing"})
+
+
 @app.get("/api/refresh")
 def refresh():
     global _last_forced_refresh
@@ -1530,6 +1653,292 @@ def refresh():
     d = get_raw(force=force)
     return JSONResponse({"fetched_at": d["fetched_at"], "matches": d["matches"], "bets": d["bets"],
                          "forced": force})
+
+
+# ---------------------------------------------------------------------------
+# GAA (hurling + gaelic football) — a self-contained consolidated tab.
+# Odds: Paddy Power (soft, paddypower.py) vs Betfair Exchange fair line
+# (sharp, sportbex.py). Intel: gaa_intel.py (Claude, web-search team context).
+# Nothing here touches the soccer pipeline.
+# ---------------------------------------------------------------------------
+_gaa_intel_cache = {}          # {intel_key: intel_dict}
+_gaa_intel_lock  = threading.Lock()
+_gaa_intel_busy  = False
+
+
+def _gaa_sport(competition: str) -> str:
+    return "football" if "football" in (competition or "").lower() else "hurling"
+
+
+def _norm_event(name: str) -> str:
+    """Normalise 'Cork v Galway' for cross-source matching (order-independent)."""
+    parts = name.lower().replace(" vs ", " v ").split(" v ")
+    return " v ".join(sorted(p.strip() for p in parts))
+
+
+def _gaa_build_intel_bg(games):
+    """Background: run Claude analysis per game, publishing each to the in-memory
+    cache as soon as it finishes so cards fill in one-by-one (not all-at-once)."""
+    global _gaa_intel_busy
+    try:
+        for g in games:
+            try:
+                intel = gaa_intel.get_gaa_intel(
+                    g["home"], g["away"], g.get("sport", "hurling"),
+                    g.get("competition", ""), g.get("throw_in", ""))
+            except Exception as e:
+                print(f"[gaa] intel {g['home']} v {g['away']} failed: {e}")
+                intel = None
+            if intel:
+                ck = gaa_intel.intel_key(g["home"], g["away"], g.get("sport", "hurling"))
+                with _gaa_intel_lock:
+                    _gaa_intel_cache[ck] = intel
+                _persist_intel()   # survive redeploys/spin-downs (Upstash)
+    finally:
+        with _gaa_intel_lock:
+            _gaa_intel_busy = False
+
+
+@app.get("/api/gaa/diag")
+def gaa_diag():
+    """Upstash health check — is it configured and does a SET/GET round-trip work?"""
+    url, tok = _upstash_creds()
+    status = {"url_set": bool(url), "token_set": bool(tok),
+              "url_prefix": (url[:22] + "…") if url else None}
+    if url and tok:
+        try:
+            _upstash_cmd(url, tok, ["SET", "gaa_healthcheck", "ok"])
+            r = _upstash_cmd(url, tok, ["GET", "gaa_healthcheck"])
+            status["roundtrip"] = "ok" if r.get("result") == "ok" else f"unexpected: {r}"
+        except Exception as e:
+            status["roundtrip"] = f"error: {type(e).__name__}: {str(e)[:180]}"
+    pp = _kv_get(_PP_KEY)
+    status["pp_snapshot_present"] = bool(pp and pp.get("odds"))
+    return JSONResponse(status)
+
+
+@app.post("/api/gaa/refresh")
+def gaa_refresh():
+    """Manual 'Refresh analysis': clear the intel + research caches so the next
+    /api/gaa re-fetches fresh form/injury news for every game."""
+    global _gaa_intel_busy
+    with _gaa_intel_lock:
+        _gaa_intel_cache.clear()
+    _kv_set(_INTEL_KEY, {})       # clear persisted copy too
+    gaa_intel.clear_cache()
+    return JSONResponse({"ok": True})
+
+
+# --- Paddy Power soft-odds snapshot store (Option B) ---------------------------
+# Paddy Power is Cloudflare/geo-blocked from cloud IPs, so on the hosted app it
+# can't be fetched directly. Instead a script on a residential Irish machine
+# (pp_push.py) POSTs snapshots to /api/gaa/push; we store the latest and serve it.
+# Storage is pluggable: Upstash Redis (survives Render spin-downs) if configured,
+# else an in-memory fallback (lost on restart, repopulated by the next push).
+# Generic key/value store: Upstash Redis if configured (persists across Render
+# redeploys/spin-downs), else an in-memory fallback (lost on restart). Used for
+# both the pushed PP odds snapshot AND the analyst intel cache.
+_kv_mem = {}
+
+
+def _upstash_creds():
+    return (os.environ.get("UPSTASH_REDIS_REST_URL"),
+            os.environ.get("UPSTASH_REDIS_REST_TOKEN"))
+
+
+def _upstash_cmd(url, tok, cmd):
+    req = urllib.request.Request(
+        url.rstrip("/"), data=json.dumps(cmd).encode(),
+        headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _kv_set(key, payload):
+    url, tok = _upstash_creds()
+    if url and tok:
+        try:
+            _upstash_cmd(url, tok, ["SET", key, json.dumps(payload)])
+            return
+        except Exception as e:
+            print(f"[gaa] upstash set {key} failed, using memory: {e}")
+    _kv_mem[key] = payload
+
+
+def _kv_get(key):
+    url, tok = _upstash_creds()
+    if url and tok:
+        try:
+            r = _upstash_cmd(url, tok, ["GET", key])
+            val = r.get("result")
+            return json.loads(val) if val else None
+        except Exception as e:
+            print(f"[gaa] upstash get {key} failed, using memory: {e}")
+    return _kv_mem.get(key)
+
+
+_PP_KEY = "gaa_pp_snapshot"
+_INTEL_KEY = "gaa_intel_cache"
+_gaa_intel_store_loaded = False
+
+
+def _load_intel_from_store():
+    """One-time pull of the persisted intel cache into memory so analyst write-ups
+    survive redeploys/spin-downs (when Upstash is configured)."""
+    global _gaa_intel_store_loaded
+    if _gaa_intel_store_loaded:
+        return
+    snap = _kv_get(_INTEL_KEY)
+    if isinstance(snap, dict) and snap:
+        with _gaa_intel_lock:
+            for k, v in snap.items():
+                _gaa_intel_cache.setdefault(k, v)
+    _gaa_intel_store_loaded = True
+
+
+def _persist_intel():
+    with _gaa_intel_lock:
+        snapshot = dict(_gaa_intel_cache)
+    _kv_set(_INTEL_KEY, snapshot)
+
+
+def _get_pp_odds():
+    """Paddy Power soft odds + freshness meta. Prefers the pushed snapshot (the
+    hosted path); falls back to a direct fetch (works locally, fails on cloud IPs)."""
+    snap = _kv_get(_PP_KEY)
+    if snap and snap.get("odds"):
+        return snap["odds"], {"source": "push", "updated_at": snap.get("pushed_at")}
+    try:
+        odds = paddypower.get_gaa_odds()
+        if odds:
+            return odds, {"source": "direct", "updated_at": int(time.time())}
+    except Exception as e:
+        print(f"[gaa] direct PP fetch failed: {e}")
+    return {}, {"source": "none", "updated_at": None}
+
+
+@app.post("/api/gaa/push")
+async def gaa_push(request: Request):
+    """Receive a Paddy Power odds snapshot from the residential-IP fetcher
+    (pp_push.py). Secret-protected via the X-Push-Secret header == GAA_PUSH_SECRET."""
+    secret = os.environ.get("GAA_PUSH_SECRET")
+    if not secret:
+        return JSONResponse({"error": "push not configured (GAA_PUSH_SECRET unset)"},
+                            status_code=503)
+    if request.headers.get("x-push-secret") != secret:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400)
+    odds = body.get("odds")
+    if not isinstance(odds, dict) or not odds:
+        # Reject empty pushes so a bad/blocked fetch can't wipe a good snapshot.
+        return JSONResponse({"error": "body must be a non-empty {\"odds\": {...}}"},
+                            status_code=400)
+    _kv_set(_PP_KEY, {"odds": odds, "pushed_at": int(time.time())})
+    return JSONResponse({"ok": True, "events": len(odds)})
+
+
+@app.get("/api/gaa")
+def gaa():
+    """Consolidated GAA payload: per-game soft (PP) + sharp (Betfair fair) odds,
+    computed edges, and cached Claude intel. Odds return immediately; intel fills
+    in via a background thread (poll again while intel_loading is true)."""
+    global _gaa_intel_busy
+
+    _load_intel_from_store()   # restore persisted write-ups after a restart
+
+    # 1. odds from both sources (each self-caches; degrade gracefully on failure).
+    #    Capture per-source status so the hosted endpoint can be diagnosed without
+    #    log access (Paddy Power is expected to fail from non-IE cloud IPs).
+    sources = {}
+    soft, soft_meta = _get_pp_odds()
+    if soft:
+        sources["paddypower"] = f"ok via {soft_meta['source']} ({len(soft)} events)"
+    else:
+        sources["paddypower"] = "empty (no pushed snapshot; direct fetch blocked from this IP)"
+    sharp = {}
+    try:
+        markets = sportbex.get_gaa_markets()
+        for m in markets:
+            sharp[_norm_event(m["event"])] = m
+        sources["sportbex"] = f"ok ({len(markets)} markets)" if markets \
+            else "empty (no live markets returned)"
+    except Exception as e:
+        sources["sportbex"] = f"error: {type(e).__name__}: {e}"
+        print(f"[gaa] sportbex failed: {e}")
+
+    # 2. assemble from the UNION of both sources, keyed by normalised event name.
+    #    Either source may be missing (e.g. Paddy Power is blocked from cloud/non-IE
+    #    IPs, so on Render only the Betfair fair line may return) — a game shows with
+    #    whatever it has: PP-only (no edge), Betfair-only (fair line + intel, no soft
+    #    price), or both (full edge).
+    keys = list(dict.fromkeys(list(soft.keys()) + [sm["event"] for sm in sharp.values()]))
+    games, intel_games = [], []
+    for ev_name in keys:
+        key = _norm_event(ev_name)
+        s = soft.get(ev_name, {})
+        sm = sharp.get(key)
+        competition = s.get("competition") or (sm.get("competition") if sm else "")
+        throw_in = s.get("throw_in") or (sm.get("throw_in") if sm else "")
+        sport = _gaa_sport(competition)
+        # edges: PP price vs Betfair fair for the same runner (only when both exist)
+        edges = []
+        if sm and s.get("match_odds"):
+            fair = sm["fair"]
+            for runner, pp_odds in s["match_odds"].items():
+                fr = fair.get(runner) or next(
+                    (v for k, v in fair.items() if k.lower() == runner.lower()), None)
+                if not fr or not pp_odds:
+                    continue
+                fair_odds = 100.0 / fr["fair_pct"] if fr["fair_pct"] else None
+                edge_pct = round((pp_odds - fair_odds) / fair_odds * 100, 1) if fair_odds else None
+                edges.append({
+                    "runner": runner, "pp": pp_odds,
+                    "fair_pct": fr["fair_pct"], "fair_odds": round(fair_odds, 2) if fair_odds else None,
+                    "back": fr["back"], "lay": fr["lay"],
+                    "edge_pct": edge_pct, "value": bool(edge_pct and edge_pct > 0),
+                })
+        # team names from the event label (both sources use "Home v Away")
+        parts = [p.strip() for p in ev_name.replace(" vs ", " v ").split(" v ")]
+        home, away = (parts + ["", ""])[:2]
+        ck = gaa_intel.intel_key(home, away, sport)
+        with _gaa_intel_lock:
+            intel = _gaa_intel_cache.get(ck)
+        if intel is None:
+            intel_games.append({"home": home, "away": away, "sport": sport,
+                                "competition": competition, "throw_in": throw_in})
+        games.append({
+            "match": ev_name, "competition": competition, "sport": sport,
+            "throw_in": throw_in,
+            "soft": s.get("match_odds", {}), "handicap": s.get("handicap", {}),
+            "sharp": (sm["fair"] if sm else None),
+            "edges": edges, "intel": intel,
+        })
+
+    games.sort(key=lambda g: g.get("throw_in", ""))
+
+    # 3. kick off background intel for any game missing it
+    with _gaa_intel_lock:
+        loading = bool(intel_games) and os.environ.get("ANTHROPIC_API_KEY")
+        if intel_games and not _gaa_intel_busy and os.environ.get("ANTHROPIC_API_KEY"):
+            _gaa_intel_busy = True
+            threading.Thread(target=_gaa_build_intel_bg, args=(intel_games,),
+                             daemon=True).start()
+        intel_loading = _gaa_intel_busy
+
+    return JSONResponse({
+        "fetched_at": int(time.time()),
+        "games": games,
+        "intel_loading": bool(intel_loading),
+        "intel_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "sportbex_key_set": bool(os.environ.get("SPORTBEX_API_KEY")),
+        "push_configured": bool(os.environ.get("GAA_PUSH_SECRET")),
+        "soft_source": soft_meta["source"],
+        "soft_updated_at": soft_meta["updated_at"],
+        "sources": sources,
+    })
 
 
 @app.get("/")

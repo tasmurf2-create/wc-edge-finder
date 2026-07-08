@@ -133,8 +133,8 @@ function renderBets() {
       </div>
       ${(pageSearch || '').trim() ? '' : recommendedAccaHTML(allParlays, book, stake)}
       ${collapsibleBanner('acca-ev-warn',
-        '⚠ Accumulators are −EV — expected to lose money long-term.',
-        `⚠ <strong>Accumulators are −EV — expected to lose money long-term.</strong> Combining legs multiplies the bookmaker's margin, so every slip here carries negative expected value (see the red EV on each card). These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than "Best available". The genuine edge is in <button class="linklike" onclick="switchMarketsTab('singles')">Value Singles →</button>`,
+        '⚠ Accumulators are usually −EV — treat as entertainment.',
+        `⚠ <strong>Accumulators are structurally worse than singles.</strong> Combining legs multiplies the bookmaker's margin, so most slips here are negative expected value. If a model-positive acca does appear, treat it as <strong>lower-confidence than a single</strong> — model error, stale lines and leg dependence all compound across legs too. These are for entertainment — stake small. Priced on <strong>sportsbooks only</strong> (you can't place an acca on the Betfair Exchange) — pick a single book above rather than "Best available". The genuine edge is in <button class="linklike" onclick="switchMarketsTab('singles')">Value Singles →</button>`,
         'note--warn')}
       ${accaControlsHTML()}
       ${accaMarketsNote()}
@@ -450,11 +450,16 @@ function parlayHTML(p, book, stake) {
       + `• Implied chance ≈ ${impl}% (= 1 ÷ ${l.usedPrice.toFixed(2)}).\n`
       + `• A winning ${l.usedPrice.toFixed(2)} leg multiplies your stake by ${l.usedPrice.toFixed(2)} (on its own, ${eur(stake)} → ${ret}).\n`
       + `The lower the number, the bigger the favourite.`;
+    const disagrees = analystDisagrees(l, l.intel) === true;
+    const disagreeFlag = disagrees
+      ? `<div style="margin-top:3px"><span class="badge" style="background:rgba(245,158,11,0.13);color:var(--amber);font-size:var(--fs-xs)" title="The AI football analyst recommends an outcome that contradicts this leg. Accumulator legs are picked by price and probability, not by the analyst — so this is a caution to review, not a reason the leg was excluded.">⚠ Analyst disagrees</span></div>`
+      : '';
     return `<div class="parlay-leg">
       <div style="min-width:0">
         <div><strong title="Your selection for this match">${fmtPick(l.outcome)}</strong></div>
         <div style="font-size:var(--fs-xs);color:var(--tx-3)">${fmtLabel(l.match)} · ${fmt(l.commence)}${l.round ? ` · <span style="color:var(--cyan);font-weight:600">${esc(l.round.label.replace('Group Stage ', ''))}</span>` : ''}</div>
         ${weatherFlagHTML(l)}
+        ${disagreeFlag}
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         ${fallNote}
@@ -476,7 +481,7 @@ function parlayHTML(p, book, stake) {
 
   const evAmt = Math.abs(evRaw / 100 * stake);
   const evLine = evRaw >= 0
-    ? `<span class="ev-num pos help" title="Long-run average result per €${stake} staked = (fair chance × combined price − 1) × stake.">Expected gain: +€${evAmt.toFixed(2)} per €${stake}</span>`
+    ? `<span class="ev-num pos help" title="The model rates this acca positive, but acca EV is far less reliable than a single bet: model error, stale lines and leg dependence all compound. Treat as low-confidence.">Model EV +${evRaw.toFixed(1)}% — high uncertainty</span>`
     : `<span class="ev-num neg help" title="Long-run average result per €${stake} staked = (fair chance × combined price − 1) × stake. Negative: the bookmaker margin compounds across legs.">Expected cost: −€${evAmt.toFixed(2)} per €${stake}</span>`;
 
   return `<div class="card">

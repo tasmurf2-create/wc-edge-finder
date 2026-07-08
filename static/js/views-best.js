@@ -167,36 +167,71 @@ function renderSensible() {
       if (ao === 'home_win') targetOutcome = homeNorm;
       else if (ao === 'away_win') targetOutcome = awayNorm;
       else if (ao === 'draw') targetOutcome = 'draw';
-      else continue; // totals/spreads tokens have no price in divergence outcomes
 
-      const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
-      if (!priceData || !priceData.best_price) continue;
+      if (targetOutcome) {
+        // 1X2 — price AND prediction-market data come from the divergence feed.
+        const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
+        if (!priceData || !priceData.best_price) continue;
 
-      const pmGap = priceData.diff != null ? -priceData.diff : null;
+        const pmGap = priceData.diff != null ? -priceData.diff : null;
 
-      sensibleBets.push({
-        match: label,
-        commence: match.commence,
-        market: 'h2h',
-        outcome: targetOutcome,
-        fair_prob: (priceData.book_fair || 0) / 100,
-        best_price: priceData.best_price,
-        best_book: priceData.best_book,
-        paddy: priceData.paddy,
-        per_book: priceData.per_book || {},
-        edge: priceData.edge,
-        pm_gap: pmGap,
-        kalshi: priceData.kalshi,
-        poly: priceData.poly,
-        confidence: priceData.confidence || 'low',
-        round: match.round,
-        weather: match.weather,
-        intel: intel,
-        analyst_confirms: true,
-        rb_reasoning: rb.reasoning || '',
-        rb_confidence: rb.confidence || '',
-        rb_strength: rb.strength || '',
-      });
+        sensibleBets.push({
+          match: label,
+          commence: match.commence,
+          market: 'h2h',
+          outcome: targetOutcome,
+          fair_prob: (priceData.book_fair || 0) / 100,
+          best_price: priceData.best_price,
+          best_book: priceData.best_book,
+          paddy: priceData.paddy,
+          per_book: priceData.per_book || {},
+          edge: priceData.edge,
+          pm_gap: pmGap,
+          kalshi: priceData.kalshi,
+          poly: priceData.poly,
+          confidence: priceData.confidence || 'low',
+          round: match.round,
+          weather: match.weather,
+          intel: intel,
+          analyst_confirms: true,
+          rb_reasoning: rb.reasoning || '',
+          rb_confidence: rb.confidence || '',
+          rb_strength: rb.strength || '',
+        });
+      } else if (rb.best_price) {
+        // Totals / Asian handicap — the analyst pick is priced server-side and
+        // enriched onto the rec by /api/intel (best_price/best_book/per_book/edge).
+        // There's no Kalshi/Polymarket line for these, so PM fields stay null.
+        const isTotals = ao.startsWith('over') || ao.startsWith('under');
+        // fair_prob is exactly recoverable from the edge: edge = (fair − 1/price)·100.
+        const fairProb = rb.edge != null ? (rb.edge / 100 + 1 / rb.best_price) : null;
+        const home = titleCase(parts[0]), away = titleCase(parts[1]);
+
+        sensibleBets.push({
+          match: label,
+          commence: match.commence,
+          market: rb.market || (isTotals ? 'totals' : 'spreads'),
+          outcome: fmtAnalystOutcome(rb, home, away),
+          fair_prob: fairProb,
+          best_price: rb.best_price,
+          best_book: rb.best_book,
+          per_book: rb.per_book || {},
+          edge: rb.edge,
+          pm_gap: null,
+          kalshi: null,
+          poly: null,
+          confidence: 'low',
+          round: match.round,
+          weather: match.weather,
+          intel: intel,
+          analyst_confirms: true,
+          rb_reasoning: rb.reasoning || '',
+          rb_confidence: rb.confidence || '',
+          rb_strength: rb.strength || '',
+        });
+      } else {
+        continue; // totals/handicap rec without a live price yet
+      }
     }
   }
 
@@ -415,12 +450,15 @@ function renderTopPicks() {
     return;
   }
 
-  // Sort analysed matches by kick-off (looked up from the divergence list)
+  // Sort analysed matches by kick-off. The live odds feed (allMatches) drops a
+  // fixture once bookmakers pull its markets (around kickoff), so fall back to
+  // the commence time stored on the intel itself — kept even after the match
+  // is no longer live-priced.
   const commenceBy = {};
   allMatches.forEach(m => { commenceBy[m.label] = m.commence; commenceBy[normalizeMatchLabel(m.label)] = m.commence; });
+  const now = new Date();
   let items = entries
-    .map(([l, intel]) => ({ label: l, intel, commence: commenceBy[l] || commenceBy[normalizeMatchLabel(l)] || '' }))
-    .sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
+    .map(([l, intel]) => ({ label: l, intel, commence: commenceBy[l] || commenceBy[normalizeMatchLabel(l)] || intel.commence || '' }));
 
   // Page-scoped team search: keep only matches featuring the searched team.
   const fq = (pageSearch || '').trim();
@@ -434,5 +472,17 @@ function renderTopPicks() {
     return;
   }
 
-  panel.innerHTML = intro + filterNote + items.map(it => analystMatchHTML(it.label, it.intel)).join('');
+  // Upcoming fixtures first (soonest first); already-played / unknown-kickoff
+  // matches sink to the bottom (most recently played first).
+  const isUpcoming = it => it.commence && new Date(it.commence) >= now;
+  const upcoming = items.filter(isUpcoming).sort((a, b) => String(a.commence).localeCompare(String(b.commence)));
+  const played   = items.filter(it => !isUpcoming(it)).sort((a, b) => String(b.commence).localeCompare(String(a.commence)));
+
+  const playedDivider = played.length && upcoming.length
+    ? `<div class="section-title" style="margin-top:18px"><small>Played</small></div>` : '';
+
+  panel.innerHTML = intro + filterNote
+    + upcoming.map(it => analystMatchHTML(it.label, it.intel)).join('')
+    + playedDivider
+    + played.map(it => analystMatchHTML(it.label, it.intel)).join('');
 }
