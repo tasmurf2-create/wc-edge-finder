@@ -20,6 +20,7 @@ import json
 import time
 import hashlib
 import threading
+import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 
@@ -136,6 +137,14 @@ def invalidate_match_cache(pairs):
         if removed:
             _save_cache(cache)
     return removed
+
+
+def clear_research():
+    """Drop every cached web-search snapshot so the next analysis re-searches.
+    Used by the manual team-news refresh."""
+    with _io_lock:
+        if RESEARCH_FILE.exists():
+            _save_json(RESEARCH_FILE, {})
 
 
 def load_intel_from_disk():
@@ -388,26 +397,51 @@ def get_match_intel(home, away, commence, league_key=None,
 
 
 def get_intel_batch(match_list, max_calls=15):
-    """Analyse a batch of fixtures sequentially (the Anthropic SDK handles 429
-    backoff). match_list items: {home, away, commence, league_key, price_notes}.
-    Returns {"Home vs Away": intel}."""
-    out = {}
-    for i, m in enumerate(match_list[:max_calls]):
-        home, away = m["home"], m["away"]
-        label = f"{home} vs {away}"
-        try:
-            intel = get_match_intel(
-                home, away, m.get("commence", ""),
-                league_key=m.get("league_key"),
-                price_notes=m.get("price_notes", "No price signal."),
-            )
-        except Exception as e:
-            print(f"[intel] batch {label} failed: {e}")
-            intel = None
-        if intel:
-            out[label] = intel
-            print(f"[intel] {i+1}/{min(len(match_list), max_calls)} {label} ok")
-    return out
+    """
+    Fetch intel for a list of dicts with keys: home, away, commence, league_key,
+    price_notes. Returns {cache_key: intel_dict}.
+    Caps fresh matches at max_calls; serves the rest from cache.
+    """
+    cache = _load_cache()
+    results = {}
+    to_fetch = []
+
+    for m in match_list:
+        ck = _cache_key(m["home"], m["away"])
+        entry = cache.get(ck)
+        if entry and (time.time() - entry.get("cached_at", 0)) < CACHE_TTL:
+            results[ck] = entry["intel"]
+        elif len(to_fetch) < max_calls:
+            to_fetch.append(m)
+
+    if not to_fetch:
+        print(f"[intel] {len(results)} matches from cache, 0 fresh calls")
+        return results
+
+    # Concurrency is capped by INTEL_WORKERS (default 1). On Tier-1 limits,
+    # serialising the Sonnet analysis is actually fastest end-to-end: parallel
+    # calls all 429, then each burns its retry budget re-sending tokens, which
+    # saturates the shared 30k/min bucket and makes *everything* fail. One at a
+    # time stays under the limit and completes. Bump on a higher API tier.
+    workers = max(1, min(int(os.environ.get("INTEL_WORKERS", "1")), len(to_fetch)))
+    print(f"[intel] {len(results)} from cache, {len(to_fetch)} fresh "
+          f"({workers} worker{'s' if workers > 1 else ''})")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {
+            ex.submit(get_match_intel, m["home"], m["away"], m.get("commence", ""),
+                      m.get("league_key"), m.get("price_notes", "No price signal.")): m
+            for m in to_fetch
+        }
+        for f in concurrent.futures.as_completed(futs):
+            m = futs[f]
+            try:
+                intel = f.result()
+                if intel:
+                    results[_cache_key(m["home"], m["away"])] = intel
+                    print(f"[intel] {m['home']} vs {m['away']} ok")
+            except Exception as e:
+                print(f"[intel] {m['home']} vs {m['away']} failed: {e}")
+    return results
 
 
 def intel_status():

@@ -34,8 +34,7 @@ _load_env()
 import odds as odds_api
 import leagues
 import names
-import football_intel as fintel
-import static_data
+import club_intel as fintel
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -149,15 +148,6 @@ else:
     _CACHE_TTL = max(_ODDS_TTL_MINUTES, 5) * 60
 _ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
 
-# Team-form refresh cadence. During the tournament a background thread rebuilds
-# data/team_form.csv from the international-results dataset every FORM_REFRESH_HOURS
-# (default 12) so freshly played WC matches feed the analyst. The dataset download
-# is free (public GitHub); only the matches whose form CHANGED get re-analysed,
-# so the Anthropic spend is bounded. Set FORM_REFRESH_HOURS=0 to disable.
-try:
-    FORM_REFRESH_HOURS = float(os.environ.get("FORM_REFRESH_HOURS", "12"))
-except ValueError:
-    FORM_REFRESH_HOURS = 12.0
 _lock = threading.Lock()
 
 # Separate intel cache — populated by background thread
@@ -173,20 +163,14 @@ if _disk_intel:
     _intel_cache.update(_disk_intel)
     print(f"[startup] loaded {len(_disk_intel)} intel entries from disk")
 
-# Pre-fetch injury digest in background at startup if stale/missing
-def _startup_injury_fetch():
-    if not fintel.peek_injury_digest():
-        print("[startup] no injury digest on disk — fetching in background...")
-        fintel.fetch_wc_injury_digest()
-
-threading.Thread(target=_startup_injury_fetch, daemon=True).start()
-
 
 # ---------------------------------------------------------------------------
 # Bookmaker data helpers
 # ---------------------------------------------------------------------------
 
 _league_errors: dict = {}   # sport_key -> last fetch error, surfaced by /api/status
+# Stable display order for league grouping/filters (declaration order in leagues.py)
+_LEAGUE_ORDER = {k: i for i, k in enumerate(leagues.KEYS)}
 
 
 def _fetch_events():
@@ -395,6 +379,7 @@ def _build_intel_requests(singles):
             "home":        home_raw,
             "away":        away_raw,
             "commence":    s["commence"],
+            "league_key":  s.get("league_key"),
             "price_notes": price_notes,
         })
     return intel_requests
@@ -566,16 +551,6 @@ def _build_raw():
     singles     = []
     acca_pool   = []   # ALL outcomes (incl. favourites) — candidate legs for accas
     all_books   = set()
-    weather_by_label = {}   # match label -> weather signal (or None)
-    round_by_label   = {}   # match label -> {label, order} round (or None)
-
-    # Warm the forecast cache concurrently so per-match weather lookups are instant
-    try:
-        fintel.prewarm_weather(
-            (ev["home_team"], ev["away_team"], ev.get("commence_time", "")) for ev in events
-        )
-    except Exception as e:
-        print(f"[weather] prewarm failed: {e}")
 
     for ev in events:
         h2h_r = _analyse_h2h(ev)
@@ -587,9 +562,10 @@ def _build_raw():
         lg_key = ev.get("league_key")
         lg_name = ev.get("league") or leagues.league_name(lg_key)
         comm  = h2h_r["commence"]
-        weather_by_label[label] = fintel.weather_signal(home, away, comm)
-        _r = static_data.match_round(home, away)
-        round_by_label[label] = {"label": _r[0], "order": _r[1]} if _r else None
+        # The old WC model grouped fixtures by tournament round; for club football
+        # the equivalent grouping is the league. Same {label, order} shape, so the
+        # existing round-filter UI works unchanged as a league filter.
+        lg_round = {"label": lg_name, "order": _LEAGUE_ORDER.get(lg_key, 99)}
 
         sharp_fair = _sharp_h2h_fair(ev)   # {outcome: fair_prob} from the sharpest book
         book_table = _all_h2h_prices(ev)   # {bookname: {outcome: price}}
@@ -654,6 +630,7 @@ def _build_raw():
                     "match":       label,
                     "commence":    comm,
                     "league":  lg_name,
+                    "league_key": lg_key,
                     "market":      "h2h",
                     "outcome":     norm,
                     "fair_prob":   fair_p,
@@ -671,6 +648,7 @@ def _build_raw():
                     "match":       label,
                     "commence":    comm,
                     "league":  lg_name,
+                    "league_key": lg_key,
                     "market":      "h2h",
                     "outcome":     norm,
                     "raw_outcome": raw_name,
@@ -707,6 +685,7 @@ def _build_raw():
                     "match":      label,
                     "commence":   comm,
                     "league": lg_name,
+                    "league_key": lg_key,
                     "market":     "totals",
                     "outcome":    f"{name} {line}",
                     "fair_prob":  fair / 100,
@@ -722,6 +701,7 @@ def _build_raw():
                         "match":      label,
                         "commence":   comm,
                         "league": lg_name,
+                        "league_key": lg_key,
                         "market":     "totals",
                         "outcome":    f"{name} {line}",
                         "fair_prob":  fair / 100,
@@ -762,6 +742,7 @@ def _build_raw():
                 "match":        label,
                 "commence":     comm,
                 "league":   lg_name,
+                "league_key": lg_key,
                 "market":       "spreads",
                 "outcome":      outcome_label,
                 "fair_prob":    sd["fair_prob"],
@@ -780,6 +761,7 @@ def _build_raw():
                     "match":      label,
                     "commence":   comm,
                     "league": lg_name,
+                    "league_key": lg_key,
                     "market":     "spreads",
                     "outcome":    outcome_label,
                     "fair_prob":  sd["fair_prob"],
@@ -806,8 +788,7 @@ def _build_raw():
             "has_sharp_data": bool(sharp_fair),
             "outcomes":   h2h_outcomes,
             "totals":     totals_list,
-            "weather":    weather_by_label.get(label),
-            "round":      round_by_label.get(label),
+            "round":      lg_round,
         })
 
     # Accumulators can't be placed on exchanges — re-price every acca leg using
@@ -828,13 +809,12 @@ def _build_raw():
         # else: only priced at an exchange -> not acca-placeable, drop it
     acca_pool = sb_pool
 
-    # Attach the weather signal + round to every leg/single by match label
+    # Attach the league grouping to every leg/single by match label
+    _round_by_label = {m["label"]: m["round"] for m in matches}
     for s in singles:
-        s["weather"] = weather_by_label.get(s["match"])
-        s["round"]   = round_by_label.get(s["match"])
+        s["round"] = _round_by_label.get(s["match"])
     for c in acca_pool:
-        c["weather"] = weather_by_label.get(c["match"])
-        c["round"]   = round_by_label.get(c["match"])
+        c["round"] = _round_by_label.get(c["match"])
 
     # Fixture list = chronological by kickoff; the UI's sort control re-ranks
     # by sharp-line gap or margin on demand.
@@ -1132,7 +1112,6 @@ def _leg_summary(s):
         "paddy":      s.get("paddy"),
         "edge":       s["edge"],
         "confidence": s["confidence"],
-        "weather":    s.get("weather"),
         "round":      s.get("round"),
         # carried so the client can evaluate the analyst-disagrees soft flag on
         # handicap legs (needs the team + numeric point, not just the label)
@@ -1208,81 +1187,6 @@ if ODDS_REFRESH_MINUTES > 0:
 
 
 # ---------------------------------------------------------------------------
-# Background team-form auto-refresh. Rebuilds data/team_form.csv from the live
-# international-results dataset, then invalidates + re-analyses ONLY the matches
-# whose team's form changed (a new result appeared). Mirrors the injury-refresh
-# flow. The dataset pull is free; analyst spend is bounded to changed teams.
-# ---------------------------------------------------------------------------
-
-def _do_form_refresh():
-    """Rebuild team form, then invalidate/re-analyse only the affected matches.
-    Safe to call from the auto-refresh loop, startup, or the manual endpoint."""
-    res = fintel.refresh_team_form()
-    if not res["ok"]:
-        return res
-    changed = set(res["changed"])
-    if not changed:
-        print("[form] no form change — analyst cache kept intact")
-        return res
-
-    with _intel_lock:
-        labels = list(_intel_cache.keys())
-    affected_pairs, affected_labels = [], []
-    for label in labels:
-        parts = label.split(" vs ", 1)
-        if len(parts) != 2:
-            continue
-        home, away = parts
-        hc, ac = static_data.team_code(home), static_data.team_code(away)
-        if (hc and hc in changed) or (ac and ac in changed):
-            affected_pairs.append((home, away))
-            affected_labels.append(label)
-
-    fintel.invalidate_match_cache(affected_pairs)
-    with _intel_lock:
-        for label in affected_labels:
-            _intel_cache.pop(label, None)
-    print(f"[form] form changed for {len(changed)} team(s) — "
-          f"{len(affected_labels)} analyst card(s) invalidated, rest kept")
-
-    # Re-analyse the invalidated matches promptly (same path injuries use).
-    raw = get_raw()
-    _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
-    return res
-
-
-def _form_auto_refresh_loop():
-    interval = max(FORM_REFRESH_HOURS, 1) * 3600
-    while True:
-        time.sleep(interval)
-        try:
-            _do_form_refresh()
-        except Exception as e:
-            print(f"[form] auto-refresh failed: {e}", flush=True)
-
-
-def _startup_form_refresh():
-    """If the form snapshot predates today (i.e. WC matches have been played since
-    the last build), rebuild it once in the background at startup so a freshly
-    woken instance is current. Cheap — one free dataset download."""
-    try:
-        as_of = fintel.form_as_of()
-        today = datetime.now(timezone.utc).date().isoformat()
-        if as_of and as_of < today:
-            print(f"[form] snapshot is from {as_of} (< {today}) — refreshing at startup")
-            _do_form_refresh()
-    except Exception as e:
-        print(f"[form] startup refresh failed: {e}", flush=True)
-
-
-if FORM_REFRESH_HOURS > 0:
-    threading.Thread(target=_startup_form_refresh, daemon=True).start()
-    threading.Thread(target=_form_auto_refresh_loop, daemon=True).start()
-    print(f"[form] auto-refresh every {max(FORM_REFRESH_HOURS, 1):g}h "
-          f"(set FORM_REFRESH_HOURS=0 to disable)")
-
-
-# ---------------------------------------------------------------------------
 # Routes
 
 @app.get("/api/status")
@@ -1295,7 +1199,10 @@ def status():
         "odds_api_key_set": bool(raw_key),
         "key_preview":      key_preview,
         "key_length":       len(raw_key),
-        "sport_key":        _sport_key,
+        "leagues":          leagues.public_list(),
+        "league_errors":    _league_errors,
+        "odds_quota":       odds_api.QUOTA,
+        "intel":            fintel.intel_status(),
         "fetched_at":       d.get("fetched_at"),
         "match_count":      len(d.get("matches", [])),
         "error":            d.get("error"),
@@ -1566,88 +1473,73 @@ def admin_feed_books(key: str = ""):
 
 @app.get("/api/injuries")
 def injuries():
-    """Cached tournament-wide injury digest for the Injuries tab — reads the
-    cache only (no web search), so viewing it is free."""
-    return JSONResponse(fintel.injury_digest_info())
+    """Team-news digest for the Injuries tab, aggregated from the per-match
+    analyst cards already in cache. Read-only — no web search, so it is free."""
+    with _intel_lock:
+        cache = dict(_intel_cache)
+    seen, items = set(), []
+    for label, intel in cache.items():
+        if not isinstance(intel, dict) or label in seen:
+            continue
+        seen.add(label)
+        absences = (intel.get("key_absences") or "").strip()
+        if not absences or absences.lower().startswith("none"):
+            continue
+        items.append({
+            "match":    label,
+            "league":   intel.get("league"),
+            "commence": intel.get("commence"),
+            "absences": absences,
+            "cached_at": intel.get("cached_at"),
+        })
+    items.sort(key=lambda x: x.get("commence") or "")
+    newest = max((i.get("cached_at") or 0 for i in items), default=0)
+    return JSONResponse({
+        "items": items,
+        "count": len(items),
+        "as_of": newest or None,
+        "source": "per-match analyst research",
+    })
 
 
-# Cooldowns on the two cost-bearing endpoints. Both are unauthenticated (they
-# power UI buttons), so without a floor anyone — or a crawler — could drain the
-# Odds API monthly quota / burn Anthropic web searches by hammering them.
-_REFRESH_COOLDOWN          = 600   # /api/refresh: at most one forced odds fetch / 10 min
-_INJURY_REFRESH_COOLDOWN   = 300   # /api/refresh-injuries: at most one / 5 min
-_FORM_REFRESH_COOLDOWN     = 600   # /api/refresh-form: at most one dataset rebuild / 10 min
-_last_forced_refresh       = 0.0
-_last_injury_refresh       = 0.0
-_last_form_refresh         = 0.0
-_cooldown_lock             = threading.Lock()
+# Cooldowns on the cost-bearing endpoints. Both are unauthenticated (they power
+# UI buttons), so without a floor anyone — or a crawler — could drain the Odds
+# API monthly quota / burn Anthropic web searches by hammering them.
+_REFRESH_COOLDOWN        = 600   # /api/refresh: at most one forced odds fetch / 10 min
+_INJURY_REFRESH_COOLDOWN = 300   # /api/refresh-injuries: at most one / 5 min
+_last_forced_refresh     = 0.0
+_last_injury_refresh     = 0.0
+_cooldown_lock           = threading.Lock()
 
 
 @app.get("/api/refresh-injuries")
 def refresh_injuries():
-    """Refresh the tournament-wide injury digest (ONE web search), then invalidate
-    only the analyst cards for matches whose team is named in the updated digest.
-    Cards for teams the digest doesn't mention are kept as-is."""
+    """Force fresh team-news research for the upcoming fixtures: drops the cached
+    analyst cards so the next pass re-searches and re-analyses each match."""
     global _last_injury_refresh
     with _cooldown_lock:
         wait = _INJURY_REFRESH_COOLDOWN - (time.time() - _last_injury_refresh)
         if wait > 0:
             return JSONResponse({"status": "cooldown",
                                  "retry_in_s": int(wait) + 1,
-                                 "detail": "Injury digest was refreshed recently — using the cached digest."})
+                                 "detail": "Team news was refreshed recently — using the cached research."})
         _last_injury_refresh = time.time()
 
-    before = fintel.peek_injury_digest()
-
     def _do_refresh():
-        after = fintel.fetch_wc_injury_digest(force=True)
-        if not after or after == before:
-            print("[injuries] digest refresh — no change, analyst cache kept intact")
-            return
-
-        text = after.lower()
-        with _intel_lock:
-            labels = list(_intel_cache.keys())
-        affected_pairs, affected_labels = [], []
-        for label in labels:
-            p = label.split(" vs ", 1)
-            if len(p) != 2:
-                continue
-            home, away = p
-            if home.lower() in text or away.lower() in text:
-                affected_pairs.append((home, away))
-                affected_labels.append(label)
-
-        fintel.invalidate_match_cache(affected_pairs)
-        with _intel_lock:
-            for label in affected_labels:
-                _intel_cache.pop(label, None)
-        print(f"[injuries] digest refreshed — {len(affected_labels)} analyst card(s) "
-              f"invalidated (teams named in digest), rest kept")
-
-        # Re-analyse the invalidated matches promptly.
         raw = get_raw()
+        pairs = []
+        for m in raw.get("matches", []):
+            p = m["label"].split(" vs ", 1)
+            if len(p) == 2:
+                pairs.append((p[0], p[1]))
+        dropped = fintel.invalidate_match_cache(pairs)
+        fintel.clear_research()
+        with _intel_lock:
+            _intel_cache.clear()
+        print(f"[team-news] cleared {dropped} analyst card(s) + research — re-analysing")
         _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
 
     threading.Thread(target=_do_refresh, daemon=True).start()
-    return JSONResponse({"status": "refreshing"})
-
-
-@app.get("/api/refresh-form")
-def refresh_form():
-    """Rebuild team form from the international-results dataset, then re-analyse
-    only the matches whose team's recent form changed. Cards for teams with no
-    new result are kept as-is. Free dataset pull; bounded analyst spend."""
-    global _last_form_refresh
-    with _cooldown_lock:
-        wait = _FORM_REFRESH_COOLDOWN - (time.time() - _last_form_refresh)
-        if wait > 0:
-            return JSONResponse({"status": "cooldown",
-                                 "retry_in_s": int(wait) + 1,
-                                 "detail": "Team form was refreshed recently — using the current snapshot."})
-        _last_form_refresh = time.time()
-
-    threading.Thread(target=_do_form_refresh, daemon=True).start()
     return JSONResponse({"status": "refreshing"})
 
 
