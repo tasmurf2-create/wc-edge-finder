@@ -12,6 +12,17 @@ keys are The Odds API's, verified live against GET /v4/sports.
     soccer_spl             Premiership - Scotland     Scottish Soccer
 """
 
+# CRAWLER ACCESS — the `domains` lists below are NOT a wishlist.
+# Anthropic's web-search tool rejects the WHOLE request (HTTP 400) if any listed
+# domain blocks its crawler, so one bad entry kills the search for that league.
+# Verified accessible (probed 2026-08-21):
+#   skysports.com, espn.com, espn.co.uk, goal.com, premierleague.com, spfl.co.uk,
+#   football365.com, whoscored.com, fotmob.com, sofascore.com, flashscore.com,
+#   90min.com, givemesport.com, scotsman.com, laliga.com, besoccer.com,
+#   football-espana.net, football-lineups.com
+# Verified BLOCKED — do not re-add without re-probing:
+#   bbc.com, bbc.co.uk, theguardian.com, marca.com, as.com, transfermarkt.com,
+#   heraldscotland.com, dailyrecord.co.uk, talksport.com, reuters.com
 LEAGUES = [
     {
         "key":      "soccer_epl",
@@ -21,8 +32,8 @@ LEAGUES = [
         "flag":     "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
         "tier":     1,
         # Sources the analyst is allowed to ground league context in.
-        "domains":  ["bbc.com", "skysports.com", "premierleague.com",
-                     "theguardian.com", "espn.com"],
+        "domains":  ["skysports.com", "espn.com", "premierleague.com",
+                     "football365.com", "whoscored.com", "fotmob.com", "90min.com"],
     },
     {
         "key":      "soccer_spain_la_liga",
@@ -31,8 +42,9 @@ LEAGUES = [
         "country":  "Spain",
         "flag":     "🇪🇸",
         "tier":     1,
-        "domains":  ["bbc.com", "skysports.com", "marca.com", "as.com",
-                     "espn.com", "theguardian.com"],
+        "domains":  ["skysports.com", "espn.com", "laliga.com",
+                     "football-espana.net", "besoccer.com", "whoscored.com",
+                     "fotmob.com"],
     },
     {
         "key":      "soccer_spl",
@@ -41,8 +53,8 @@ LEAGUES = [
         "country":  "Scotland",
         "flag":     "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
         "tier":     1,
-        "domains":  ["bbc.com", "skysports.com", "spfl.co.uk",
-                     "theguardian.com", "heraldscotland.com"],
+        "domains":  ["skysports.com", "espn.com", "spfl.co.uk", "scotsman.com",
+                     "fotmob.com", "sofascore.com", "goal.com"],
     },
 ]
 
@@ -66,9 +78,10 @@ def league_short(key):
 
 
 def domains_for(key):
-    """Trusted grounding domains for a league (falls back to the general set)."""
+    """Trusted grounding domains for a league (falls back to the general set).
+    All entries must be crawler-accessible — see the note above LEAGUES."""
     l = BY_KEY.get(key)
-    return list(l["domains"]) if l else ["bbc.com", "skysports.com", "espn.com"]
+    return list(l["domains"]) if l else ["skysports.com", "espn.com", "fotmob.com"]
 
 
 def public_list():
