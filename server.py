@@ -1290,7 +1290,11 @@ def status():
         "key_length":       len(raw_key),
         "leagues":          leagues.public_list(),
         "league_errors":    _league_errors,
-        "odds_quota":       odds_api.QUOTA,
+        # Populated from Odds API response headers. Stays null until this process
+        # actually calls the API — a cache-served request spends nothing.
+        "odds_quota":       {**odds_api.QUOTA,
+                             "note": None if odds_api.QUOTA["remaining"] is not None
+                             else "no API call yet this process (served from cache)"},
         "intel":            fintel.intel_status(),
         "fetched_at":       d.get("fetched_at"),
         "match_count":      len(d.get("matches", [])),
