@@ -11,12 +11,30 @@ function renderAll() {
   renderDivergence();
 }
 
+// Odds are cached (demand-driven, hours-long TTL), so a bare clock time reads as
+// "live" when the snapshot may be hours old. Always show the AGE, and colour it
+// once it is old enough that prices have realistically moved.
 function _setUpdatedStamp(fetchedAt) {
   const el = document.getElementById('fetch-time');
   if (!el || !fetchedAt) return;
   const d = new Date(fetchedAt * 1000);
-  el.innerHTML = `<span class="live-dot"></span>Odds ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
-  el.title = 'Odds snapshot fetched at ' + d.toLocaleString();
+  const mins = Math.max(0, Math.round((Date.now() - fetchedAt * 1000) / 60000));
+
+  let age, cls;
+  if (mins < 1)        { age = 'just now';        cls = 'fresh'; }
+  else if (mins < 60)  { age = `${mins}m ago`;    cls = mins <= 30 ? 'fresh' : 'aging'; }
+  else {
+    const h = Math.floor(mins / 60);
+    age = `${h}h ago`;
+    cls = 'stale';
+  }
+
+  el.className = 'updated-stamp stamp--' + cls;
+  el.innerHTML = `<span class="live-dot"></span>Odds ${age}`;
+  el.title = `Odds snapshot fetched ${d.toLocaleString()}.`
+           + (cls === 'stale'
+              ? ' Prices will have moved — always confirm on your betslip before staking.'
+              : ' Always confirm the price on your betslip before staking.');
 }
 
 let _lastFetchedAt = 0;

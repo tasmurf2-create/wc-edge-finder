@@ -82,6 +82,12 @@ a { color: var(--blue); }
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;
   background: var(--green); margin-right: 5px; vertical-align: 1px;
 }
+/* Odds-age honesty: a cached snapshot must never read as a live price. */
+.stamp--fresh .live-dot { background: var(--green); }
+.stamp--aging { color: var(--amber); }
+.stamp--aging .live-dot { background: var(--amber); }
+.stamp--stale { color: var(--red); }
+.stamp--stale .live-dot { background: var(--red); animation: none; }
 
 /* ---------- primary nav (desktop: under header strip) ---------- */
 .nav {
@@ -532,7 +538,10 @@ tr:last-child td { border-bottom: none; }
   .app-header { padding: 0 var(--sp-3); gap: var(--sp-2); }
   .brand__tag { display: none; }
   .header-meta { gap: var(--sp-2); }
-  .updated-stamp { display: none; }
+  /* Odds age stays visible on mobile — it is the single most important piece of
+     context on the page. Only the dot is dropped, to save width. */
+  .updated-stamp { font-size: 10px; }
+  .updated-stamp .live-dot { display: none; }
   #refresh-btn span.btn-label { display: none; }
 
   .nav { display: none; }   /* replaced by bottom bar */

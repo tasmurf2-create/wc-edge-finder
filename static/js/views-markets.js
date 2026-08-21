@@ -266,7 +266,13 @@ function singleHTML(s, book, stake, opts = {}) {
 
 function buildWhy(s) {
   const parts = [];
-  parts.push(`De-vigged consensus fair prob <strong>${(s.fair_prob * 100).toFixed(1)}%</strong> vs best price implied <strong>${(1 / s.best_price * 100).toFixed(1)}%</strong> — <strong>+${s.edge.toFixed(1)}% price edge</strong>.`);
+  // Exchange prices are pre-commission; the edge is measured on what you keep.
+  const netP = s.net_price || s.best_price;
+  const isNet = s.net_price && Math.abs(s.net_price - s.best_price) > 0.001;
+  parts.push(`De-vigged consensus fair prob <strong>${(s.fair_prob * 100).toFixed(1)}%</strong> vs best price implied <strong>${(1 / netP * 100).toFixed(1)}%</strong> — <strong>+${s.edge.toFixed(1)}% price edge</strong>.`);
+  if (isNet) {
+    parts.push(`<strong>${esc(s.best_book)}</strong> shows <strong>${s.best_price.toFixed(2)}</strong>, but that is before exchange commission — you actually collect <strong>${netP.toFixed(2)}</strong>, and the edge above is measured on that.`);
+  }
   if (s.sharp_gap !== null && s.sharp_gap !== undefined) {
     if (s.sharp_gap < -1)
       parts.push(`The sharpest book rates this side <strong>${Math.abs(s.sharp_gap).toFixed(1)}%</strong> more likely than the soft-book consensus — the sharp money agrees it's underpriced.`);

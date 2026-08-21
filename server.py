@@ -103,6 +103,45 @@ BOOKMAKER_WHITELIST = {
 # Exchanges: better prices on singles, but you CANNOT place accumulators on them.
 # So they're used for singles but excluded from accumulator leg pricing.
 EXCHANGE_BOOKS = {"Betfair", "Betfair Exchange", "Matchbook", "Smarkets"}
+
+# EXCHANGE COMMISSION — this materially changes which bets are +EV.
+#
+# Exchange prices in the feed are PRE-commission, and the exchange takes a cut of
+# net winnings (Betfair 2-5% depending on loyalty, Smarkets ~2%). Because
+# exchanges post the best raw price on almost every outcome, they win the
+# best-price comparison nearly every time — so if commission is ignored, EVERY
+# reported edge is overstated by roughly the commission rate. On efficient league
+# markets, where real edges are ~1%, that is the difference between +EV and -EV.
+#
+# So exchange prices are converted to what you actually KEEP before any edge or
+# best-price comparison:  effective = 1 + (price - 1) * (1 - commission)
+# Set EXCHANGE_COMMISSION to your own rate (0.02 = 2%).
+try:
+    EXCHANGE_COMMISSION = float(os.environ.get("EXCHANGE_COMMISSION", "0.02"))
+except ValueError:
+    EXCHANGE_COMMISSION = 0.02
+EXCHANGE_COMMISSION = min(max(EXCHANGE_COMMISSION, 0.0), 0.10)
+
+
+def _net_price(price, book):
+    """Decimal price after exchange commission — what you actually collect.
+    Sportsbook prices pass through unchanged."""
+    if price and book in EXCHANGE_BOOKS and price > 1:
+        return 1.0 + (price - 1.0) * (1.0 - EXCHANGE_COMMISSION)
+    return price
+
+
+def _best_net(per_book):
+    """Pick the book paying the most AFTER commission.
+    Returns (book, gross_price, net_price) or (None, None, None)."""
+    best = None
+    for bk, price in (per_book or {}).items():
+        if not price:
+            continue
+        net = _net_price(price, bk)
+        if best is None or net > best[2]:
+            best = (bk, price, net)
+    return best or (None, None, None)
 # Edge thresholds, calibrated for CLUB LEAGUE markets.
 #
 # These are deliberately lower than the World Cup app's. EPL/La Liga 1X2 is among
@@ -624,14 +663,16 @@ def _build_raw():
             # Per-bookmaker prices for this outcome (whitelisted books only)
             per_book = {bk: prices[raw_name] for bk, prices in book_table.items() if raw_name in prices}
             paddy = per_book.get("Paddy Power")
-            # Best price from whitelisted books only
+            # Best price from whitelisted books only, compared AFTER commission
+            # so an exchange's headline price can't beat a book it doesn't really beat.
             if per_book:
-                bp_book  = max(per_book, key=per_book.get)
-                bp_price = per_book[bp_book]
+                bp_book, bp_price, bp_net = _best_net(per_book)
             else:
                 bp_price, bp_book = h2h_r["best_price"].get(raw_name, (None, None))
+                bp_net = _net_price(bp_price, bp_book)
 
-            edge = round((fair_p - 1.0/bp_price) * 100, 2) if bp_price else None
+            # Edge is measured against the NET price — what you actually collect.
+            edge = round((fair_p - 1.0/bp_net) * 100, 2) if bp_net else None
 
             # Sharp-book anchor: Pinnacle runs the lowest margin and moves first,
             # so its de-vigged price is the closest thing to a true line. Where the
@@ -658,6 +699,7 @@ def _build_raw():
                 "sharp_fair": round(sharp_p * 100, 1) if sharp_p is not None else None,
                 "sharp_gap":  sharp_gap,
                 "best_price": bp_price,
+                "net_price":  round(bp_net, 3) if bp_net else None,
                 "best_book":  bp_book,
                 "paddy":      paddy,
                 "edge":       edge,
@@ -697,6 +739,7 @@ def _build_raw():
                     "raw_outcome": raw_name,
                     "fair_prob":   fair_p,
                     "best_price":  bp_price,
+                    "net_price":   round(bp_net, 3) if bp_net else None,
                     "best_book":   bp_book,
                     "per_book":    per_book,   # {bookname: price}
                     "paddy":       paddy,
@@ -721,9 +764,10 @@ def _build_raw():
                 fair = od.get("fair")
                 if not pb or fair is None:
                     continue
-                best_book  = max(pb, key=pb.get)
-                best_price = pb[best_book]
-                edge = round((fair / 100 - 1.0 / best_price) * 100, 2)
+                best_book, best_price, best_net = _best_net(pb)
+                if not best_net:
+                    continue
+                edge = round((fair / 100 - 1.0 / best_net) * 100, 2)
                 acca_pool.append({
                     "match":      label,
                     "commence":   comm,
@@ -749,6 +793,7 @@ def _build_raw():
                         "outcome":    f"{name} {line}",
                         "fair_prob":  fair / 100,
                         "best_price": best_price,
+                        "net_price":  round(best_net, 3) if best_net else None,
                         "best_book":  best_book,
                         "per_book":   pb,
                         "paddy":      None,
@@ -768,14 +813,14 @@ def _build_raw():
             per_book = {k: v for k, v in per_book.items() if k in BOOKMAKER_WHITELIST}
             paddy = per_book.get("Paddy Power")
             if per_book:
-                bp_book  = max(per_book, key=per_book.get)
-                bp_price = per_book[bp_book]
+                bp_book, bp_price, bp_net = _best_net(per_book)
             else:
                 bp_price = sd["best_price"]
                 bp_book  = sd["best_book"]
-            if not bp_price:
+                bp_net   = _net_price(bp_price, bp_book)
+            if not bp_price or not bp_net:
                 continue
-            edge = round((sd["fair_prob"] - 1.0/bp_price) * 100, 2)
+            edge = round((sd["fair_prob"] - 1.0/bp_net) * 100, 2)
             # Human-readable: "Germany (-1.5)" = Germany wins by 2+
             sign = "+" if point > 0 else ""
             outcome_label = f"{team_name} ({sign}{point:g})"
@@ -809,6 +854,7 @@ def _build_raw():
                     "outcome":    outcome_label,
                     "fair_prob":  sd["fair_prob"],
                     "best_price": bp_price,
+                    "net_price":  round(bp_net, 3) if bp_net else None,
                     "best_book":  bp_book,
                     "per_book":   per_book,
                     "paddy":      paddy,

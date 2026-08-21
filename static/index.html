@@ -292,7 +292,20 @@
         Small edges on big prices are therefore treated as noise and labelled <em>speculative</em>, not value.</li>
       </ul>
 
-      <h3>3. Edge and EV</h3>
+      <h3>3. Exchange commission — why the best price isn't the best price</h3>
+      <p>Betting exchanges (Betfair, Smarkets) post the best raw price on almost every outcome, so they
+      win a naive best-price comparison nearly every time. But an exchange takes <strong>commission on
+      your net winnings</strong> — typically 2–5%. The price on screen is not the price you collect.</p>
+      <p>On a market where genuine edges are around 1%, that commission is the whole edge. So exchange
+      prices here are converted to what you actually keep —
+      <code>net = 1 + (price − 1) × (1 − commission)</code> — <strong>before</strong> any edge is
+      calculated and before any book is declared best. A card backed by an exchange states both the
+      shown price and the net price.</p>
+      <p>The default assumes 2%. If your rate differs, the deployment can set <code>EXCHANGE_COMMISSION</code>.
+      This is also why accumulators never use exchange prices: you cannot place an acca on an exchange
+      at all.</p>
+
+      <h3>4. Edge and EV</h3>
       <p><strong>Edge</strong> = fair probability − the probability implied by the best price (in percentage points).
       It's a model diagnostic. The money number is <strong>EV (expected value)</strong>:
       <code>EV = fair probability × price − 1</code>.
@@ -300,7 +313,7 @@
       you'd average +€0.30 profit per €10 staked. Any single bet still just wins or loses — EV only shows up over
       dozens of bets. Variance dominates small samples.</p>
 
-      <h3>4. The sharp-line cross-check</h3>
+      <h3>5. The sharp-line cross-check</h3>
       <p>Not all bookmakers are equally informed. <strong>Pinnacle</strong> and the betting exchanges run margins
       around 2% (against 5–8% at a typical high-street book), accept large stakes, and move their prices first when
       real money arrives. Their de-vigged line is the closest thing available to a true probability.</p>
@@ -312,7 +325,7 @@
       Those venues price big tournaments but barely cover a midweek league fixture, so for club football they were
       empty far more often than not.</p>
 
-      <h3>5. The AI analyst</h3>
+      <h3>6. The AI analyst</h3>
       <p>For each fixture the app runs <strong>one web search</strong> across trusted football sources for that league
       (Sky Sports, ESPN, the official league sites, FotMob and similar), gathering recent form, league position,
       confirmed team news and head-to-head. A language-model analyst then writes the football read from that material
@@ -323,26 +336,26 @@
       <p>It never sees enough to judge value. It supplies football reasons; the price layer judges the odds. It is a
       second opinion, not a fact, and it can be wrong.</p>
 
-      <h3>6. Best Bets — the two gates</h3>
+      <h3>7. Best Bets — the two gates</h3>
       <p>A bet appears only when (1) the analyst explicitly recommended that outcome for football reasons, and
       (2) the current price is fair or better for that pick. Verdicts: <strong style="color:var(--green)">Bet Now</strong>
       (EV ≥ +2% and outside the longshot-noise band), <strong style="color:var(--amber)">Lean</strong> (roughly fair price),
       <strong style="color:var(--blue)">Track Price</strong> (analyst likes it, price short), <strong style="color:var(--red)">
       Avoid at Price</strong>.</p>
 
-      <h3>7. Accumulators are −EV. Full stop.</h3>
+      <h3>8. Accumulators are −EV. Full stop.</h3>
       <p>Multiplying legs multiplies the bookmaker's margin. The acca tools here exist because people enjoy accas:
       they find the least-bad version (single-book pricing, high-probability legs, honest EV in red). The long-term
       expectation of every acca on this site is negative and the cards say exactly how negative. The genuine edge,
       where it exists, is in singles.</p>
 
-      <h3>8. What would prove this works</h3>
+      <h3>9. What would prove this works</h3>
       <p>A logged record. The My Bets journal records the model's fair probability and EV at the moment you log a bet,
       so over time you can compare expected P/L with actual P/L and check whether prices you took beat the market's
       later prices (closing line value). Until that record exists over a meaningful sample, treat every number here as
       a hypothesis, not a promise.</p>
 
-      <h3>9. Bankroll</h3>
+      <h3>10. Bankroll</h3>
       <p>Flat, small stakes — 1–2% of a bankroll you can afford to lose — survive variance. Chasing losses and
       increasing stakes after wins are both how positive-EV bettors go broke. If betting stops being fun, stop.</p>
     </div>
@@ -430,15 +443,15 @@
   </div>
 </div>
 
-<script src="/static/js/helpers.js?v=18"></script>
-<script src="/static/js/data.js?v=18"></script>
-<script src="/static/js/views-today.js?v=18"></script>
-<script src="/static/js/views-best.js?v=18"></script>
-<script src="/static/js/views-markets.js?v=18"></script>
-<script src="/static/js/views-journal.js?v=18"></script>
-<script src="/static/js/views-injuries.js?v=18"></script>
-<script src="/static/js/views-admin.js?v=18"></script>
-<script src="/static/js/views-method.js?v=18"></script>
-<script src="/static/js/app.js?v=18"></script>
+<script src="/static/js/helpers.js?v=19"></script>
+<script src="/static/js/data.js?v=19"></script>
+<script src="/static/js/views-today.js?v=19"></script>
+<script src="/static/js/views-best.js?v=19"></script>
+<script src="/static/js/views-markets.js?v=19"></script>
+<script src="/static/js/views-journal.js?v=19"></script>
+<script src="/static/js/views-injuries.js?v=19"></script>
+<script src="/static/js/views-admin.js?v=19"></script>
+<script src="/static/js/views-method.js?v=19"></script>
+<script src="/static/js/app.js?v=19"></script>
 </body>
 </html>
