@@ -118,7 +118,9 @@ a { color: var(--blue); }
 }
 .nav-btn:hover { color: var(--tx-2); }
 .nav-btn.active { color: var(--tx-1); border-bottom-color: var(--green); }
-.nav-btn .nav-ico { font-size: 1rem; line-height: 1; }
+.nav-btn .nav-ico { font-size: 1rem; line-height: 1; display: inline-flex; }
+.nav-ico svg, .bb-ico svg, .more-item svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+.more-item svg { width: 17px; height: 17px; margin-right: 2px; }
 .nav-btn .caret { font-size: 0.6rem; color: var(--tx-4); }
 
 /* "More" dropdown — body-level fixed element so it works from the desktop
@@ -211,8 +213,10 @@ input[type="range"] { accent-color: var(--blue); }
 
 /* ---------- cards ---------- */
 .card {
-  background: var(--bg-1); border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, var(--bg-1), #0e131c);
+  border: 1px solid var(--line-2);
   border-radius: var(--radius); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.28), 0 14px 32px -22px rgba(0,0,0,.7);
 }
 .card__head {
   background: var(--bg-2); padding: var(--sp-3) var(--sp-4);
