@@ -33,7 +33,6 @@
   <button class="nav-btn active" data-view="today" onclick="switchView('today')"><span class="nav-ico">📅</span>Today</button>
   <button class="nav-btn" data-view="best" onclick="switchView('best')"><span class="nav-ico">★</span>Best Bets</button>
   <button class="nav-btn" data-view="markets" onclick="switchView('markets')"><span class="nav-ico">📊</span>Markets</button>
-  <button class="nav-btn" data-view="gaa" onclick="switchView('gaa')"><span class="nav-ico">☘</span>GAA</button>
   <button class="nav-btn" data-view="mybets" onclick="switchView('mybets')"><span class="nav-ico">📒</span>My Bets</button>
   <button class="nav-btn" id="more-btn" data-view="more" onclick="toggleMoreMenu(event)"><span class="nav-ico">⋯</span>More <span class="caret">▾</span></button>
 </nav>
@@ -220,15 +219,6 @@
     <div id="mybets-panel" class="view-body"></div>
   </section>
 
-  <!-- ===================== GAA ===================== -->
-  <section id="tab-gaa" class="view">
-    <div class="legend">
-      <span>All-Ireland hurling &amp; gaelic football — <strong>Paddy Power</strong> price vs the vig-free <strong>Betfair Exchange</strong> fair line, with an analyst read per game.</span>
-      <span style="color:var(--tx-4)">Positive edge = Paddy Power's price beats the sharp fair line (rare — soft books carry a margin). Analysis is web-researched; treat as indicative.</span>
-    </div>
-    <div id="gaa-panel" class="view-body"></div>
-  </section>
-
   <!-- ===================== INJURIES ===================== -->
   <section id="tab-injuries" class="view">
     <div class="toolbar">
@@ -400,7 +390,6 @@
   <button class="bb-btn active" data-view="today" onclick="switchView('today')"><span class="bb-ico">📅</span>Today</button>
   <button class="bb-btn" data-view="best" onclick="switchView('best')"><span class="bb-ico">★</span>Best Bets</button>
   <button class="bb-btn" data-view="markets" onclick="switchView('markets')"><span class="bb-ico">📊</span>Markets</button>
-  <button class="bb-btn" data-view="gaa" onclick="switchView('gaa')"><span class="bb-ico">☘</span>GAA</button>
   <button class="bb-btn" data-view="mybets" onclick="switchView('mybets')"><span class="bb-ico">📒</span>My Bets</button>
   <button class="bb-btn" data-view="more" onclick="toggleMoreMenu(event, true)"><span class="bb-ico">⋯</span>More</button>
 </nav>
@@ -433,7 +422,6 @@
 <script src="/static/js/views-markets.js?v=15"></script>
 <script src="/static/js/views-journal.js?v=15"></script>
 <script src="/static/js/views-injuries.js?v=15"></script>
-<script src="/static/js/views-gaa.js?v=15"></script>
 <script src="/static/js/views-admin.js?v=15"></script>
 <script src="/static/js/views-method.js?v=15"></script>
 <script src="/static/js/app.js?v=15"></script>

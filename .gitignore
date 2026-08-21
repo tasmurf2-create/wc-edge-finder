@@ -28,3 +28,4 @@ gaa_research_cache.json
 
 # Odds disk cache (runtime)
 odds_cache.json
+.venv-check/
