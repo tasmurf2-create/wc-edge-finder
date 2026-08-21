@@ -32,7 +32,7 @@ def _load_env(path=".env"):
 _load_env()
 
 import wc_odds
-import prediction_markets as pmkt
+import names
 import football_intel as fintel
 import static_data
 
@@ -275,6 +275,32 @@ def _all_h2h_prices(event):
     return result
 
 
+# Sharp reference books, best first. These are NOT in the betting whitelist —
+# they're the market's opinion, not somewhere an Irish/UK user places a bet.
+# Pinnacle runs ~2% margin vs 5-8% at soft books and moves first on real money,
+# so its de-vigged line is the closest available proxy for the true probability.
+SHARP_BOOKS = ("Pinnacle", "Betfair", "Betfair Exchange", "Smarkets", "Matchbook")
+
+
+def _sharp_h2h_fair(event):
+    """De-vigged h2h probabilities from the sharpest available book.
+    Returns {outcome_name: fair_prob}, or {} when no sharp book priced it."""
+    books = {}
+    for bm in event.get("bookmakers", []):
+        for market in bm.get("markets", []):
+            if market["key"] == "h2h":
+                books[bm["title"]] = market["outcomes"]
+    for title in SHARP_BOOKS:
+        outcomes = books.get(title)
+        if not outcomes:
+            continue
+        raw = {o["name"]: 1.0 / o["price"] for o in outcomes if o.get("price")}
+        total = sum(raw.values())
+        if total > 0 and len(raw) >= 2:
+            return {k: v / total for k, v in raw.items()}
+    return {}
+
+
 def _analyse_spreads(event):
     """
     De-vig Asian handicap (spreads) market.
@@ -364,8 +390,6 @@ def _build_intel_requests(singles):
             f"- {x['outcome'].upper()}: book fair {x['fair_prob']*100:.1f}% "
             f"vs best price {x['best_price']} ({x['best_book']}) "
             f"= +{x['edge']:.1f}% edge"
-            + (f", Kalshi {x['kalshi']}%" if x['kalshi'] else "")
-            + (f", PM gap {x['pm_gap']:+.1f}%" if x['pm_gap'] else "")
             for x in match_singles
         )
         intel_requests.append({
@@ -512,9 +536,9 @@ def _analyst_token(c):
 
     if m == "h2h":
         o = c["outcome"]
-        if o == "draw":                       return "draw"
-        if o == pmkt.normalize_team(home):    return "home_win"
-        if o == pmkt.normalize_team(away):    return "away_win"
+        if o == "draw":                        return "draw"
+        if o == names.normalize_team(home):    return "home_win"
+        if o == names.normalize_team(away):    return "away_win"
         return None
 
     if m == "spreads":
@@ -539,15 +563,6 @@ def _build_raw():
         traceback.print_exc()
         return {"error": str(e), "fetched_at": int(time.time()), "matches": [], "bets": {"singles": [], "parlays": [], "acca_pool": []}}
 
-    try:
-        kal = pmkt.fetch_kalshi()
-    except Exception:
-        kal = {}
-    try:
-        poly = pmkt.fetch_polymarket()
-    except Exception:
-        poly = {}
-
     matches     = []
     singles     = []
     acca_pool   = []   # ALL outcomes (incl. favourites) — candidate legs for accas
@@ -569,15 +584,13 @@ def _build_raw():
             continue
 
         home, away = ev["home_team"], ev["away_team"]
-        mk    = pmkt.match_key(home, away)
         label = f"{home} vs {away}"
         comm  = h2h_r["commence"]
         weather_by_label[label] = fintel.weather_signal(home, away, comm)
         _r = static_data.match_round(home, away)
         round_by_label[label] = {"label": _r[0], "order": _r[1]} if _r else None
 
-        kl_probs   = kal.get(mk, {}).get("probs", {})
-        pm_probs   = poly.get(mk, {}).get("probs", {})
+        sharp_fair = _sharp_h2h_fair(ev)   # {outcome: fair_prob} from the sharpest book
         book_table = _all_h2h_prices(ev)   # {bookname: {outcome: price}}
         book_table = {k: v for k, v in book_table.items() if k in BOOKMAKER_WHITELIST}
         all_books.update(book_table.keys())
@@ -587,7 +600,7 @@ def _build_raw():
         max_gap = 0.0
 
         for raw_name, fair_p in h2h_r["fair"].items():
-            norm = "draw" if pmkt._is_draw(raw_name) else pmkt.normalize_team(raw_name)
+            norm = "draw" if names.is_draw(raw_name) else names.normalize_team(raw_name)
             # Per-bookmaker prices for this outcome (whitelisted books only)
             per_book = {bk: prices[raw_name] for bk, prices in book_table.items() if raw_name in prices}
             paddy = per_book.get("Paddy Power")
@@ -598,29 +611,23 @@ def _build_raw():
             else:
                 bp_price, bp_book = h2h_r["best_price"].get(raw_name, (None, None))
 
-            kp = kl_probs.get(norm)
-            pp = pm_probs.get(norm)
-            pmvals = [x for x in (kp, pp) if x is not None]
-            pm_cons = sum(pmvals) / len(pmvals) if pmvals else None
-
-            diff = round((fair_p - pm_cons) * 100, 1) if pm_cons is not None else None
-            if diff is not None and abs(diff) > abs(max_gap):
-                max_gap = diff
-
             edge = round((fair_p - 1.0/bp_price) * 100, 2) if bp_price else None
 
-            # Confidence: edge on price line + PM confirmation
-            pm_gap = round((pm_cons - fair_p) * 100, 1) if pm_cons is not None else None
-            pm_confirms = pm_gap is not None and pm_gap > 0  # PM thinks it's more likely than books
+            # Sharp-book anchor: Pinnacle runs the lowest margin and moves first,
+            # so its de-vigged price is the closest thing to a true line. Where the
+            # soft-book consensus sits above it, the sharp side agrees the outcome
+            # is underpriced — the club-football stand-in for the old PM signal.
+            sharp_p  = sharp_fair.get(raw_name)
+            sharp_gap = round((fair_p - sharp_p) * 100, 1) if sharp_p is not None else None
+            # Sharp confirms when it rates the outcome AT LEAST as likely as consensus.
+            sharp_confirms = sharp_gap is not None and sharp_gap <= 0
+            if sharp_gap is not None and abs(sharp_gap) > abs(max_gap):
+                max_gap = sharp_gap
 
             if edge is not None and edge > VALUE_THRESHOLD * 100:
-                confidence = "high" if pm_confirms else "medium"
+                confidence = "high" if sharp_confirms else "medium"
             elif edge is not None and edge > EDGE_MIN * 100:
-                confidence = "medium" if pm_confirms else "low"
-            elif pm_gap is not None and pm_gap < -4:
-                # Books SHORT by >4% vs PM with no direct book edge
-                confidence = "medium"
-                edge = edge or 0
+                confidence = "medium" if sharp_confirms else "low"
             else:
                 confidence = None
 
@@ -628,14 +635,12 @@ def _build_raw():
                 "outcome":    norm,
                 "market":     "h2h",
                 "book_fair":  round(fair_p * 100, 1),
-                "poly":       round(pp * 100, 1) if pp is not None else None,
-                "kalshi":     round(kp * 100, 1) if kp is not None else None,
-                "diff":       diff,
+                "sharp_fair": round(sharp_p * 100, 1) if sharp_p is not None else None,
+                "sharp_gap":  sharp_gap,
                 "best_price": bp_price,
                 "best_book":  bp_book,
                 "paddy":      paddy,
                 "edge":       edge,
-                "pm_gap":     pm_gap,
                 "confidence": confidence,
                 "per_book":   {k: v for k, v in per_book.items() if k not in EXCHANGE_BOOKS},
             }
@@ -672,10 +677,9 @@ def _build_raw():
                     "per_book":    per_book,   # {bookname: price}
                     "paddy":       paddy,
                     "edge":        edge,
-                    "pm_gap":      pm_gap,
+                    "sharp_fair":  round(sharp_p * 100, 1) if sharp_p is not None else None,
+                    "sharp_gap":   sharp_gap,
                     "confidence":  confidence or "low",
-                    "kalshi":      round(kp * 100, 1) if kp is not None else None,
-                    "poly":        round(pp * 100, 1) if pp is not None else None,
                 })
 
         h2h_outcomes.sort(key=lambda x: -x["book_fair"])
@@ -721,10 +725,9 @@ def _build_raw():
                         "per_book":   pb,
                         "paddy":      None,
                         "edge":       edge,
-                        "pm_gap":     None,
+                        "sharp_fair": None,
+                        "sharp_gap":  None,
                         "confidence": "medium" if edge > VALUE_THRESHOLD * 100 else "low",
-                        "kalshi":     None,
-                        "poly":       None,
                     })
             totals_list.append({"line": line, **td})
 
@@ -778,10 +781,9 @@ def _build_raw():
                     "per_book":   per_book,
                     "paddy":      paddy,
                     "edge":       edge,
-                    "pm_gap":     None,
+                    "sharp_fair": None,
+                    "sharp_gap":  None,
                     "confidence": "medium" if edge > VALUE_THRESHOLD * 100 else "low",
-                    "kalshi":     None,
-                    "poly":       None,
                     # Keep raw handicap info for analyst matching
                     "spread_team":  team_name,
                     "spread_point": point,
@@ -792,7 +794,7 @@ def _build_raw():
             "commence":   comm,
             "margin":     round(h2h_r["margin"] * 100, 1),
             "max_gap":    round(max_gap, 1),
-            "has_pm_data": bool(kl_probs or pm_probs),
+            "has_sharp_data": bool(sharp_fair),
             "outcomes":   h2h_outcomes,
             "totals":     totals_list,
             "weather":    weather_by_label.get(label),
@@ -926,8 +928,8 @@ def _outcome_matches(single, analyst_outcome, analyst_market=""):
     # Extract home/away team names from match label "Home vs Away"
     match_label = single.get("match", "")
     parts       = match_label.split(" vs ", 1)
-    home_name   = pmkt.normalize_team(parts[0]) if len(parts) == 2 else ""
-    away_name   = pmkt.normalize_team(parts[1]) if len(parts) == 2 else ""
+    home_name   = names.normalize_team(parts[0]) if len(parts) == 2 else ""
+    away_name   = names.normalize_team(parts[1]) if len(parts) == 2 else ""
 
     ao = analyst_outcome.lower().replace(" ", "_")
 
@@ -1325,8 +1327,9 @@ def debug_sensible():
     })
 # ---------------------------------------------------------------------------
 
-@app.get("/api/divergence")
-def divergence():
+@app.get("/api/matches")
+def matches():
+    """Per-match consensus fair prices vs the sharp-book line."""
     d = get_raw()
     return JSONResponse({"fetched_at": d["fetched_at"], "matches": d["matches"]})
 

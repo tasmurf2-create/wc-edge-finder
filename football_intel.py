@@ -867,7 +867,7 @@ def _norm_label(label: str) -> str:
     """Normalize both team names in 'Home vs Away' for cache-key matching."""
     parts = label.split(" vs ", 1)
     if len(parts) == 2:
-        from prediction_markets import normalize_team
+        from names import normalize_team
         return f"{normalize_team(parts[0])} vs {normalize_team(parts[1])}"
     return label.lower()
 
