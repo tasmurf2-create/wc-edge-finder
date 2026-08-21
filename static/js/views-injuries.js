@@ -32,50 +32,42 @@ function fmtInjuryDigest(text) {
 
 function renderInjuryTable() {
   const panel = document.getElementById('injuries-panel');
-  const items = _injuryInfo?.items || [];
-  const teamFilter = document.getElementById('inj-team-filter')?.value || '';
-  const statusFilter = document.getElementById('inj-status-filter')?.value || '';
+  const items = _injuryInfo?.items || [];      // per-match: {match, league, commence, absences}
+  const leagueFilter = document.getElementById('inj-team-filter')?.value || '';
 
-  const teams = [...new Set(items.map(i => i.team))].sort();
-  const statuses = [...new Set(items.map(i => i.status))];
-  const list = items.filter(i =>
-    (!teamFilter || i.team === teamFilter) && (!statusFilter || i.status === statusFilter));
+  const leagues = [...new Set(items.map(i => i.league).filter(Boolean))].sort();
+  const list = items.filter(i => !leagueFilter || i.league === leagueFilter);
 
   const filterBar = `<div class="toolbar" style="padding-left:0;padding-right:0;padding-top:0">
-    <div class="field"><label>Team</label>
+    <div class="field"><label>League</label>
       <select id="inj-team-filter" onchange="renderInjuryTable()">
-        <option value="">All teams (${teams.length})</option>
-        ${teams.map(t => `<option value="${esc(t)}"${t === teamFilter ? ' selected' : ''}>${esc(t)}</option>`).join('')}
+        <option value="">All leagues (${leagues.length})</option>
+        ${leagues.map(l => `<option value="${esc(l)}"${l === leagueFilter ? ' selected' : ''}>${esc(l)}</option>`).join('')}
       </select>
     </div>
-    <div class="field"><label>Status</label>
-      <select id="inj-status-filter" onchange="renderInjuryTable()">
-        <option value="">All statuses</option>
-        ${statuses.map(st => `<option value="${esc(st)}"${st === statusFilter ? ' selected' : ''}>${esc(INJURY_STATUS_META[st]?.label || st)}</option>`).join('')}
-      </select>
-    </div>
-    <span style="font-size:var(--fs-xs);color:var(--tx-4)">${list.length} player${list.length !== 1 ? 's' : ''}</span>
+    <span style="font-size:var(--fs-xs);color:var(--tx-4)">${list.length} match${list.length !== 1 ? 'es' : ''} with team news</span>
   </div>`;
 
-  const rows = list.map(i => {
-    const meta = INJURY_STATUS_META[i.status] || INJURY_STATUS_META.unknown;
-    return `<tr>
-      <td>${esc(i.team)}</td>
-      <td style="text-align:left">${esc(i.player)}</td>
-      <td style="text-align:left"><span class="badge" style="background:${meta.col}18;color:${meta.col};border-color:${meta.col}55">${meta.label}</span></td>
-      <td style="text-align:left;color:var(--tx-3)">${esc(i.detail || '—')}</td>
-    </tr>`;
-  }).join('');
+  const legend = `<div class="legend" style="margin-bottom:12px">
+    <span>Team news is gathered per match from the analyst's research. It reflects what was found — a match with no entry means nothing notable was reported, not that every player is fit.</span>
+  </div>`;
 
-  const table = list.length
-    ? `<div class="table-wrap">
-        <table style="min-width:560px"><thead><tr>
-          <th>Team</th><th style="text-align:left">Player</th><th style="text-align:left">Status</th><th style="text-align:left">Detail</th>
-        </tr></thead><tbody>${rows}</tbody></table>
-      </div>`
-    : emptyState('🔍', 'No injury or suspension news matches the current filters', '');
+  const cards = list.length
+    ? list.map(i => {
+        const when = i.commence ? fmt(i.commence) : '';
+        return `<div class="card" style="margin-bottom:10px">
+          <div class="card__head">
+            <div>
+              <div class="match-title">${fmtLabel(i.match)}</div>
+              <div class="match-sub">${esc(i.league || '')}${when ? ' · ' + when : ''}</div>
+            </div>
+          </div>
+          <div style="line-height:1.6;color:var(--tx-2);font-size:var(--fs-sm)">${esc(i.absences)}</div>
+        </div>`;
+      }).join('')
+    : emptyState('🩹', 'No team news yet', 'Team news appears here as the analyst researches each upcoming match. Open Today or Best Bets to kick that off, or hit "Refresh injuries".');
 
-  panel.innerHTML = filterBar + table;
+  panel.innerHTML = legend + filterBar + cards;
 }
 
 function renderInjuries(info) {

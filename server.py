@@ -1592,9 +1592,12 @@ def injuries():
         })
     items.sort(key=lambda x: x.get("commence") or "")
     newest = max((i.get("cached_at") or 0 for i in items), default=0)
+    # `fetched_at` is what the frontend polls to detect a completed refresh;
+    # keep `as_of` too for anything reading the older name.
     return JSONResponse({
         "items": items,
         "count": len(items),
+        "fetched_at": newest or None,
         "as_of": newest or None,
         "source": "per-match analyst research",
     })
@@ -1625,16 +1628,30 @@ def refresh_injuries():
 
     def _do_refresh():
         raw = get_raw()
+        # Only refresh fixtures that are actually still upcoming — re-analysing a
+        # match that has already kicked off spends a search and a Sonnet call for
+        # a card nobody can bet on.
+        upcoming = set(_upcoming_labels(raw.get("matches")))
         pairs = []
         for m in raw.get("matches", []):
-            p = m["label"].split(" vs ", 1)
+            label = m.get("label", "")
+            if upcoming and label not in upcoming:
+                continue
+            p = label.split(" vs ", 1)
             if len(p) == 2:
                 pairs.append((p[0], p[1]))
+
+        # Drop the DISK cards + research so the next pass re-searches, but do NOT
+        # clear the in-memory cache: the UI keeps serving the last known team news
+        # while the new cards are built, and each card is swapped in place as it
+        # lands (see _publish). Blanking memory here left the Injuries tab empty
+        # for the whole re-analysis — many minutes.
         dropped = fintel.invalidate_match_cache(pairs)
         fintel.clear_research()
         with _intel_lock:
-            _intel_cache.clear()
-        print(f"[team-news] cleared {dropped} analyst card(s) + research — re-analysing")
+            _intel_fetching.update(f"{h} vs {a}" for h, a in pairs)
+        print(f"[team-news] re-researching {len(pairs)} upcoming fixture(s) "
+              f"({dropped} card(s) invalidated); serving previous news meanwhile")
         _trigger_intel_bg(raw["bets"]["singles"], all_matches=raw["matches"])
 
     threading.Thread(target=_do_refresh, daemon=True).start()
