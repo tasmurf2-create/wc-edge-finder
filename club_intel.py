@@ -396,11 +396,15 @@ def get_match_intel(home, away, commence, league_key=None,
         return None
 
 
-def get_intel_batch(match_list, max_calls=15):
+def get_intel_batch(match_list, max_calls=15, on_result=None):
     """
     Fetch intel for a list of dicts with keys: home, away, commence, league_key,
     price_notes. Returns {cache_key: intel_dict}.
     Caps fresh matches at max_calls; serves the rest from cache.
+
+    on_result(label, intel) is called as EACH card lands, so the UI can fill in
+    one match at a time instead of waiting for the whole batch — a full matchweek
+    is ~24 serial Sonnet calls, which is many minutes end to end.
     """
     cache = _load_cache()
     results = {}
@@ -434,13 +438,19 @@ def get_intel_batch(match_list, max_calls=15):
         }
         for f in concurrent.futures.as_completed(futs):
             m = futs[f]
+            label = f"{m['home']} vs {m['away']}"
             try:
                 intel = f.result()
                 if intel:
                     results[_cache_key(m["home"], m["away"])] = intel
-                    print(f"[intel] {m['home']} vs {m['away']} ok")
+                    print(f"[intel] {label} ok")
+                    if on_result:
+                        try:
+                            on_result(label, intel)
+                        except Exception as cb_err:
+                            print(f"[intel] publish {label} failed: {cb_err}")
             except Exception as e:
-                print(f"[intel] {m['home']} vs {m['away']} failed: {e}")
+                print(f"[intel] {label} failed: {e}")
     return results
 
 

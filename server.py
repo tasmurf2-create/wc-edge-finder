@@ -411,18 +411,33 @@ def _run_intel_bg(intel_requests):
     # NB: _intel_busy was set (under _intel_lock) by _trigger_intel_bg before
     # this thread started; this function is responsible for clearing it.
     print(f"[intel] background fetch starting for {len(intel_requests)} match(es)...")
+
+    def _publish(label, intel):
+        """Publish each card the moment it lands so the UI fills in one match at
+        a time — a full matchweek is ~24 serial Sonnet calls, and batching the
+        publish would leave every card blank for the whole run."""
+        with _intel_lock:
+            _intel_cache[label] = intel
+            norm = fintel._norm_label(label)
+            if norm != label:
+                _intel_cache[norm] = intel
+            _intel_fetching.discard(label)
+
     try:
-        raw_map = fintel.get_intel_batch(intel_requests, max_calls=MAX_INTEL_MATCHES)
+        raw_map = fintel.get_intel_batch(intel_requests, max_calls=MAX_INTEL_MATCHES,
+                                         on_result=_publish)
+        # Sweep up anything served straight from the disk cache (those never hit
+        # the callback because no fresh call was made for them).
         with _intel_lock:
             for req in intel_requests:
                 ck = fintel._cache_key(req["home"], req["away"])
-                if ck in raw_map:
-                    label = req["home"] + " vs " + req["away"]
+                label = req["home"] + " vs " + req["away"]
+                if ck in raw_map and label not in _intel_cache:
                     _intel_cache[label] = raw_map[ck]
                     norm = fintel._norm_label(label)
                     if norm != label:
                         _intel_cache[norm] = raw_map[ck]
-                    _intel_fetching.discard(label)
+                _intel_fetching.discard(label)
         print(f"[intel] background fetch done — {len(_intel_cache)} match(es) cached")
     except Exception as e:
         print(f"[intel] background fetch failed: {e}")
