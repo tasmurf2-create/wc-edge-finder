@@ -25,7 +25,7 @@ import secrets
 import itertools
 import threading
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 def _load_env(path=".env"):
@@ -447,25 +447,34 @@ def _parse_commence(iso):
         return None
 
 
-def _active_round(all_matches):
-    """Return the lowest round order that still has upcoming matches."""
+ANALYSIS_HORIZON_DAYS = 8   # analyse roughly the next matchweek
+
+
+def _upcoming_labels(all_matches):
+    """Labels of fixtures kicking off inside the analysis horizon, soonest first.
+
+    The World Cup version analysed 'the lowest round still to be played', because
+    a tournament runs one round at a time. Club leagues all run CONCURRENTLY, so
+    round-order is meaningless here — filtering by it would analyse one league and
+    silently starve the others. The right filter is time.
+    """
     now = datetime.now(timezone.utc)
+    horizon = now + timedelta(days=ANALYSIS_HORIZON_DAYS)
     upcoming = []
     for m in (all_matches or []):
         dt = _parse_commence(m.get("commence"))
-        if dt is not None and dt > now:
-            upcoming.append(m)
-    if not upcoming:
-        return None
-    orders = [m["round"]["order"] for m in upcoming if m.get("round")]
-    return min(orders) if orders else None
+        if dt is not None and now < dt <= horizon:
+            upcoming.append((dt, m.get("label", "")))
+    upcoming.sort(key=lambda x: x[0])
+    return [label for _, label in upcoming if label]
 
 
 def _trigger_intel_bg(singles, all_matches=None):
-    """Start background intel fetch for the current active round only.
+    """Start background analysis for fixtures inside the analysis horizon.
 
-    Only analyses matches in the lowest round that still has upcoming
-    fixtures — no point running R2/R3 analysis weeks in advance.
+    Covers ALL leagues — they run concurrently, so there is no single "active
+    round" to narrow to. Value singles are analysed first (they are what the user
+    is most likely to act on), then any remaining upcoming fixture.
     """
     global _intel_busy
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -476,28 +485,29 @@ def _trigger_intel_bg(singles, all_matches=None):
             return
         cached_labels = set(_intel_cache.keys())
 
-    # Determine which round is currently active
-    active_order = _active_round(all_matches)
+    upcoming = _upcoming_labels(all_matches)
+    upcoming_set = set(upcoming)
 
-    # 1. Value singles in the active round (sorted by edge)
+    # 1. Value singles on upcoming fixtures (already edge-sorted)
     active_singles = [s for s in singles
-                      if (s.get("round") or {}).get("order") == active_order] if active_order else singles
+                      if not upcoming_set or s.get("match") in upcoming_set]
     singles_requests = _build_intel_requests(active_singles or singles)
 
-    # 2. All other priced matches in the active round with no singles
+    # 2. Every other upcoming fixture, soonest first
     extra_requests = []
-    if all_matches and active_order is not None:
-        seen = {r["home"] + " vs " + r["away"] for r in singles_requests}
-        for m in all_matches:
-            if (m.get("round") or {}).get("order") != active_order:
-                continue
-            label = m.get("label", "")
-            if label in seen or label in cached_labels:
-                continue
-            parts = label.split(" vs ", 1)
-            if len(parts) != 2:
-                continue
-            extra_requests.append({"home": parts[0], "away": parts[1], "price_notes": ""})
+    seen = {r["home"] + " vs " + r["away"] for r in singles_requests}
+    by_label = {m.get("label"): m for m in (all_matches or [])}
+    for label in upcoming:
+        if label in seen or label in cached_labels:
+            continue
+        parts = label.split(" vs ", 1)
+        if len(parts) != 2:
+            continue
+        m = by_label.get(label) or {}
+        extra_requests.append({"home": parts[0], "away": parts[1],
+                               "commence": m.get("commence", ""),
+                               "league_key": m.get("league_key"),
+                               "price_notes": "No price signal."})
 
     all_requests = singles_requests + extra_requests
     missing = [r for r in all_requests
@@ -1273,6 +1283,11 @@ def matches():
 @app.get("/api/bets")
 def bets(risk: str = "balanced", value_guard: bool = True, round: str = ""):
     d = get_raw()
+    # Kick off analysis for any upcoming fixture that still lacks a card. This
+    # lives here rather than only in _build_raw() because a process that starts
+    # with a warm odds cache never rebuilds — and would otherwise never analyse.
+    # _trigger_intel_bg is idempotent (no-ops when busy or nothing is missing).
+    _trigger_intel_bg(d["bets"]["singles"], all_matches=d.get("matches"))
     # Attach latest intel from background cache before responding
     with _intel_lock:
         cached_intel = dict(_intel_cache)
