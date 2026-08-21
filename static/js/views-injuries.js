@@ -182,7 +182,6 @@ function onTeamSearch(q) {
   if (!q) { clearTeamSearch(); return; }
 
   clearEl.style.display = '';
-  document.getElementById('primary-nav').style.display = 'none';
   document.querySelectorAll('.view').forEach(p => p.style.display = 'none');
   summaryEl.style.display = '';
   resultsEl.style.display = 'flex';
@@ -275,7 +274,6 @@ function clearTeamSearch() {
   summaryEl.textContent = '';
   summaryEl.style.display = 'none';
   document.getElementById('team-search-results').style.display = 'none';
-  document.getElementById('primary-nav').style.display = '';
   document.querySelectorAll('.view').forEach(p => p.style.display = '');
   // Drop any page-scoped filter and re-render the current list page.
   if (pageSearch) { pageSearch = ''; rerenderScopedView(); }

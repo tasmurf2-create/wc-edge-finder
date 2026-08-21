@@ -87,7 +87,9 @@
   /* PRODUCT PREVIEW (browser-framed CSS mockup of the real dashboard) */
   .preview { position: relative; z-index: 1; margin: 56px auto 0; max-width: 720px; }
   .preview::after { content:''; position:absolute; left:8%; right:8%; bottom:-26px; height:60px; background: rgba(63,207,110,.16); filter: blur(46px); border-radius: 50%; z-index:-1; }
-  .browser { border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-1); overflow: hidden; box-shadow: 0 30px 80px -20px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02); }
+  .preview-cap { text-align: center; font-size: 12.5px; color: var(--tx-4); margin-bottom: 14px; letter-spacing: .01em; }
+  .browser { position: relative; border-radius: 16px; border: 1px solid var(--line-2); background: var(--bg-1); overflow: hidden; box-shadow: 0 30px 80px -20px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02); }
+  .browser::before { content:""; position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(90deg, transparent, rgba(63,207,110,.5), transparent); }
   .browser-bar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--bg-2); border-bottom: 1px solid var(--line-2); }
   .dots { display: flex; gap: 6px; }
   .dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
@@ -221,12 +223,9 @@
     <div class="hero-note">Free to use · No account · 18+ only</div>
 
     <!-- Product preview: a faithful CSS recreation of a real Value Single card -->
+    <div class="preview-cap">A live value single, exactly as the dashboard shows it</div>
     <div class="preview" aria-label="Soccer Edge Finder dashboard preview">
       <div class="browser">
-        <div class="browser-bar">
-          <div class="dots"><i></i><i></i><i></i></div>
-          <div class="urlbar">soccer-edge-finder · Markets → Value Singles</div>
-        </div>
         <div class="app">
           <div class="app-top">
             <div class="app-brand"><span class="m">⚽</span>Soccer&nbsp;<em>Edge&nbsp;Finder</em></div>

@@ -10,51 +10,58 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/app.css?v=24">
+<link rel="stylesheet" href="/static/css/app.css?v=25">
 </head>
 <body>
 
-<!-- ===================== HEADER ===================== -->
-<header class="app-header">
+<!-- ===================== APP SHELL ===================== -->
+<div class="shell">
+
+<aside class="sidebar" id="sidebar">
   <a class="brand" href="/" title="Home">
     <span class="brand__mark">⚽</span>
     <span class="brand__text">
       <span class="brand__name">Soccer <b>Edge Finder</b></span>
-      <span class="brand__tag">Premier League · La Liga · Scottish Premiership</span>
+      <span class="brand__tag">EPL · La Liga · SPFL</span>
     </span>
   </a>
-  <div class="header-meta">
-    <div class="search-wrap">
-      <input id="team-search" type="text" placeholder="Search team…" autocomplete="off"
-        oninput="onTeamSearch(this.value)">
-      <button id="team-search-clear" class="btn btn--quiet btn--sm" onclick="clearTeamSearch()" style="display:none">✕</button>
-    </div>
-    <span id="fetch-time" class="updated-stamp">Loading…</span>
-    <button id="refresh-btn" class="btn btn--sm" onclick="loadData(true)" title="Re-fetch latest odds (server enforces a cooldown to protect the API quota)">
-      ↻ <span class="btn-label">Refresh</span>
-    </button>
+  <nav class="side-nav" id="primary-nav">
+    <button class="nav-btn active" data-view="today" onclick="switchView('today')"><span class="nav-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span>Today</button>
+    <button class="nav-btn" data-view="best" onclick="switchView('best')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6 .8-4.4 4.2 1.1 6L12 17l-5.3 2.6 1.1-6L3.4 9.4l6-.8z"/></svg></span>Best Bets</button>
+    <button class="nav-btn" data-view="markets" onclick="switchView('markets')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></span>Markets</button>
+    <button class="nav-btn" data-view="mybets" onclick="switchView('mybets')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="M5 4a2 2 0 0 1 2-2h11v18H7a2 2 0 0 0-2 2z"/><path d="M9 7h6M9 11h5"/></svg></span>My Bets</button>
+    <div class="side-sep"><span>More</span></div>
+    <button class="nav-btn" data-view="injuries" onclick="switchView('injuries')"><span class="nav-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>Injuries</button>
+    <button class="nav-btn" data-view="method" onclick="switchView('method')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="M12 6C10 4.6 7 4.2 4 5v13c3-.8 6-.4 8 1 2-1.4 5-1.8 8-1V5c-3-.8-6-.4-8 1z"/><path d="M12 6v13"/></svg></span>Methodology</button>
+    <button class="nav-btn js-admin" id="admin-nav-item" data-view="admin" onclick="switchView('admin')" style="display:none"><span class="nav-ico"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>Admin</button>
+  </nav>
+  <div class="side-foot">
+    <span class="age-badge">18+</span>
+    <span>Gamble responsibly. <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a></span>
   </div>
-</header>
+</aside>
 
-<!-- ===================== PRIMARY NAV (desktop) ===================== -->
-<nav class="nav" id="primary-nav">
-  <button class="nav-btn active" data-view="today" onclick="switchView('today')"><span class="nav-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span>Today</button>
-  <button class="nav-btn" data-view="best" onclick="switchView('best')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6 .8-4.4 4.2 1.1 6L12 17l-5.3 2.6 1.1-6L3.4 9.4l6-.8z"/></svg></span>Best Bets</button>
-  <button class="nav-btn" data-view="markets" onclick="switchView('markets')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></span>Markets</button>
-  <button class="nav-btn" data-view="mybets" onclick="switchView('mybets')"><span class="nav-ico"><svg viewBox="0 0 24 24"><path d="M5 4a2 2 0 0 1 2-2h11v18H7a2 2 0 0 0-2 2z"/><path d="M9 7h6M9 11h5"/></svg></span>My Bets</button>
-  <button class="nav-btn" id="more-btn" data-view="more" onclick="toggleMoreMenu(event)"><span class="nav-ico"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>More <span class="caret">▾</span></button>
-</nav>
+<div class="content">
+  <header class="topbar">
+    <a class="brand brand--mobile" href="/" title="Home">
+      <span class="brand__mark">⚽</span>
+      <span class="brand__name">Soccer <b>Edge Finder</b></span>
+    </a>
+    <div class="topbar-actions">
+      <div class="search-wrap">
+        <input id="team-search" type="text" placeholder="Search team…" autocomplete="off"
+          oninput="onTeamSearch(this.value)">
+        <button id="team-search-clear" class="btn btn--quiet btn--sm" onclick="clearTeamSearch()" style="display:none">✕</button>
+      </div>
+      <span id="fetch-time" class="updated-stamp">Loading…</span>
+      <button id="refresh-btn" class="btn btn--sm" onclick="loadData(true)" title="Re-fetch latest odds (server enforces a cooldown to protect the API quota)">
+        ↻ <span class="btn-label">Refresh</span>
+      </button>
+    </div>
+  </header>
 
-<!-- More menu (shared by desktop nav + mobile bottom bar) -->
-<div class="more-menu" id="more-menu">
-  <button class="more-item" data-view="injuries" onclick="switchView('injuries')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg> Injuries &amp; Suspensions</button>
-  <button class="more-item" data-view="method" onclick="switchView('method')"><svg viewBox="0 0 24 24"><path d="M12 6C10 4.6 7 4.2 4 5v13c3-.8 6-.4 8 1 2-1.4 5-1.8 8-1V5c-3-.8-6-.4-8 1z"/><path d="M12 6v13"/></svg> Methodology</button>
-  <button class="more-item" id="admin-nav-item" data-view="admin" onclick="switchView('admin')" style="display:none"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Admin</button>
-</div>
-
-<!-- search results overlay (replaces views while searching) -->
-<div id="team-search-summary" class="legend" style="display:none"></div>
-<div id="team-search-results" class="search-results"></div>
+  <div id="team-search-summary" class="legend" style="display:none"></div>
+  <div id="team-search-results" class="search-results"></div>
 
 <main id="views">
 
@@ -373,6 +380,8 @@
   </section>
 
 </main>
+</div><!-- .content -->
+</div><!-- .shell -->
 
 <!-- ===================== ACCA TRAY (Best Bets multi-select) ===================== -->
 <div id="acca-tray" class="tray">
@@ -419,6 +428,13 @@
   </div>
 </footer>
 
+<!-- Mobile More menu (bottom-bar) -->
+<div class="more-menu" id="more-menu">
+  <button class="more-item" data-view="injuries" onclick="switchView('injuries')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg> Injuries &amp; Suspensions</button>
+  <button class="more-item" data-view="method" onclick="switchView('method')"><svg viewBox="0 0 24 24"><path d="M12 6C10 4.6 7 4.2 4 5v13c3-.8 6-.4 8 1 2-1.4 5-1.8 8-1V5c-3-.8-6-.4-8 1z"/><path d="M12 6v13"/></svg> Methodology</button>
+  <button class="more-item js-admin" data-view="admin" onclick="switchView('admin')" style="display:none"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Admin</button>
+</div>
+
 <!-- ===================== BOTTOM NAV (mobile) ===================== -->
 <nav class="bottombar" id="bottom-nav">
   <button class="bb-btn active" data-view="today" onclick="switchView('today')"><span class="bb-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span>Today</button>
@@ -449,15 +465,15 @@
   </div>
 </div>
 
-<script src="/static/js/helpers.js?v=24"></script>
-<script src="/static/js/data.js?v=24"></script>
-<script src="/static/js/views-today.js?v=24"></script>
-<script src="/static/js/views-best.js?v=24"></script>
-<script src="/static/js/views-markets.js?v=24"></script>
-<script src="/static/js/views-journal.js?v=24"></script>
-<script src="/static/js/views-injuries.js?v=24"></script>
-<script src="/static/js/views-admin.js?v=24"></script>
-<script src="/static/js/views-method.js?v=24"></script>
-<script src="/static/js/app.js?v=24"></script>
+<script src="/static/js/helpers.js?v=25"></script>
+<script src="/static/js/data.js?v=25"></script>
+<script src="/static/js/views-today.js?v=25"></script>
+<script src="/static/js/views-best.js?v=25"></script>
+<script src="/static/js/views-markets.js?v=25"></script>
+<script src="/static/js/views-journal.js?v=25"></script>
+<script src="/static/js/views-injuries.js?v=25"></script>
+<script src="/static/js/views-admin.js?v=25"></script>
+<script src="/static/js/views-method.js?v=25"></script>
+<script src="/static/js/app.js?v=25"></script>
 </body>
 </html>

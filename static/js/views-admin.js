@@ -15,8 +15,8 @@ function adminKey() { return localStorage.getItem(ADMIN_KEY_LS) || ''; }
 
 // Reveal the Admin entry in the More menu only on devices holding a key.
 function refreshAdminNav() {
-  const item = document.getElementById('admin-nav-item');
-  if (item) item.style.display = adminKey() ? '' : 'none';
+  const show = adminKey() ? '' : 'none';
+  document.querySelectorAll('.js-admin').forEach(el => { el.style.display = show; });
 }
 
 function keyFormHTML(err = '') {

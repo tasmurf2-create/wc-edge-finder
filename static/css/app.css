@@ -612,3 +612,82 @@ tr:last-child td { border-bottom: none; }
 .edge-viz__fill.price { background: var(--tx-4); }
 .edge-viz__v { width: 46px; flex-shrink: 0; text-align: right; font-size: var(--fs-xs); font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; }
 .edge-viz__cap { font-size: var(--fs-xs); color: var(--tx-4); padding-left: 76px; }
+
+/* ============================================================
+   APP SHELL — sidebar (desktop) / bottom bar (mobile).
+   Appended last so it is authoritative over the mobile-first
+   header/nav rules above. Breakpoint: 900px.
+   ============================================================ */
+:root { --sidebar-w: 238px; }
+
+.shell { display: flex; align-items: stretch; min-height: 100vh; }
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* sidebar hidden by default (mobile-first) */
+.sidebar { display: none; }
+.side-nav { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; }
+.side-sep { display: flex; align-items: center; padding: 16px 12px 6px; }
+.side-sep span { font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; color: var(--tx-4); }
+.side-foot { display: none; }
+.age-badge { display: inline-grid; place-items: center; min-width: 26px; height: 20px; padding: 0 6px; border-radius: 5px; font-weight: 800; font-size: 11px; color: #06210f; background: var(--green); }
+
+/* nav buttons become vertical rows */
+.nav-btn {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  text-align: left; background: none; border: none; border-bottom: none; cursor: pointer;
+  color: var(--tx-3); font-size: .9rem; font-weight: 550;
+  padding: 10px 12px; border-radius: 9px; min-height: 0; transition: background .12s, color .12s;
+}
+.nav-btn:hover { color: var(--tx-1); background: var(--bg-2); border-bottom: none; }
+.nav-btn.active { color: var(--tx-1); background: var(--bg-3); border-bottom: none; }
+.nav-btn .nav-ico { display: inline-flex; color: var(--tx-4); }
+.nav-btn.active .nav-ico { color: var(--green); }
+.nav-btn .nav-ico svg { width: 19px; height: 19px; }
+
+/* topbar (content header) */
+.topbar {
+  position: sticky; top: 0; z-index: 55; height: 56px;
+  display: flex; align-items: center; gap: 14px; padding: 0 var(--sp-4);
+  background: rgba(11,15,21,.9); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line-2);
+}
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); }
+.brand--mobile { display: flex; align-items: center; gap: 9px; }
+
+/* content column — comfortable reading width, centered so it never crams left */
+.view.active { width: 100%; max-width: 960px; margin: 0 auto; }
+
+/* mobile bottom bar visible by default */
+:root { --bottomnav-h: 62px; }
+body { padding-bottom: 0; }
+#views { padding-bottom: calc(var(--bottomnav-h) + 12px); }
+.bottombar {
+  display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  background: var(--bg-1); border-top: 1px solid var(--line-2); height: var(--bottomnav-h);
+}
+.bottombar .bb-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: none; border: none; cursor: pointer; color: var(--tx-3); font-size: 10px; font-weight: 550;
+}
+.bottombar .bb-btn.active { color: var(--green); }
+.bottombar .bb-btn .bb-ico { display: inline-flex; }
+.bottombar .bb-btn .bb-ico svg { width: 20px; height: 20px; }
+
+/* ---- desktop ---- */
+@media (min-width: 900px) {
+  :root { --bottomnav-h: 0px; }
+  .sidebar {
+    display: flex; flex-direction: column; width: var(--sidebar-w); flex-shrink: 0;
+    position: sticky; top: 0; align-self: flex-start; height: 100vh;
+    background: var(--bg-1); border-right: 1px solid var(--line-2); padding: 16px 12px;
+  }
+  .sidebar .brand { padding: 6px 8px 14px; }
+  .side-foot {
+    display: flex; gap: 8px; align-items: flex-start; font-size: 11px; color: var(--tx-4);
+    line-height: 1.5; padding: 12px 8px 2px; border-top: 1px solid var(--line-1);
+  }
+  .side-foot a { color: var(--blue); }
+  .brand--mobile { display: none; }
+  .bottombar { display: none; }
+  #views { padding-bottom: 28px; }
+}
