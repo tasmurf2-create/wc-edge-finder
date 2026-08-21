@@ -245,6 +245,7 @@ function singleHTML(s, book, stake, opts = {}) {
       <span>Book fair <b>${(s.fair_prob * 100).toFixed(1)}%</b></span>
       ${kalLine}${polyLine}
     </div>
+    ${edgeBar(s, price)}
     <div class="money-strip">
       <div class="money-cell">
         <div class="money-lbl">Expected value (the number that matters)</div>
@@ -261,6 +262,35 @@ function singleHTML(s, book, stake, opts = {}) {
     </div>
     <div style="font-size:var(--fs-xs);color:var(--tx-3);background:var(--bg-2);border-radius:var(--radius-sm);padding:8px 12px;line-height:1.5">${buildWhy(s)}</div>
     ${analystSection}
+  </div>`;
+}
+
+// Compact value bar: the de-vigged fair probability vs the probability implied by
+// the price you can actually get. The green overhang between them IS the edge —
+// makes a 1-2% number legible at a glance. Bars share a scale so the gap is honest.
+function edgeBar(s, price) {
+  const fairPct = (s.fair_prob || 0) * 100;
+  const net = s.net_price || price;
+  if (!net || !fairPct) return '';
+  const impliedPct = 100 / net;
+  const edge = fairPct - impliedPct;
+  const ref = Math.max(fairPct, impliedPct) * 1.12 || 1;
+  const wFair = Math.max(2, fairPct / ref * 100);
+  const wImp = Math.max(2, impliedPct / ref * 100);
+  const pos = edge >= 0;
+  const edgeCol = pos ? 'var(--green)' : 'var(--red)';
+  return `<div class="edge-viz" title="Fair probability vs the probability your best price implies. The gap is the edge.">
+    <div class="edge-viz__row">
+      <span class="edge-viz__k">Fair</span>
+      <span class="edge-viz__bar"><span class="edge-viz__fill fair" style="width:${wFair.toFixed(1)}%"></span></span>
+      <span class="edge-viz__v">${fairPct.toFixed(1)}%</span>
+    </div>
+    <div class="edge-viz__row">
+      <span class="edge-viz__k">Your price</span>
+      <span class="edge-viz__bar"><span class="edge-viz__fill price" style="width:${wImp.toFixed(1)}%"></span></span>
+      <span class="edge-viz__v">${impliedPct.toFixed(1)}%</span>
+    </div>
+    <div class="edge-viz__cap">${pos ? 'You are getting a bigger price than fair' : 'Price is shorter than fair'} — <b style="color:${edgeCol}">${pos ? '+' : ''}${edge.toFixed(1)}% edge</b></div>
   </div>`;
 }
 

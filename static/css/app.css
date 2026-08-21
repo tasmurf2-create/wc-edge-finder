@@ -601,3 +601,14 @@ tr:last-child td { border-bottom: none; }
 
   .app-footer { padding-bottom: calc(var(--sp-4) + var(--bottomnav-h)); }
 }
+
+/* ---------- edge value bar (Value Singles) ---------- */
+.edge-viz { margin: 12px 0 4px; display: grid; gap: 5px; }
+.edge-viz__row { display: flex; align-items: center; gap: 10px; }
+.edge-viz__k { width: 66px; flex-shrink: 0; font-size: var(--fs-xs); color: var(--tx-3); }
+.edge-viz__bar { flex: 1; height: 8px; background: var(--bg-3); border-radius: 999px; overflow: hidden; }
+.edge-viz__fill { display: block; height: 100%; border-radius: 999px; }
+.edge-viz__fill.fair  { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
+.edge-viz__fill.price { background: var(--tx-4); }
+.edge-viz__v { width: 46px; flex-shrink: 0; text-align: right; font-size: var(--fs-xs); font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; }
+.edge-viz__cap { font-size: var(--fs-xs); color: var(--tx-4); padding-left: 76px; }
