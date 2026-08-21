@@ -1,127 +1,176 @@
-# WC 2026 Edge Finder
+# ⚽ Soccer Edge Finder
 
-A betting edge finder for the 2026 FIFA World Cup. It combines bookmaker odds, prediction markets (Kalshi/Polymarket), and a **fact-grounded** AI football analyst to surface genuine value across match markets.
+A betting edge finder for **club football** across the **Premier League**, **La Liga** and the
+**Scottish Premiership**.
 
-## What it does
+It does two independent things and only combines them at the end:
 
-- **De-vigs** bookmaker prices to expose the true consensus fair probability
-- **Compares** that fair prob against Kalshi and Polymarket implied prices — divergence is the edge signal
-- **AI analyst** (Claude Sonnet) gives a football read grounded **only in sourced data** — squad, FIFA ranking, recent form, injuries, venue/conditions, prices — and is explicitly forbidden from inventing stats, records, managers or formations
-- **Confirms or contradicts** each price-edge bet with the analyst — agreement between the maths and the football view (★ Both agree) is the strongest signal
-- **Tracks your bets** in a built-in journal (My Bets) — logs odds, stake and book, and stores the model's fair prob + EV at the moment you bet for later closing-line-value review
+1. **The maths.** De-vigs every bookmaker's prices to a consensus fair probability, finds the best
+   available price across the books you can actually bet at, and reports the gap (the *edge*) — then
+   cross-checks that against the **sharpest line in the market**.
+2. **The football.** Researches each fixture (recent form, league position, team news, head-to-head)
+   and has an AI analyst write a grounded read, with up to three recommended bets.
+
+Where the maths and the football agree, that's the strongest signal the app produces. Where they
+disagree, it says so rather than hiding it.
+
+> **This is not a tipping service and it does not predict results.** It surfaces pricing soft-spots
+> and football reasoning. Club league markets are highly efficient; edges are small and variance
+> dominates. Read the Methodology tab before staking anything.
+
+---
+
+## What it actually does
+
+### De-vigging → "fair" probability
+
+Bookmaker odds include a margin — the implied probabilities of Home/Draw/Away sum to more than 100%.
+Each book is de-vigged proportionally, then averaged across books into a consensus **fair
+probability**.
+
+"Fair" means *the market average*, not the truth. Beating it means you got a better-than-consensus
+price — it does not prove the consensus is wrong.
+
+### The sharp-line cross-check
+
+Not all books are equally informed. **Pinnacle** and the betting exchanges run ~2% margins (against
+5–8% at a high-street book), accept large stakes, and move first on real money. Their de-vigged line
+is the closest available proxy for a true probability.
+
+Every outcome is compared against it:
+
+| Sharp vs consensus | Meaning |
+|---|---|
+| Sharp rates it **higher** | Sharp money agrees it's underpriced — supportive |
+| Sharp rates it **lower** | The apparent edge is more likely model error — treat with caution |
+
+*(The World Cup version of this app used Kalshi/Polymarket here. Those venues price big tournaments
+but barely cover a midweek league fixture, so for club football they were empty far more often than
+not.)*
+
+### The AI analyst — grounded, not guessing
+
+For each fixture the app runs **one web search** over sources trusted for that league, then has
+Claude write the football read from that material **and nothing else**.
+
+It is explicitly constrained. It may not:
+
+- invent a scoreline, table position, or statistic;
+- name a manager or signing it isn't confident about;
+- read *"no injuries found"* as *"the squad is fit"* — missing information is reported as missing.
+
+Those last two are not hypothetical: both were real failure modes caught while testing this against
+live fixtures, and each has a rule in the prompt because of it.
+
+The analyst never sees enough to judge value. It supplies football reasons; the price layer judges
+the odds.
+
+---
 
 ## Navigation
 
-The app opens on **Today** and has a primary tab bar (a bottom tab bar on mobile), plus a **More ⋯** menu for the secondary pages.
-
 | Tab | What it shows |
 |---|---|
-| 📅 **Today** | The next matchday at a glance — the soonest day with fixtures (Today / Tomorrow / upcoming within 7 days), each match with the analyst's read and recommended bets. Bets you've already logged are flagged. |
-| ★ **Best Bets** | Analyst-led picks with the odds quality scored. Every pick passed two gates: **①** the AI analyst studied the match and recommended that outcome, **②** the bookmaker price was checked for fair-or-better value. Graded **★ Strong** (great price + Kalshi agrees) / **Solid** (fair price) / **Speculative** (analyst backed, odds tight). Multi-select picks here to build accumulators. |
-| 📊 **Markets** | Every match ranked by bookmaker vs prediction-market divergence. Green = PM rates it higher than books (possible value); Red = books shorter (possible trap). |
-| 📒 **My Bets** | A personal betting journal saved in your browser (localStorage). Log each bet's odds, stake and book; it tracks the result and records the model's fair probability + EV **at the moment you bet** (closing-line-value groundwork). |
+| 📅 **Today** | The next matchday — each fixture with the analyst's read and recommended bets |
+| ★ **Best Bets** | Picks that passed **two gates**: the analyst recommended the outcome, *and* the price is fair or better |
+| 📊 **Markets** | Value Singles · Accumulators · Acca Builder · **Sharp Line** (consensus vs sharpest book) |
+| 📒 **My Bets** | A private journal in your browser. Records the model's fair prob + EV **at the moment you bet** — the groundwork for closing-line-value review |
+| 🩹 **Injuries** | Team news across the covered leagues, gathered per match |
+| 📖 **Methodology** | An interactive map of the whole pipeline, plus the honest limits |
 
-**More ⋯ menu:**
+## Markets covered
 
-| Item | What it shows |
-|---|---|
-| 🩹 **Injuries & Suspensions** | Tournament-wide injury/suspension digest in one place. Manual refresh only (no auto-poll). |
-| 📖 **Methodology** | How the edge logic, de-vig, prediction-market comparison and grounded analyst work. |
-| 🔒 **Admin** | Hidden by default — visitor stats (requires the admin key). |
+**1X2** · **Over/Under** (1.5, 2.5) · **Asian Handicap** · **Accumulators** (priced at a single book —
+you can't split legs across books)
 
-## Bet types covered
+## Bookmakers
 
-- **1X2** — Home win / Draw / Away win
-- **Over/Under** — Goals totals (1.5, 2.5)
-- **Asian Handicap** — symmetric (either team, either line)
-- **Accumulators** — priced at a **single bookmaker** (you can't split legs across books); each slip names the book to place it at
+Irish-accessible books only: Paddy Power · Betfair · Bet365 · BoyleSports · Ladbrokes · William Hill.
+Exchanges are used for singles but excluded from accumulator pricing (you can't place an acca on an
+exchange).
 
-## Bookmakers covered
-
-Irish-accessible books only: **Paddy Power · Betfair · Bet365 · BoyleSports · Ladbrokes · William Hill**. Exchanges are used for singles but excluded from accumulator pricing.
-
-## The AI analyst — grounded, not guessing
-
-The analyst is given **only sourced inputs** and is instructed not to invent anything beyond them (no fabricated stats, scorelines, records, managers or formations):
-
-| Input | Source |
-|---|---|
-| Squad — players, clubs, ages | official FIFA 2026 squad PDF → `data/players.csv` |
-| FIFA world ranking | `data/team_facts.csv` |
-| Recent form — last 8, W/D/L, GF/GA, with competition labels | `data/team_form.csv` (built by `build_form.py`) |
-| Injuries / suspensions | one tournament-wide web digest → `injury_digest.json` (12 h) |
-| Venue, altitude, weather | `data/venues.csv` + Open-Meteo (live forecast inside 16 days, else climate normal — labelled which) |
-| Bookmaker prices | live odds, de-vigged |
-
-It outputs up to 3 `recommended_bets[]` with football reasoning. Cards show **✓ Analyst backed** / **⚠ Analyst prefers other outcome** / **★ Both agree**.
-
-## Architecture
-
-```
-wc_odds.py            — Odds API fetch + de-vig + line-shopping
-prediction_markets.py — Kalshi + Polymarket implied probs
-static_data.py        — sourced reference data (squads, venues, FIFA ranking, recent form)
-football_intel.py     — Claude analyst (grounded) + injury digest + weather
-build_form.py         — (manual) rebuild data/team_form.csv from the open results dataset
-server.py             — FastAPI backend, caching, background intel, visitor stats
-static/index.html     — single-page dashboard shell (Today · Best Bets · Markets · My Bets · More)
-static/js/            — views (today, best, markets, journal, injuries, admin) + helpers/data/app wiring
-static/css/app.css    — styling (responsive: top tab bar on desktop, bottom tab bar on mobile)
-data/                 — players.csv, teams.csv, venues.csv, matches.csv, team_facts.csv, team_form.csv
-```
+---
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# Add your keys:
-#   ODDS_API_KEY      — free tier at https://the-odds-api.com (500 req/month)
-#   ANTHROPIC_API_KEY — at https://console.anthropic.com
+# ODDS_API_KEY      — free tier at https://the-odds-api.com
+# ANTHROPIC_API_KEY — https://console.anthropic.com
 
 pip install -r requirements.txt
-python server.py
-# Open http://localhost:8000
+python server.py     # http://localhost:8000
 ```
 
-Refresh the recent-form data whenever you like (one download, no per-analysis web calls):
+### ⚠️ API quota — read this before deploying
 
-```bash
-python build_form.py    # rebuilds data/team_form.csv from the public results dataset
-```
+The Odds API bills **`markets × regions` credits per league request**. With the defaults
+(3 markets, `uk`, 3 leagues) one full refresh costs **9 credits**.
+
+The free tier is **500 credits per month** — about **55 full refreshes total**, i.e. under two a day.
+
+So the app is **demand-driven by default**: no background timer, and odds are only re-fetched when
+someone loads the app and the snapshot is older than the TTL (6h). An idle app spends nothing.
+Live quota is shown at `/api/status`.
+
+**For a real, marketable deployment you want a paid Odds API plan.** Then set
+`ODDS_REFRESH_MINUTES=15` to keep a background thread warming the cache.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `ODDS_REFRESH_MINUTES` | `0` (off) | Background refresh cadence. Set on a paid plan. |
+| `ODDS_CACHE_MINUTES` | `360` | Demand-driven cache TTL |
+| `ODDS_REGIONS` | `uk` | Widening to `uk,eu` **doubles** credit burn |
+| `BOOKMAKER_WHITELIST` | Irish books | Books to show prices from |
+| `INTEL_WORKERS` | `1` | Analyst concurrency. Raise only on a higher API tier. |
+| `ADMIN_KEY` | random | Unlocks the Admin tab |
 
 ## Deploy (Render)
 
-`render.yaml` defines a free web service. Deploy via **New → Blueprint**, then set `ODDS_API_KEY` and `ANTHROPIC_API_KEY` (and optionally `ADMIN_KEY` for `/admin/stats`) as dashboard secrets. `intel_seed.json` ships pre-built analyst cards so the deployed app isn't empty on a cold start. Visitor stats: `/admin/stats?key=<ADMIN_KEY>`.
+`render.yaml` defines a free web service. Deploy via **New → Blueprint**, then set `ODDS_API_KEY`,
+`ANTHROPIC_API_KEY` and `ADMIN_KEY` as dashboard secrets.
+
+---
+
+## Architecture
+
+```
+leagues.py      — league registry: sport keys + per-league trusted research domains
+odds.py         — Odds API fetch across all leagues, de-vig, line-shopping
+names.py        — club-name normalisation (Man Utd / Spurs / Falkirk F.C. → canonical)
+club_intel.py   — per-match web research + Claude analyst, cached
+server.py       — FastAPI backend, caching, background analysis, visitor stats
+static/         — single-page dashboard (index.html + js/ + css/)
+```
+
+### Adding a league
+
+One entry in `leagues.py` — sport key, display name, and the domains the analyst may research from.
+
+**The domain list is not a wishlist.** Anthropic's web-search tool rejects the *entire* request if any
+listed domain blocks its crawler, so one bad entry silently kills research for that league. BBC,
+Guardian, Marca, AS and Transfermarkt all block it. Verified-accessible and verified-blocked lists are
+recorded in `leagues.py` — probe before adding.
+
+---
 
 ## Caching
 
-| Cache | TTL | File |
+| Cache | TTL | Where |
 |---|---|---|
-| Match odds | 5 min | in-memory |
-| Match intel (analyst) | 12 hours | `intel_cache.json` (falls back to committed `intel_seed.json`) |
-| Injury/suspension digest (tournament-wide) | 12 hours | `injury_digest.json` |
-| Weather forecasts | 6 hours | `weather_cache.json` |
-| Squad / FIFA ranking / recent form | static (manual refresh) | `data/*.csv` |
-
-## Edge logic
-
-```
-fair_prob   = de-vigged consensus across all books
-best_price  = best available decimal price from whitelisted books
-edge %      = (fair_prob − 1/best_price) × 100
-
-pm_gap      = (kalshi/polymarket implied − fair_prob) × 100
-              positive = PM thinks this outcome is MORE likely than books
-              negative = PM thinks it's LESS likely
-
-confidence:
-  high   = edge > 1.5% AND pm_gap confirms (PM > books)
-  medium = edge > 0.5% OR strong PM signal
-  low    = small edge, no PM confirmation
-```
-
-Accumulators are priced at the **single best book that covers all legs** (never line-shopped across books), and EV is computed off that realistic price — so favourite-heavy slips correctly show negative EV.
+| Match odds | 6h (demand-driven) | `odds_cache.json` + memory |
+| Analyst cards | 12h | `intel_cache.json` |
+| Match research | 6h | `research_cache.json` |
 
 ## Reality check
 
-These are +EV leans and pricing soft-spots — not predictions. World Cup match markets are efficient; variance dominates over a small sample. The analyst confirmation layer filters out mathematically-edged bets that have no football logic behind them. Stake in flat units, treat the analyst as a second opinion, and always line-shop.
+These are +EV leans and pricing soft-spots — **not predictions**. Premier League and La Liga match
+markets are among the most efficient in betting: dozens of books, huge liquidity, no information
+asymmetry. Observed edges top out around 1%, and the app's confidence tiers are calibrated to that
+reality rather than inflated to look impressive.
+
+The analyst layer exists to filter out mathematically-edged bets with no football logic behind them.
+Stake flat, treat the analyst as a second opinion, and always line-shop.
+
+Gamble responsibly. If it stops being fun, stop. — [GambleAware](https://www.begambleaware.org/) ·
+[Gambling Care (IE)](https://www.gamblingcare.ie/)

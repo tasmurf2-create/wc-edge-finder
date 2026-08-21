@@ -23,29 +23,16 @@ function sensibleScore(s) {
     reasons.push({ t: 'warn', x: `⚠ odds below fair value (${s.edge.toFixed(1)}%) — shop around` });
   }
 
-  // 2. Kalshi prediction market — does real money agree with the analyst?
-  if (s.pm_gap != null) {
-    if (s.pm_gap > 1)       { score += 2; reasons.push({ t: 'good', x: `✅ Kalshi agrees — prediction market also backs this (+${s.pm_gap}%)` }); }
-    else if (s.pm_gap < -2) { score -= 1; reasons.push({ t: 'warn', x: `⚠ Kalshi less convinced (${s.pm_gap}%) — analyst and market diverge` }); }
-    else                    { reasons.push({ t: 'muted', x: `— Kalshi neutral on this outcome` }); }
+  // 2. Sharp book — does the sharpest line in the market agree with the analyst?
+  if (s.sharp_gap != null) {
+    if (s.sharp_gap < -1)      { score += 2; reasons.push({ t: 'good', x: `✅ Sharp line agrees — the sharpest book rates this ${Math.abs(s.sharp_gap).toFixed(1)}% more likely than consensus` }); }
+    else if (s.sharp_gap > 2)  { score -= 1; reasons.push({ t: 'warn', x: `⚠ Sharp line is shorter (${s.sharp_gap.toFixed(1)}%) — analyst and sharp money diverge` }); }
+    else                       { reasons.push({ t: 'muted', x: `— sharp line neutral on this outcome` }); }
   } else {
-    reasons.push({ t: 'muted', x: `— no Kalshi data for this match` });
+    reasons.push({ t: 'muted', x: `— no sharp line for this match` });
   }
 
-  // 3. Weather / conditions
-  const w = s.weather;
-  if (w) {
-    const o = (s.outcome || '').toLowerCase();
-    const fav = (w.favours || '').toLowerCase(), dis = (w.disfavours || '').toLowerCase();
-    const hits = n => n && (n.includes(o) || o.includes(n));
-    if (hits(fav))                                            { score += 1; reasons.push({ t: 'good', x: `🌡️ conditions favour this — ${esc(fmtAltitudeText(w.headline))}` }); }
-    else if (hits(dis))                                       { score -= 1; reasons.push({ t: 'warn', x: `🌡️ conditions work against this — ${esc(fmtAltitudeText(w.headline))}` }); }
-    else if (w.goals_lean === 'under' && o.includes('under')) { score += 1; reasons.push({ t: 'good', x: `🌡️ heat suits Under` }); }
-    else if (w.goals_lean === 'under' && o.includes('over'))  { score -= 1; reasons.push({ t: 'warn', x: `🌡️ heat works against Over` }); }
-    else if (w.goals_lean === 'over'  && o.includes('over'))  { score += 1; reasons.push({ t: 'good', x: `⛰️ altitude suits Over` }); }
-  }
-
-  // 4. Analyst confidence (from the intel itself)
+  // 3. Analyst confidence (from the intel itself)
   const iconf = s.intel?.intel_confidence;
   if (iconf === 'high')        { score += 2; reasons.push({ t: 'good', x: `★ analyst is highly confident in this pick` }); }
   else if (iconf === 'medium') { score += 1; reasons.push({ t: 'good', x: `analyst is moderately confident` }); }
@@ -169,11 +156,9 @@ function renderSensible() {
       else if (ao === 'draw') targetOutcome = 'draw';
 
       if (targetOutcome) {
-        // 1X2 — price AND prediction-market data come from the divergence feed.
+        // 1X2 — price AND sharp-line data come from the matches feed.
         const priceData = (match.outcomes || []).find(o => o.outcome === targetOutcome);
         if (!priceData || !priceData.best_price) continue;
-
-        const pmGap = priceData.diff != null ? -priceData.diff : null;
 
         sensibleBets.push({
           match: label,
@@ -186,12 +171,12 @@ function renderSensible() {
           paddy: priceData.paddy,
           per_book: priceData.per_book || {},
           edge: priceData.edge,
-          pm_gap: pmGap,
-          kalshi: priceData.kalshi,
-          poly: priceData.poly,
+          sharp_gap: priceData.sharp_gap,
+          sharp_fair: priceData.sharp_fair,
+          league: match.league,
+          league_key: match.league_key,
           confidence: priceData.confidence || 'low',
           round: match.round,
-          weather: match.weather,
           intel: intel,
           analyst_confirms: true,
           rb_reasoning: rb.reasoning || '',
@@ -201,7 +186,7 @@ function renderSensible() {
       } else if (rb.best_price) {
         // Totals / Asian handicap — the analyst pick is priced server-side and
         // enriched onto the rec by /api/intel (best_price/best_book/per_book/edge).
-        // There's no Kalshi/Polymarket line for these, so PM fields stay null.
+        // Totals/handicap have no per-outcome sharp line, so those fields stay null.
         const isTotals = ao.startsWith('over') || ao.startsWith('under');
         // fair_prob is exactly recoverable from the edge: edge = (fair − 1/price)·100.
         const fairProb = rb.edge != null ? (rb.edge / 100 + 1 / rb.best_price) : null;
@@ -217,12 +202,12 @@ function renderSensible() {
           best_book: rb.best_book,
           per_book: rb.per_book || {},
           edge: rb.edge,
-          pm_gap: null,
-          kalshi: null,
-          poly: null,
+          sharp_gap: null,
+          sharp_fair: null,
+          league: match.league,
+          league_key: match.league_key,
           confidence: 'low',
           round: match.round,
-          weather: match.weather,
           intel: intel,
           analyst_confirms: true,
           rb_reasoning: rb.reasoning || '',
@@ -253,7 +238,7 @@ function renderSensible() {
   const statsLine = `<div class="note--mini note">${intelCoverage} matches analysed · ${nTotal} analyst-backed bet${nTotal !== 1 ? 's' : ''}${nStrong ? ` · <span style="color:var(--green)">${nStrong} ★ Strong</span>` : ''} · analyst runs in background, more appear as it completes</div>`;
   const intro = collapsibleBanner('sensible-bets-intro',
     '🎯 Best Bets — analyst picks, odds quality scored.',
-    `🎯 <strong>Best Bets — analyst-recommended picks with the odds quality scored.</strong><div style="margin-top:8px;font-size:var(--fs-sm);color:var(--tx-2);line-height:1.6">Every bet here passed two gates:<br><span style="color:var(--green)">①</span> The <strong>AI analyst</strong> studied the match — squad, form, injuries, conditions — and explicitly recommended this outcome.<br><span style="color:var(--green)">②</span> The <strong>bookmaker odds</strong> were checked: are you getting fair or better value for that pick?<br>Tiers: <strong style="color:var(--green)">★ Strong</strong> = great price + Kalshi agrees · <strong>Solid</strong> = fair price · <em style="color:var(--tx-4)">Speculative</em> = analyst backed it but odds tight.</div>`);
+    `🎯 <strong>Best Bets — analyst-recommended picks with the odds quality scored.</strong><div style="margin-top:8px;font-size:var(--fs-sm);color:var(--tx-2);line-height:1.6">Every bet here passed two gates:<br><span style="color:var(--green)">①</span> The <strong>AI analyst</strong> studied the match — recent form, league position, team news, head-to-head — and explicitly recommended this outcome.<br><span style="color:var(--green)">②</span> The <strong>bookmaker odds</strong> were checked: are you getting fair or better value for that pick?<br>Tiers: <strong style="color:var(--green)">★ Strong</strong> = great price + sharp line agrees · <strong>Solid</strong> = fair price · <em style="color:var(--tx-4)">Speculative</em> = analyst backed it but odds tight.</div>`);
 
   if (!hasIntel) {
     panel.innerHTML = intro + statsLine + emptyState('🧠', 'Analyst is researching matches',
@@ -439,7 +424,7 @@ function renderTopPicks() {
 
   const intro = collapsibleBanner('btrs-analysis-intro',
     '⚖️ Analyst Writeups — the football view on each covered match.',
-    `⚖️ <strong>The football view — a professional second opinion, not fact.</strong> The analyst's read on each game it has covered (squad, form, conditions, injuries), with its specific recommended bets and reasoning. Cross-check against <button class="linklike" onclick="switchView('markets')">Markets → Value Singles</button> — agreement between the two is the strongest signal.`);
+    `⚖️ <strong>The football view — a professional second opinion, not fact.</strong> The analyst's read on each game it has covered (form, league position, team news, matchup), with its specific recommended bets and reasoning. Cross-check against <button class="linklike" onclick="switchView('markets')">Markets → Value Singles</button> — agreement between the two is the strongest signal.`);
 
   const entries = intelEntries();
   if (!entries.length) {

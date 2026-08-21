@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0b0f15">
-<title>WC 2026 Edge Finder</title>
+<title>Soccer Edge Finder</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230b0f15%27/%3E%3Ctext x=%2716%27 y=%2723%27 font-size=%2720%27 text-anchor=%27middle%27%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+<meta name="description" content="Soccer Edge Finder — de-vigged bookmaker prices, sharp-line cross-check and a grounded AI analyst across the Premier League, La Liga and the Scottish Premiership.">
 <link rel="stylesheet" href="/static/css/app.css?v=9">
 </head>
 <body>
@@ -12,8 +14,8 @@
 <!-- ===================== HEADER ===================== -->
 <header class="app-header">
   <div class="brand">
-    <span class="brand__name">WC26 <b>Edge Finder</b></span>
-    <span class="brand__tag">de-vigged prices · analyst-checked</span>
+    <span class="brand__name">⚽ Soccer <b>Edge Finder</b></span>
+    <span class="brand__tag">Premier League · La Liga · Scottish Premiership</span>
   </div>
   <div class="header-meta">
     <div class="search-wrap">
@@ -69,9 +71,9 @@
             <input type="number" id="sensible-stake-input" value="10" min="1" step="1" oninput="renderSensible()">
           </span>
         </div>
-        <div class="field"><label>Round</label>
+        <div class="field"><label>League</label>
           <select id="sensible-round-filter" onchange="renderSensible()">
-            <option value="">All rounds</option>
+            <option value="">All leagues</option>
           </select>
         </div>
         <div class="field"><label>Show</label>
@@ -108,7 +110,7 @@
       <button class="pill active" data-mkt="singles" onclick="switchMarketsTab('singles')">Value Singles <span class="pill-hint">+EV</span></button>
       <button class="pill" data-mkt="accas" onclick="switchMarketsTab('accas')">Accumulators <span class="pill-hint">−EV</span></button>
       <button class="pill" data-mkt="builder" onclick="switchMarketsTab('builder')">Acca Builder</button>
-      <button class="pill" data-mkt="divergence" onclick="switchMarketsTab('divergence')">Market Divergence</button>
+      <button class="pill" data-mkt="divergence" onclick="switchMarketsTab('divergence')">Sharp Line</button>
     </div>
 
     <!-- shared toolbar for Singles / Accumulators -->
@@ -125,8 +127,8 @@
       </div>
       <div class="field singles-only"><label>Confidence</label>
         <select id="conf-filter" onchange="renderBets()">
-          <option value="all">All (incl. speculative)</option>
-          <option value="high,medium" selected>High + Medium</option>
+          <option value="all" selected>All (incl. speculative)</option>
+          <option value="high,medium">High + Medium</option>
           <option value="high">High only</option>
         </select>
       </div>
@@ -138,9 +140,9 @@
           <option value="spreads">Asian Handicap</option>
         </select>
       </div>
-      <div class="field"><label>Round</label>
+      <div class="field"><label>League</label>
         <select id="round-filter" onchange="onRoundChange()">
-          <option value="">All rounds</option>
+          <option value="">All leagues</option>
         </select>
       </div>
     </div>
@@ -185,7 +187,7 @@
       </div>
     </div>
 
-    <!-- Market Divergence -->
+    <!-- Sharp Line: consensus vs the sharpest book -->
     <div id="divergence-wrap" style="display:none">
       <div class="toolbar">
         <div class="field"><label>Sort</label>
@@ -201,13 +203,13 @@
         <div class="field"><label>Show</label>
           <select id="pm-filter" onchange="renderDivergence()">
             <option value="all">All matches</option>
-            <option value="pm">PM data only</option>
+            <option value="pm">With sharp line only</option>
           </select>
         </div>
       </div>
       <div class="legend">
-        <span><span class="dot" style="background:var(--red)"></span>Books LONG — this side overpriced</span>
-        <span><span class="dot" style="background:var(--green)"></span>Books SHORT — possible value here</span>
+        <span><span class="dot" style="background:var(--green)"></span>Sharp rates it HIGHER than consensus — supportive</span>
+        <span><span class="dot" style="background:var(--red)"></span>Sharp rates it LOWER — treat the edge with caution</span>
         <span style="color:var(--cyan)">PP = Paddy Power price</span>
       </div>
       <div id="matches" class="view-body div-grid"></div>
@@ -226,7 +228,7 @@
       <span id="injuries-updated" style="font-size:var(--fs-xs);color:var(--tx-4)"></span>
     </div>
     <div class="legend">
-      <span>Tournament-wide injury &amp; suspension news — the same data the analyst uses for its "Absences" reasoning.</span>
+      <span>Team news across the covered leagues — the same absences the analyst uses in its reasoning, gathered per match.</span>
       <span style="color:var(--tx-4)">Refreshing runs one web search, updates affected analyst cards, and is rate-limited server-side.</span>
     </div>
     <div id="injuries-panel" class="view-body"></div>
@@ -273,9 +275,11 @@
       </div>
 
       <h3>1. Where the prices come from</h3>
-      <p>Live decimal odds for every World Cup match from The Odds API, covering the Irish-accessible bookmakers
+      <p>Live decimal odds for every fixture in the <strong>Premier League</strong>, <strong>La Liga</strong> and the
+      <strong>Scottish Premiership</strong>, from The Odds API, covering the Irish-accessible bookmakers
       (Paddy Power, Betfair, Bet365, BoyleSports, Ladbrokes, William Hill). The timestamp in the header is the truth
-      about freshness. Prediction-market prices (Kalshi, Polymarket) are pulled alongside as an independent cross-check.</p>
+      about freshness — odds are cached and refreshed on a schedule, so they are minutes-to-hours old, not live ticks.
+      Always confirm the price at the book before you stake.</p>
 
       <h3>2. "Fair" probability — de-vigging</h3>
       <p>Bookmaker odds include a built-in margin (the "vig"): the implied probabilities of Home/Draw/Away sum to
@@ -296,17 +300,28 @@
       you'd average +€0.30 profit per €10 staked. Any single bet still just wins or loses — EV only shows up over
       dozens of bets. Variance dominates small samples.</p>
 
-      <h3>4. The prediction-market cross-check</h3>
-      <p>Kalshi and Polymarket are real-money exchanges with low margins. Their prices are normalised to sum to 100%
-      and compared against the book consensus. When they disagree with the books in your favour, that's confirmation;
-      when they disagree against you, the "edge" is probably the model being wrong, and the card says so.</p>
+      <h3>4. The sharp-line cross-check</h3>
+      <p>Not all bookmakers are equally informed. <strong>Pinnacle</strong> and the betting exchanges run margins
+      around 2% (against 5–8% at a typical high-street book), accept large stakes, and move their prices first when
+      real money arrives. Their de-vigged line is the closest thing available to a true probability.</p>
+      <p>Every outcome is therefore compared against that sharp line as well as against the soft-book consensus.
+      When the sharp book rates an outcome <em>more</em> likely than the consensus does, the sharp money agrees it is
+      underpriced — that is confirmation. When the sharp book is <em>shorter</em>, the apparent edge is more likely
+      the model being wrong than a real opportunity, and the card says so.</p>
+      <p>This replaced a prediction-market check (Kalshi/Polymarket) that the World Cup version of this app used.
+      Those venues price big tournaments but barely cover a midweek league fixture, so for club football they were
+      empty far more often than not.</p>
 
       <h3>5. The AI analyst</h3>
-      <p>A language-model analyst writes a football read for each match using only sourced inputs: the official FIFA
-      squad lists, FIFA rankings, sourced recent form, one tournament-wide injury digest from a web search, and venue
-      conditions (live forecast inside 16 days, otherwise climate normals — always labelled which). It is explicitly
-      forbidden from inventing stats, records, managers or formations, and it never sees enough to judge value — it
-      supplies football reasons; the price layer judges the odds. It is a second opinion, not a fact, and it can be wrong.</p>
+      <p>For each fixture the app runs <strong>one web search</strong> across trusted football sources for that league
+      (Sky Sports, ESPN, the official league sites, FotMob and similar), gathering recent form, league position,
+      confirmed team news and head-to-head. A language-model analyst then writes the football read from that material
+      and nothing else.</p>
+      <p>It is explicitly constrained: it may not invent a scoreline, a table position or a statistic; it may not name
+      a manager or a signing it is not confident about; and — the rule that matters most in a betting product — it may
+      not read "no injuries found" as "the squad is fit". Missing information is reported as missing, never as good news.</p>
+      <p>It never sees enough to judge value. It supplies football reasons; the price layer judges the odds. It is a
+      second opinion, not a fact, and it can be wrong.</p>
 
       <h3>6. Best Bets — the two gates</h3>
       <p>A bet appears only when (1) the analyst explicitly recommended that outcome for football reasons, and
@@ -415,15 +430,15 @@
   </div>
 </div>
 
-<script src="/static/js/helpers.js?v=15"></script>
-<script src="/static/js/data.js?v=15"></script>
-<script src="/static/js/views-today.js?v=15"></script>
-<script src="/static/js/views-best.js?v=15"></script>
-<script src="/static/js/views-markets.js?v=15"></script>
-<script src="/static/js/views-journal.js?v=15"></script>
-<script src="/static/js/views-injuries.js?v=15"></script>
-<script src="/static/js/views-admin.js?v=15"></script>
-<script src="/static/js/views-method.js?v=15"></script>
-<script src="/static/js/app.js?v=15"></script>
+<script src="/static/js/helpers.js?v=18"></script>
+<script src="/static/js/data.js?v=18"></script>
+<script src="/static/js/views-today.js?v=18"></script>
+<script src="/static/js/views-best.js?v=18"></script>
+<script src="/static/js/views-markets.js?v=18"></script>
+<script src="/static/js/views-journal.js?v=18"></script>
+<script src="/static/js/views-injuries.js?v=18"></script>
+<script src="/static/js/views-admin.js?v=18"></script>
+<script src="/static/js/views-method.js?v=18"></script>
+<script src="/static/js/app.js?v=18"></script>
 </body>
 </html>

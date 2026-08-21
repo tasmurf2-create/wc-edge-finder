@@ -2,7 +2,7 @@
 # Then set ODDS_API_KEY and ANTHROPIC_API_KEY in the dashboard when prompted.
 services:
   - type: web
-    name: wc-edge-finder
+    name: soccer-edge-finder
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -16,7 +16,7 @@ services:
         sync: false                # set a stable secret in dashboard; else it's random per restart
       - key: PYTHON_VERSION
         value: "3.12.6"
-      - key: ODDS_REFRESH_MINUTES  # paid Odds API plan: background refresh cadence
-        value: "15"
+      - key: ODDS_REFRESH_MINUTES  # 0 = demand-driven (free tier). Set e.g. 15 on a paid plan.
+        value: "0"
       # Optional widening (paid plan): ODDS_REGIONS=uk,eu and a wider
       # BOOKMAKER_WHITELIST — see .env.example. Defaults keep the Irish focus.

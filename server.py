@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-FastAPI backend for the WC Edge Finder dashboard.
+FastAPI backend for the Soccer Edge Finder dashboard.
+
+Covers the Premier League, La Liga and the Scottish Premiership (see leagues.py).
 
 Endpoints:
-  GET /api/divergence   -- match divergence report (book vs prediction markets)
-  GET /api/bets         -- recommended singles + parlay suggestions
-  GET /api/refresh      -- force re-fetch of all data
+  GET /api/status           -- health, quota, league errors, analyst cache state
+  GET /api/matches          -- per-match consensus fair prices vs the sharp line
+  GET /api/bets             -- value singles + accumulator suggestions
+  GET /api/intel            -- cached analyst cards
+  GET /api/injuries         -- team-news digest aggregated from the analyst cards
+  GET /api/refresh          -- force re-fetch of odds (cooldown-protected)
+  GET /api/refresh-injuries -- re-research team news (cooldown-protected)
 
 Run:  python server.py
 Then open http://localhost:8000
@@ -97,9 +103,21 @@ BOOKMAKER_WHITELIST = {
 # Exchanges: better prices on singles, but you CANNOT place accumulators on them.
 # So they're used for singles but excluded from accumulator leg pricing.
 EXCHANGE_BOOKS = {"Betfair", "Betfair Exchange", "Matchbook", "Smarkets"}
-EDGE_MIN   = 0.005         # flag singles with >0.5% edge
-PARLAY_MIN = 0.005         # minimum combined EV to include a parlay
-VALUE_THRESHOLD = 0.015    # 1.5% edge = "clear value"
+# Edge thresholds, calibrated for CLUB LEAGUE markets.
+#
+# These are deliberately lower than the World Cup app's. EPL/La Liga 1X2 is among
+# the most efficient markets in betting — dozens of books, huge liquidity, no
+# information asymmetry. Observed best-price edges top out around 1%, where a
+# tournament market routinely offered 2-3%. Keeping the old 1.5% "clear value"
+# bar would classify literally every real opportunity as "low" and show the user
+# an empty screen.
+#
+# What has NOT changed: the edge is still measured the same honest way
+# (de-vigged consensus minus best available price). We lowered the LABELS to
+# match the market, we did not inflate the numbers.
+EDGE_MIN   = 0.004         # surface singles with >0.4% edge
+PARLAY_MIN = 0.004         # minimum combined EV to include a parlay
+VALUE_THRESHOLD = 0.010    # 1.0% edge = "clear value" in an efficient league market
 
 # Accumulator risk presets — drive _build_parlays().
 #   min_leg_prob      : reject any leg below this fair (de-vigged) probability

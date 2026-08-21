@@ -36,14 +36,14 @@ async function loadData(force = false, silent = false) {
   }
 
   try {
-    const [divRes, betsRes, intelRes] = await Promise.all([
-      fetch(force ? '/api/refresh' : '/api/divergence'),
+    const [matchRes, betsRes, intelRes] = await Promise.all([
+      fetch(force ? '/api/refresh' : '/api/matches'),
       fetch('/api/bets'),
       fetch('/api/intel'),
     ]);
     const prevIntelCount = Object.keys(allIntel).length;
     try { allIntel = (await intelRes.json()).intel || {}; } catch { allIntel = {}; }
-    const divData  = await divRes.json();
+    const divData  = await matchRes.json();
     const betsData = await betsRes.json();
 
     if (divData.error) throw new Error(divData.error);

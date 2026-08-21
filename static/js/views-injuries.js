@@ -1,5 +1,5 @@
 /* ============================================================
-   views-injuries.js — injuries table + tournament team search
+   views-injuries.js — team-news table + club search
    ============================================================ */
 
 let _injuryInfo = null;   // last /api/injuries payload (items may be null = legacy text)
@@ -14,7 +14,7 @@ const INJURY_STATUS_META = {
 
 // Legacy text digest fallback — strips any AI preamble lines before rendering.
 function fmtInjuryDigest(text) {
-  if (!text) return emptyState('🩹', 'No injury data yet', 'Hit "Refresh injuries" to fetch the tournament-wide digest.');
+  if (!text) return emptyState('🩹', 'No team news yet', 'Team news is gathered per match when the analyst runs. Hit "Refresh injuries" to re-research the upcoming fixtures.');
   const preambleRe = /^(i'?ll\s|i will\s|based on\s|here is\s|here'?s\s|let me\s|searching\s|i('ve| have)\s)/i;
   const lines = text.split('\n');
   while (lines.length > 0 && (lines[0].trim() === '' || preambleRe.test(lines[0].trim()))) {
@@ -209,14 +209,14 @@ function onTeamSearch(q) {
   let html = '';
 
   if (divMatches.length) {
-    html += `<div><div class="search-section-title">Market Divergence (${divMatches.length})</div>`;
+    html += `<div><div class="search-section-title">Sharp Line (${divMatches.length})</div>`;
     divMatches.forEach(m => {
       const probs = (m.outcomes || []).map(o =>
         `${fmtPick(o.outcome)} ${o.book_fair != null ? o.book_fair.toFixed(0) + '%' : '—'}`).join(' · ');
       html += `<div class="search-hit">
         <strong style="color:var(--tx-1)">${fmtLabel(m.label)}</strong>
         <span style="color:var(--tx-4);margin-left:8px">${esc(m.round?.label || '')}</span>
-        <div style="color:var(--tx-3);margin-top:4px">Book fair: ${probs || '—'}${m.has_pm_data ? ` · PM gap ${m.max_gap > 0 ? '+' : ''}${m.max_gap}%` : ''}</div>
+        <div style="color:var(--tx-3);margin-top:4px">Book fair: ${probs || '—'}${m.has_sharp_data ? ` · sharp gap ${m.max_gap > 0 ? '+' : ''}${m.max_gap}%` : ''}</div>
       </div>`;
     });
     html += '</div>';

@@ -212,8 +212,8 @@ function singleHTML(s, book, stake, opts = {}) {
   const fallbackNote = fallback
     ? `<span style="color:var(--amber);font-size:var(--fs-xs)"> ⚠ not at ${esc(book)}, using ${esc(bookLabel)}</span>` : '';
 
-  const kalLine  = s.kalshi != null ? `<span style="color:var(--tx-3)">Kalshi <b style="color:var(--blue)">${s.kalshi}%</b></span>` : '';
-  const polyLine = s.poly   != null ? `<span style="color:var(--tx-3)">Poly <b style="color:var(--blue)">${s.poly}%</b></span>` : '';
+  const kalLine  = s.sharp_fair != null ? `<span style="color:var(--tx-3)">Sharp <b style="color:var(--blue)">${s.sharp_fair}%</b></span>` : '';
+  const polyLine = s.league ? `<span style="color:var(--tx-3)">${esc(s.league)}</span>` : '';
 
   // Analyst section: only show the full match writeup when the analyst actually
   // backs THIS selection. These are pure price-edge candidates, so when the
@@ -267,15 +267,15 @@ function singleHTML(s, book, stake, opts = {}) {
 function buildWhy(s) {
   const parts = [];
   parts.push(`De-vigged consensus fair prob <strong>${(s.fair_prob * 100).toFixed(1)}%</strong> vs best price implied <strong>${(1 / s.best_price * 100).toFixed(1)}%</strong> — <strong>+${s.edge.toFixed(1)}% price edge</strong>.`);
-  if (s.pm_gap !== null && s.pm_gap !== undefined) {
-    if (s.pm_gap < -2)
-      parts.push(`Kalshi/Polymarket price this side <strong>${Math.abs(s.pm_gap).toFixed(1)}%</strong> higher than the books — prediction markets confirm the value.`);
-    else if (s.pm_gap > 2)
-      parts.push(`<strong>Warning:</strong> Prediction markets price this side <strong>${s.pm_gap.toFixed(1)}%</strong> <em>lower</em> than the books — the price edge may be misleading.`);
+  if (s.sharp_gap !== null && s.sharp_gap !== undefined) {
+    if (s.sharp_gap < -1)
+      parts.push(`The sharpest book rates this side <strong>${Math.abs(s.sharp_gap).toFixed(1)}%</strong> more likely than the soft-book consensus — the sharp money agrees it's underpriced.`);
+    else if (s.sharp_gap > 1)
+      parts.push(`<strong>Caution:</strong> the sharpest book rates this side <strong>${s.sharp_gap.toFixed(1)}%</strong> <em>less</em> likely than the consensus — the price edge may be misleading.`);
     else
-      parts.push(`Prediction markets broadly agree with bookmaker consensus.`);
+      parts.push(`The sharpest book agrees with the consensus on this outcome.`);
   } else {
-    parts.push(`No prediction market data — price signal from bookmaker consensus only.`);
+    parts.push(`No sharp line available — price signal from bookmaker consensus only.`);
   }
   return parts.join(' ');
 }
@@ -389,7 +389,7 @@ function recommendedAccaHTML(parlays, book, stake) {
   const bookUrl = BOOK_URLS[bestBook] || 'https://www.paddypower.com';
 
   const legLines = legData.map(l => `${pickLabel(l)} @ ${l.usedPrice.toFixed(2)} (${titleCase(l.match)})`).join('\n');
-  const waMsg = `⭐ WC 2026 Recommended Acca\n\n${legLines}\n\nCombined: ${combinedPrice.toFixed(2)}\nStake €${stake} → Returns €${grossReturn.toFixed(2)}\n\nBuilt with WC Edge Finder`;
+  const waMsg = `⭐ Recommended Acca\n\n${legLines}\n\nCombined: ${combinedPrice.toFixed(2)}\nStake €${stake} → Returns €${grossReturn.toFixed(2)}\n\nBuilt with Soccer Edge Finder`;
 
   return `<div class="card" style="border-color:#1d5733">
     <div class="card__body">
@@ -740,7 +740,7 @@ function renderFixtureAcca() {
       return `✓ ${titleCase(single.outcome)} — ${titleCase(single.match)} @ ${price}`;
     }).join('\n');
     const ret = bestOdds > 0 ? (stake * bestOdds).toFixed(2) : '—';
-    const msg = `🏆 WC 2026 Acca${bestBook ? ` (${bestBook})` : ''}\n\n${legLines}\n\nCombined: ${oddsStr}\nStake €${stake} → Returns €${ret}\n\nBuilt with WC Edge Finder`;
+    const msg = `⚽ Acca${bestBook ? ` (${bestBook})` : ''}\n\n${legLines}\n\nCombined: ${oddsStr}\nStake €${stake} → Returns €${ret}\n\nBuilt with Soccer Edge Finder`;
     waBtn.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
   }
 
@@ -753,7 +753,7 @@ function renderFixtureAcca() {
   }
 }
 
-/* ---------------- market divergence ---------------- */
+/* ---------------- sharp line (consensus vs sharpest book) ---------------- */
 
 function onThreshold() {
   threshold = parseFloat(document.getElementById('threshold').value);
@@ -767,16 +767,16 @@ function renderDivergence() {
   if (!allMatches.length) { container.innerHTML = _dataLoaded ? noOddsState() : skeletonCards(4); return; }
 
   const sortBy = document.getElementById('sort-select').value;
-  const pmOnly = document.getElementById('pm-filter').value === 'pm';
+  const sharpOnly = document.getElementById('pm-filter').value === 'pm';
 
   let list = allMatches.filter(m => {
-    if (pmOnly && !m.has_pm_data) return false;
-    if (Math.abs(m.max_gap) < threshold) return false;
+    if (sharpOnly && !m.has_sharp_data) return false;
+    if (Math.abs(m.max_gap || 0) < threshold) return false;
     return teamMatches(m.label);   // page-scoped team search
   });
 
   if (sortBy === 'time') list.sort((a, b) => a.commence.localeCompare(b.commence));
-  else list.sort((a, b) => Math.abs(b.max_gap) - Math.abs(a.max_gap));
+  else list.sort((a, b) => Math.abs(b.max_gap || 0) - Math.abs(a.max_gap || 0));
 
   if (!list.length) {
     const noHit = (pageSearch || '').trim()
@@ -789,34 +789,36 @@ function renderDivergence() {
 }
 
 function matchCardHTML(m) {
-  const gap = m.max_gap;
+  // gap = consensus fair − sharp fair. Negative means the sharp book rates the
+  // outcome MORE likely than the soft-book consensus does (sharp side agrees
+  // it's underpriced); positive means the sharp book is shorter.
+  const gap = m.max_gap || 0;
   const isLong = gap > 2;
   const isShort = gap < -2;
 
   const cardCls = 'card' + (isLong ? ' flag-long' : isShort ? ' flag-short' : '');
-  const badgeCls = isLong ? 'badge badge--red' : isShort ? 'badge badge--green' : 'badge';
-  const badgeTxt = Math.abs(gap) > 0
-    ? (gap > 0 ? '+' : '') + gap.toFixed(1) + '% gap'
-    : 'no PM data';
+  const badgeCls = isShort ? 'badge badge--green' : isLong ? 'badge badge--red' : 'badge';
+  const badgeTxt = !m.has_sharp_data
+    ? 'no sharp line'
+    : (gap > 0 ? '+' : '') + gap.toFixed(1) + '% vs sharp';
 
   const rows = m.outcomes.map(o => {
-    const diff = o.diff;
-    const hasDiff = diff !== null;
-    const diffCls = !hasDiff ? 'diff-neutral' : diff > 2 ? 'diff-long' : diff < -2 ? 'diff-short' : 'diff-neutral';
-    const barCls = !hasDiff ? 'bar-neutral' : diff > 2 ? 'bar-long' : diff < -2 ? 'bar-short' : 'bar-neutral';
-    const barW = hasDiff ? Math.min(Math.abs(diff) / 10 * 100, 100) : 0;
+    const diff = o.sharp_gap;
+    const hasDiff = diff !== null && diff !== undefined;
+    // Sharp rates it higher (negative gap) = supportive; sharp shorter = caution.
+    const diffCls = !hasDiff ? 'diff-neutral' : diff < -1 ? 'diff-short' : diff > 1 ? 'diff-long' : 'diff-neutral';
+    const barCls = !hasDiff ? 'bar-neutral' : diff < -1 ? 'bar-short' : diff > 1 ? 'bar-long' : 'bar-neutral';
+    const barW = hasDiff ? Math.min(Math.abs(diff) / 5 * 100, 100) : 0;
     const diffTxt = hasDiff ? (diff > 0 ? '+' : '') + diff.toFixed(1) + '%' : '—';
-    const polyTxt = o.poly != null ? o.poly.toFixed(1) + '%' : '<span class="pm-missing">—</span>';
-    const kalTxt = o.kalshi != null ? o.kalshi.toFixed(1) + '%' : '<span class="pm-missing">—</span>';
+    const sharpTxt = o.sharp_fair != null ? o.sharp_fair.toFixed(1) + '%' : '<span class="pm-missing">—</span>';
     const bestTxt = o.best_price ? o.best_price.toFixed(2) + ' <span style="color:var(--tx-4);font-size:var(--fs-xs)">(' + esc(o.best_book) + ')</span>' : '—';
     const paddyTxt = o.paddy != null ? '<span class="paddy-price">PP ' + o.paddy.toFixed(2) + '</span>' : '';
     const edgeTxt = o.edge != null ? `<span class="${o.edge > 0 ? 'edge-pos' : 'edge-neg'}">${o.edge > 0 ? '+' : ''}${o.edge.toFixed(1)}%</span>` : '<span style="color:var(--tx-4)">—</span>';
 
     return `<tr>
       <td>${fmtPick(o.outcome)}</td>
-      <td>${o.book_fair.toFixed(1)}%</td>
-      <td>${polyTxt}</td>
-      <td>${kalTxt}</td>
+      <td>${(o.book_fair ?? 0).toFixed(1)}%</td>
+      <td>${sharpTxt}</td>
       <td class="diff-cell ${diffCls}">${diffTxt}</td>
       <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill ${barCls}" style="width:${barW}%"></div></div></td>
       <td>${bestTxt} ${paddyTxt}</td>
@@ -833,7 +835,7 @@ function matchCardHTML(m) {
         return `<tr>
           <td>${esc(name)} ${t.line}</td>
           <td>${od.fair}%</td>
-          <td colspan="3" style="color:var(--tx-4)">no PM data</td>
+          <td colspan="2" style="color:var(--tx-4)">no sharp line</td>
           <td class="bar-cell"></td>
           <td>${od.best_price ? od.best_price.toFixed(2) + ' <span style="color:var(--tx-4);font-size:var(--fs-xs)">(' + esc(od.best_book) + ')</span>' : '—'}</td>
           <td><span class="${eCls}">${od.edge != null ? (od.edge > 0 ? '+' : '') + od.edge.toFixed(1) + '%' : '—'}</span></td>
@@ -846,7 +848,7 @@ function matchCardHTML(m) {
       </div>
       <div class="totals-body" id="${id}">
         <table><thead><tr>
-          <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th><th>Edge</th>
+          <th>Outcome</th><th>Book fair</th><th>Sharp</th><th>Gap</th><th></th><th>Best price</th><th>Edge</th>
         </tr></thead><tbody>${totRows}</tbody></table>
       </div>`;
   }
@@ -864,7 +866,7 @@ function matchCardHTML(m) {
     </div>
     <table>
       <thead><tr>
-        <th>Outcome</th><th>Book fair</th><th>Poly</th><th>Kalshi</th><th>Diff</th><th></th><th>Best price</th><th>Edge</th>
+        <th>Outcome</th><th>Book fair</th><th>Sharp</th><th>Gap</th><th></th><th>Best price</th><th>Edge</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>

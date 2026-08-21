@@ -326,6 +326,8 @@ function weatherFlagHTML(item) {
 }
 
 // ---- collapsible explainer banners (seen-state in localStorage 'wc26_seen') ----
+// NB: the wc26_* storage keys are intentionally UNCHANGED across the rebrand —
+// renaming them would orphan every bet a user has already logged.
 function hasSeen(key) {
   try { return !!JSON.parse(localStorage.getItem('wc26_seen') || '{}')[key]; } catch { return false; }
 }
@@ -478,7 +480,7 @@ function intelHTML(intel) {
   return `<div class="intel-block">
     <div class="intel-block__head">
       <span>ANALYST RESEARCH</span>
-      <span style="font-weight:400;color:${confColour}" title="How confident the analyst is in its READ OF THE MATCH (squad, form, conditions) — NOT in this particular bet. The analyst's actual pick is shown below.">match-read confidence: ${esc(conf)}</span>
+      <span style="font-weight:400;color:${confColour}" title="How confident the analyst is in its READ OF THE MATCH (form, team news, matchup) — NOT in this particular bet. The analyst's actual pick is shown below.">match-read confidence: ${esc(conf)}</span>
     </div>
     <div class="intel-block__body">
       ${condLine}
