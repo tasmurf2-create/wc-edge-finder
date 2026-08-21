@@ -31,7 +31,8 @@ def _load_env(path=".env"):
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 _load_env()
 
-import wc_odds
+import odds as odds_api
+import leagues
 import names
 import football_intel as fintel
 import static_data
@@ -123,18 +124,29 @@ ACCA_GUARD_TOL_PCT = -4.0
 # ---------------------------------------------------------------------------
 _cache = {"raw": None, "fetched_at": 0}
 
-# Odds refresh cadence. With the paid Odds API plan the cache refreshes every
-# ODDS_REFRESH_MINUTES (default 15) and a background thread keeps it warm while
-# the process is alive. Set ODDS_REFRESH_MINUTES=0 to disable auto-refresh and
-# fall back to the old frugal 2-hour request-driven TTL (free-tier behaviour).
+# Odds refresh cadence.
+#
+# QUOTA: one full refresh costs  markets x regions x leagues  credits — with the
+# defaults (h2h,totals,spreads / uk / 3 leagues) that is 9 credits. The free tier
+# is 500 credits per MONTH, i.e. ~16/day, i.e. under two full refreshes a day.
+# So the default is DEMAND-DRIVEN: no background timer, and the cache is only
+# rebuilt when someone actually loads the app and the snapshot is older than the
+# TTL. An idle app spends nothing.
+#
+# On a paid plan set ODDS_REFRESH_MINUTES (e.g. 15) to keep a background thread
+# warming the cache; get_raw() still enforces the TTL so the two never race.
 try:
-    ODDS_REFRESH_MINUTES = float(os.environ.get("ODDS_REFRESH_MINUTES", "15"))
+    ODDS_REFRESH_MINUTES = float(os.environ.get("ODDS_REFRESH_MINUTES", "0"))
 except ValueError:
-    ODDS_REFRESH_MINUTES = 15.0
+    ODDS_REFRESH_MINUTES = 0.0
+try:
+    _ODDS_TTL_MINUTES = float(os.environ.get("ODDS_CACHE_MINUTES", "360"))  # 6h
+except ValueError:
+    _ODDS_TTL_MINUTES = 360.0
 if ODDS_REFRESH_MINUTES > 0:
     _CACHE_TTL = max(ODDS_REFRESH_MINUTES, 5) * 60   # floor 5 min — be deliberate with quota
 else:
-    _CACHE_TTL = 7200
+    _CACHE_TTL = max(_ODDS_TTL_MINUTES, 5) * 60
 _ODDS_CACHE_FILE = pathlib.Path("odds_cache.json")
 
 # Team-form refresh cadence. During the tournament a background thread rebuilds
@@ -174,29 +186,16 @@ threading.Thread(target=_startup_injury_fetch, daemon=True).start()
 # Bookmaker data helpers
 # ---------------------------------------------------------------------------
 
-_sport_key: str | None = None  # cached for the lifetime of the process
+_league_errors: dict = {}   # sport_key -> last fetch error, surfaced by /api/status
+
 
 def _fetch_events():
-    """Pull h2h + totals + spreads (Asian handicap) in a single API call.
-    Falls back to h2h-only if spreads/totals aren't available on this plan."""
-    global _sport_key
-    if _sport_key is None:
-        _sport_key = wc_odds.find_world_cup_key()
-    try:
-        return wc_odds.get(
-            f"/sports/{_sport_key}/odds",
-            regions=REGIONS,
-            markets="h2h,totals,spreads",
-            oddsFormat=wc_odds.ODDS_FORMAT,
-        )
-    except Exception as e:
-        print(f"[odds] full markets request failed ({e}), retrying h2h-only", flush=True)
-        return wc_odds.get(
-            f"/sports/{_sport_key}/odds",
-            regions=REGIONS,
-            markets="h2h",
-            oddsFormat=wc_odds.ODDS_FORMAT,
-        )
+    """Every fixture across the covered leagues, each tagged with its league.
+    One league failing doesn't take the others down."""
+    global _league_errors
+    events, errors = odds_api.fetch_all(regions=REGIONS, markets="h2h,totals,spreads")
+    _league_errors = errors
+    return events
 
 
 def _devig(raw):
@@ -205,8 +204,8 @@ def _devig(raw):
 
 
 def _analyse_h2h(event):
-    """Returns h2h fair probs, best prices, margin — same as wc_odds.analyse."""
-    return wc_odds.analyse(event)
+    """Returns h2h fair probs, best prices, margin — same as odds_api.analyse."""
+    return odds_api.analyse(event)
 
 
 def _analyse_totals(event):
@@ -585,6 +584,8 @@ def _build_raw():
 
         home, away = ev["home_team"], ev["away_team"]
         label = f"{home} vs {away}"
+        lg_key = ev.get("league_key")
+        lg_name = ev.get("league") or leagues.league_name(lg_key)
         comm  = h2h_r["commence"]
         weather_by_label[label] = fintel.weather_signal(home, away, comm)
         _r = static_data.match_round(home, away)
@@ -652,6 +653,7 @@ def _build_raw():
                 acca_pool.append({
                     "match":       label,
                     "commence":    comm,
+                    "league":  lg_name,
                     "market":      "h2h",
                     "outcome":     norm,
                     "fair_prob":   fair_p,
@@ -668,6 +670,7 @@ def _build_raw():
                 singles.append({
                     "match":       label,
                     "commence":    comm,
+                    "league":  lg_name,
                     "market":      "h2h",
                     "outcome":     norm,
                     "raw_outcome": raw_name,
@@ -703,6 +706,7 @@ def _build_raw():
                 acca_pool.append({
                     "match":      label,
                     "commence":   comm,
+                    "league": lg_name,
                     "market":     "totals",
                     "outcome":    f"{name} {line}",
                     "fair_prob":  fair / 100,
@@ -717,6 +721,7 @@ def _build_raw():
                     singles.append({
                         "match":      label,
                         "commence":   comm,
+                        "league": lg_name,
                         "market":     "totals",
                         "outcome":    f"{name} {line}",
                         "fair_prob":  fair / 100,
@@ -756,6 +761,7 @@ def _build_raw():
             acca_pool.append({
                 "match":        label,
                 "commence":     comm,
+                "league":   lg_name,
                 "market":       "spreads",
                 "outcome":      outcome_label,
                 "fair_prob":    sd["fair_prob"],
@@ -773,6 +779,7 @@ def _build_raw():
                 singles.append({
                     "match":      label,
                     "commence":   comm,
+                    "league": lg_name,
                     "market":     "spreads",
                     "outcome":    outcome_label,
                     "fair_prob":  sd["fair_prob"],
@@ -792,6 +799,8 @@ def _build_raw():
         matches.append({
             "label":      label,
             "commence":   comm,
+            "league":     lg_name,
+            "league_key": lg_key,
             "margin":     round(h2h_r["margin"] * 100, 1),
             "max_gap":    round(max_gap, 1),
             "has_sharp_data": bool(sharp_fair),
@@ -827,7 +836,9 @@ def _build_raw():
         c["weather"] = weather_by_label.get(c["match"])
         c["round"]   = round_by_label.get(c["match"])
 
-    matches.sort(key=lambda m: (-abs(m["max_gap"]) if m["has_pm_data"] else 999, m["commence"]))
+    # Fixture list = chronological by kickoff; the UI's sort control re-ranks
+    # by sharp-line gap or margin on demand.
+    matches.sort(key=lambda m: (m["commence"], m["label"]))
     singles.sort(key=lambda s: -s["edge"])
 
     # Price index for analyst recommendations: {label: {analyst_token: {...}}}.
