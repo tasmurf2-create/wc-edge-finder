@@ -1674,7 +1674,13 @@ def refresh():
 
 
 @app.get("/")
-def index():
+def landing():
+    # Marketing front door. The dashboard lives at /app.
+    return FileResponse("static/landing.html", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/app")
+def dashboard():
     # no-store so the browser always loads the latest UI (avoids stale-cache confusion)
     return FileResponse("static/index.html", headers={"Cache-Control": "no-store"})
 

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f15">
+<title>Soccer Edge Finder — de-vigged prices, sharp-line checked, analyst-backed</title>
+<meta name="description" content="A betting edge finder for club football across the Premier League, La Liga and the Scottish Premiership. De-vigged bookmaker prices, a sharp-line cross-check and a grounded AI analyst — with the maths kept honest.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230b0f15%27/%3E%3Ctext x=%2716%27 y=%2723%27 font-size=%2720%27 text-anchor=%27middle%27%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-0:#0b0f15; --bg-1:#11161f; --bg-2:#161d28; --bg-3:#1c2533;
+    --line-1:#1d2632; --line-2:#28323f;
+    --tx-1:#e9eef5; --tx-2:#aeb9c7; --tx-3:#7d8aa0; --tx-4:#59667a;
+    --green:#3fcf6e; --green-dim:#2ea25b; --green-bg:#0e2417;
+    --blue:#58a6ff; --amber:#e3a93c; --red:#f85149;
+    --maxw:1080px;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-0); color: var(--tx-1);
+    -webkit-font-smoothing: antialiased; line-height: 1.5;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 62px; padding: 0 24px;
+    background: rgba(11,15,21,.82); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line-2);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; letter-spacing: -.01em; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    font-size: 16px; background: linear-gradient(150deg, #16241a, #0d1712);
+    border: 1px solid #223528;
+  }
+  .brand em { color: var(--green); font-style: normal; }
+  .nav-links { display: flex; align-items: center; gap: 26px; }
+  .nav-links a.muted { color: var(--tx-3); font-size: 14px; font-weight: 500; }
+  .nav-links a.muted:hover { color: var(--tx-1); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font-family: inherit; font-weight: 650; font-size: 14px; border-radius: 9px;
+    padding: 9px 18px; border: 1px solid transparent; transition: .15s;
+  }
+  .btn-primary { background: var(--green); color: #06210f; }
+  .btn-primary:hover { background: #56d982; }
+  .btn-ghost { background: transparent; color: var(--tx-2); border-color: var(--line-2); }
+  .btn-ghost:hover { color: var(--tx-1); border-color: var(--tx-4); }
+  .btn-lg { padding: 13px 26px; font-size: 15px; border-radius: 11px; }
+
+  /* HERO */
+  .hero { position: relative; overflow: hidden; padding: 96px 0 72px; text-align: center; }
+  .hero::before {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(60% 55% at 50% 0%, rgba(63,207,110,.13), transparent 70%),
+      radial-gradient(40% 40% at 85% 20%, rgba(88,166,255,.08), transparent 70%);
+  }
+  .hero .wrap { position: relative; z-index: 1; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; margin-bottom: 26px;
+    padding: 6px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    color: var(--green); background: rgba(63,207,110,.08); border: 1px solid rgba(63,207,110,.28);
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(63,207,110,.18); }
+  h1 {
+    font-size: clamp(34px, 6vw, 62px); font-weight: 900; line-height: 1.05;
+    letter-spacing: -.025em; margin: 0 auto 22px; max-width: 860px;
+  }
+  h1 .g { color: var(--green); }
+  .sub { font-size: clamp(16px,2.3vw,20px); color: var(--tx-2); max-width: 620px; margin: 0 auto 36px; line-height: 1.6; }
+  .hero-cta { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; }
+  .hero-note { margin-top: 20px; font-size: 13px; color: var(--tx-4); }
+
+  /* LEAGUE STRIP */
+  .leagues { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 52px; }
+  .league-chip {
+    display: flex; align-items: center; gap: 9px; padding: 10px 18px;
+    background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 11px;
+    font-size: 14px; font-weight: 600; color: var(--tx-2);
+  }
+  .league-chip .flag { font-size: 18px; }
+
+  /* SECTIONS */
+  section.block { padding: 76px 0; border-top: 1px solid var(--line-1); }
+  .eyebrow { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--green-dim); margin-bottom: 12px; }
+  .h2 { text-align: center; font-size: clamp(26px,4vw,38px); font-weight: 800; letter-spacing: -.02em; margin-bottom: 14px; }
+  .lede { text-align: center; color: var(--tx-2); max-width: 640px; margin: 0 auto 48px; font-size: 16px; line-height: 1.65; }
+
+  .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+  .card {
+    background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 14px; padding: 26px;
+    transition: .18s;
+  }
+  .card:hover { border-color: #33465a; transform: translateY(-2px); }
+  .card .ico { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-size: 20px; margin-bottom: 16px; background: var(--bg-3); border: 1px solid var(--line-2); }
+  .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .card p { color: var(--tx-3); font-size: 14.5px; line-height: 1.6; }
+  .card p b { color: var(--tx-2); font-weight: 600; }
+
+  /* HONESTY */
+  .honesty { max-width: 760px; margin: 0 auto; display: grid; gap: 14px; }
+  .row {
+    display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px;
+    background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 13px;
+  }
+  .row .k { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 17px; background: var(--green-bg); border: 1px solid rgba(63,207,110,.25); }
+  .row h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 4px; }
+  .row p { color: var(--tx-3); font-size: 14px; line-height: 1.6; }
+  .row p em { color: var(--tx-2); font-style: italic; }
+
+  /* CTA */
+  .cta-final { text-align: center; }
+  .cta-final .box {
+    max-width: 720px; margin: 0 auto; padding: 52px 32px; border-radius: 18px;
+    background: linear-gradient(160deg, #12211a 0%, #0e1620 60%); border: 1px solid #234030;
+  }
+  .cta-final h2 { font-size: clamp(24px,4vw,34px); font-weight: 800; letter-spacing: -.02em; margin-bottom: 12px; }
+  .cta-final p { color: var(--tx-2); margin-bottom: 28px; font-size: 16px; }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--line-2); background: var(--bg-1); padding: 40px 0 56px; }
+  footer .cols { display: flex; justify-content: space-between; gap: 30px; flex-wrap: wrap; margin-bottom: 28px; }
+  footer .disc { color: var(--tx-3); font-size: 13px; line-height: 1.65; max-width: 560px; }
+  footer .disc strong { color: var(--tx-2); }
+  footer .rg { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--tx-3); }
+  .age { display: inline-grid; place-items: center; min-width: 30px; height: 24px; padding: 0 8px; border-radius: 6px; font-weight: 800; font-size: 12px; color: #06210f; background: var(--green); }
+  footer a.link { color: var(--blue); }
+  footer a.link:hover { text-decoration: underline; }
+  .fine { color: var(--tx-4); font-size: 12px; line-height: 1.6; margin-top: 18px; }
+
+  @media (max-width: 780px) {
+    .grid { grid-template-columns: 1fr; }
+    .nav-links a.muted { display: none; }
+    .hero { padding: 68px 0 52px; }
+    section.block { padding: 56px 0; }
+    footer .cols { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="/"><span class="mark">⚽</span>Soccer&nbsp;<em>Edge&nbsp;Finder</em></a>
+  <div class="nav-links">
+    <a class="muted" href="#how">How it works</a>
+    <a class="muted" href="#honest">Why trust it</a>
+    <a class="btn btn-primary" href="/app">Launch app →</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="badge"><span class="dot"></span>De-vigged prices · Sharp-line checked · AI analyst</span>
+    <h1>Find the <span class="g">edge</span> the bookmakers hope you'll miss.</h1>
+    <p class="sub">
+      Soccer Edge Finder strips the margin out of bookmaker prices, cross-checks every outcome
+      against the sharpest line in the market, and has a grounded AI analyst read each match —
+      across the Premier League, La Liga and the Scottish Premiership.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" href="/app">Open the dashboard</a>
+      <a class="btn btn-ghost btn-lg" href="#how">See how it works</a>
+    </div>
+    <div class="hero-note">Free to use · No account · 18+ only</div>
+
+    <div class="leagues">
+      <span class="league-chip"><span class="flag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span> Premier League</span>
+      <span class="league-chip"><span class="flag">🇪🇸</span> La Liga</span>
+      <span class="league-chip"><span class="flag">🏴󠁧󠁢󠁳󠁣󠁴󠁿</span> Scottish Premiership</span>
+    </div>
+  </div>
+</header>
+
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="eyebrow">How it works</div>
+    <h2 class="h2">Two independent reads, one honest verdict</h2>
+    <p class="lede">
+      The maths never has a football opinion. The analyst never sees enough to judge value.
+      They meet only at the end — and where they agree is the strongest signal on the page.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico">📊</div>
+        <h3>De-vigged fair prices</h3>
+        <p>Bookmaker odds bake in a margin. We strip it out of every book and average to a
+        <b>consensus fair probability</b>, then line-shop the best price you can actually get.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🎯</div>
+        <h3>The sharp-line check</h3>
+        <p>Pinnacle and the exchanges run tiny margins and move first on real money. Every edge is
+        cross-checked against that <b>sharp line</b> — the closest thing to a true probability.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🧠</div>
+        <h3>A grounded analyst</h3>
+        <p>An AI analyst researches each match — form, table, team news, head-to-head — and writes a
+        read <b>grounded only in what it found</b>. It is forbidden from inventing stats.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="honest">
+  <div class="wrap">
+    <div class="eyebrow">Why trust it</div>
+    <h2 class="h2">Built to be honest, not to look impressive</h2>
+    <p class="lede">
+      Most tipster sites are engineered to sell confidence. This one is engineered to tell you the
+      truth about the numbers — including the parts that make the edges look smaller.
+    </p>
+    <div class="honesty">
+      <div class="row">
+        <div class="k">💸</div>
+        <div>
+          <h4>Exchange commission is priced in</h4>
+          <p>Exchanges show the best headline price on almost everything — but take a cut of your
+          winnings. Edges here are measured on what you actually <em>collect</em>, so a 1% edge is a
+          real 1%, not a mirage.</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">🚫</div>
+        <div>
+          <h4>No fake predictions</h4>
+          <p>These are +EV leans and pricing soft-spots, not score forecasts. Club league markets are
+          highly efficient; edges are small and variance dominates. The app says so, everywhere.</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">⏱️</div>
+        <div>
+          <h4>You always know how old a price is</h4>
+          <p>Odds are cached, and the app shows the age in plain sight — green when fresh, red when
+          it has had time to move. Always confirm the price on your betslip before you stake.</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">📒</div>
+        <div>
+          <h4>Your record, kept honest</h4>
+          <p>The My Bets journal snapshots the model's fair price and EV at the moment you log a bet —
+          so over time you can check whether the edges were real, not just claimed.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block cta-final">
+  <div class="wrap">
+    <div class="box">
+      <h2>Ready to see today's board?</h2>
+      <p>Live fixtures, de-vigged prices and the analyst's read — no sign-up.</p>
+      <a class="btn btn-primary btn-lg" href="/app">Launch Soccer Edge Finder →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div class="disc">
+        <div class="brand" style="margin-bottom:12px"><span class="mark">⚽</span>Soccer&nbsp;<em>Edge&nbsp;Finder</em></div>
+        This site shows information and statistical estimates — it is <strong>not betting or
+        financial advice</strong>, and nothing here guarantees a profit. Expected value is a
+        long-run average; any individual bet can lose. Only stake what you can afford to lose.
+      </div>
+      <div class="rg">
+        <span class="age">18+</span>
+        <span>Help &amp; support:</span>
+        <a class="link" href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> ·
+        <a class="link" href="https://www.gamblingcare.ie" target="_blank" rel="noopener">GamblingCare.ie</a>
+      </div>
+    </div>
+    <div class="fine">
+      Gamble responsibly. If it stops being fun, stop. Odds can change after they are displayed;
+      always confirm the price on your betslip. Bets are placed with third-party bookmakers, not with
+      this site. © <span id="yr"></span> Soccer Edge Finder.
+    </div>
+  </div>
+</footer>
+
+<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+</body>
+</html>
