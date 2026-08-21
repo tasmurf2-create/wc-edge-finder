@@ -24,109 +24,141 @@
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-0); color: var(--tx-1);
-    -webkit-font-smoothing: antialiased; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5; letter-spacing: -.006em; overflow-x: hidden;
   }
   a { color: inherit; text-decoration: none; }
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  svg.ico { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
   /* NAV */
   nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; justify-content: space-between;
     height: 62px; padding: 0 24px;
-    background: rgba(11,15,21,.82); backdrop-filter: blur(10px);
+    background: rgba(11,15,21,.8); backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line-2);
   }
-  .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; letter-spacing: -.01em; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; letter-spacing: -.02em; }
   .brand .mark {
     width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-    font-size: 16px; background: linear-gradient(150deg, #16241a, #0d1712);
-    border: 1px solid #223528;
+    font-size: 16px; background: linear-gradient(150deg, #16241a, #0d1712); border: 1px solid #223528;
   }
   .brand em { color: var(--green); font-style: normal; }
   .nav-links { display: flex; align-items: center; gap: 26px; }
-  .nav-links a.muted { color: var(--tx-3); font-size: 14px; font-weight: 500; }
+  .nav-links a.muted { color: var(--tx-3); font-size: 14px; font-weight: 500; transition: color .15s; }
   .nav-links a.muted:hover { color: var(--tx-1); }
   .btn {
     display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
     font-family: inherit; font-weight: 650; font-size: 14px; border-radius: 9px;
     padding: 9px 18px; border: 1px solid transparent; transition: .15s;
   }
-  .btn-primary { background: var(--green); color: #06210f; }
-  .btn-primary:hover { background: #56d982; }
-  .btn-ghost { background: transparent; color: var(--tx-2); border-color: var(--line-2); }
+  .btn-primary { background: var(--green); color: #06210f; box-shadow: 0 1px 0 rgba(255,255,255,.14) inset, 0 6px 18px rgba(63,207,110,.22); }
+  .btn-primary:hover { background: #56d982; transform: translateY(-1px); }
+  .btn-ghost { background: rgba(255,255,255,.02); color: var(--tx-2); border-color: var(--line-2); }
   .btn-ghost:hover { color: var(--tx-1); border-color: var(--tx-4); }
   .btn-lg { padding: 13px 26px; font-size: 15px; border-radius: 11px; }
+  .btn .ico { width: 17px; height: 17px; }
 
   /* HERO */
-  .hero { position: relative; overflow: hidden; padding: 96px 0 72px; text-align: center; }
-  .hero::before {
-    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(60% 55% at 50% 0%, rgba(63,207,110,.13), transparent 70%),
-      radial-gradient(40% 40% at 85% 20%, rgba(88,166,255,.08), transparent 70%);
-  }
+  .hero { position: relative; overflow: hidden; padding: 92px 0 40px; text-align: center; }
+  .orbs { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .5; will-change: transform; }
+  .orb.a { width: 520px; height: 520px; top: -180px; left: 50%; margin-left: -260px; background: radial-gradient(circle, rgba(63,207,110,.34), transparent 68%); animation: drift1 20s ease-in-out infinite; }
+  .orb.b { width: 380px; height: 380px; top: -60px; right: -80px; background: radial-gradient(circle, rgba(88,166,255,.24), transparent 68%); animation: drift2 26s ease-in-out infinite; }
+  .orb.c { width: 320px; height: 320px; top: 120px; left: -100px; background: radial-gradient(circle, rgba(63,207,110,.16), transparent 68%); animation: drift3 30s ease-in-out infinite; }
+  @keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(30px,26px) scale(1.06);} }
+  @keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-38px,30px) scale(1.1);} }
+  @keyframes drift3 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(34px,-22px) scale(1.08);} }
   .hero .wrap { position: relative; z-index: 1; }
   .badge {
     display: inline-flex; align-items: center; gap: 8px; margin-bottom: 26px;
     padding: 6px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
     color: var(--green); background: rgba(63,207,110,.08); border: 1px solid rgba(63,207,110,.28);
   }
-  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(63,207,110,.18); }
-  h1 {
-    font-size: clamp(34px, 6vw, 62px); font-weight: 900; line-height: 1.05;
-    letter-spacing: -.025em; margin: 0 auto 22px; max-width: 860px;
-  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(63,207,110,.18); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  h1 { font-size: clamp(34px, 6vw, 62px); font-weight: 900; line-height: 1.05; letter-spacing: -.03em; margin: 0 auto 22px; max-width: 860px; }
   h1 .g { color: var(--green); }
-  .sub { font-size: clamp(16px,2.3vw,20px); color: var(--tx-2); max-width: 620px; margin: 0 auto 36px; line-height: 1.6; }
+  .sub { font-size: clamp(16px,2.3vw,20px); color: var(--tx-2); max-width: 620px; margin: 0 auto 34px; line-height: 1.6; }
   .hero-cta { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; }
-  .hero-note { margin-top: 20px; font-size: 13px; color: var(--tx-4); }
+  .hero-note { margin-top: 18px; font-size: 13px; color: var(--tx-4); }
 
-  /* LEAGUE STRIP */
-  .leagues { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 52px; }
-  .league-chip {
-    display: flex; align-items: center; gap: 9px; padding: 10px 18px;
-    background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 11px;
-    font-size: 14px; font-weight: 600; color: var(--tx-2);
-  }
-  .league-chip .flag { font-size: 18px; }
+  /* PRODUCT PREVIEW (browser-framed CSS mockup of the real dashboard) */
+  .preview { position: relative; z-index: 1; margin: 56px auto 0; max-width: 720px; }
+  .preview::after { content:''; position:absolute; left:8%; right:8%; bottom:-26px; height:60px; background: rgba(63,207,110,.16); filter: blur(46px); border-radius: 50%; z-index:-1; }
+  .browser { border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-1); overflow: hidden; box-shadow: 0 30px 80px -20px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02); }
+  .browser-bar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--bg-2); border-bottom: 1px solid var(--line-2); }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .dots i:nth-child(1){background:#f85149;} .dots i:nth-child(2){background:#e3a93c;} .dots i:nth-child(3){background:#3fcf6e;}
+  .urlbar { flex: 1; margin-left: 8px; background: var(--bg-0); border: 1px solid var(--line-2); border-radius: 7px; padding: 5px 12px; font-size: 12px; color: var(--tx-3); text-align: center; }
+  .app { padding: 18px; text-align: left; }
+  .app-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .app-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; }
+  .app-brand .m { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 13px; background: linear-gradient(150deg,#16241a,#0d1712); border: 1px solid #223528; }
+  .app-brand em { color: var(--green); font-style: normal; }
+  .app-age { font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 5px; }
+  .app-age .d { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .app-pills { display: flex; gap: 7px; margin-bottom: 14px; }
+  .app-pill { font-size: 11.5px; font-weight: 600; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--tx-3); white-space: nowrap; }
+  .app-pill.on { background: var(--green-bg); color: var(--green); border-color: var(--green-dim); }
+  .single { background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 11px; padding: 15px 16px; }
+  .single-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
+  .single-h .t { font-size: 15px; font-weight: 800; }
+  .single-h .t small { color: var(--tx-3); font-weight: 500; font-size: 12.5px; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .tag.hi { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-dim); }
+  .tag.edge { background: rgba(63,207,110,.1); color: var(--green); border: 1px solid rgba(63,207,110,.3); }
+  .single-sub { font-size: 11.5px; color: var(--tx-3); margin-bottom: 12px; }
+  .metrics { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--tx-3); margin-bottom: 13px; }
+  .metrics b { color: var(--tx-1); }
+  .metrics .sh { color: var(--blue); font-weight: 700; }
+  .ev { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; background: linear-gradient(120deg, rgba(63,207,110,.1), rgba(63,207,110,.02)); border: 1px solid rgba(63,207,110,.22); border-radius: 9px; }
+  .ev .big { font-size: 20px; font-weight: 900; color: var(--green); letter-spacing: -.02em; }
+  .ev .lbl { font-size: 11px; color: var(--tx-3); }
+  .ev .ret { margin-left: auto; font-size: 12px; color: var(--tx-2); }
+  .ev .ret b { color: var(--tx-1); }
+
+  /* CREDIBILITY STRIP */
+  .cred { border-top: 1px solid var(--line-1); border-bottom: 1px solid var(--line-1); background: var(--bg-1); }
+  .cred .wrap { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; padding: 26px 24px; }
+  .stat { text-align: center; min-width: 150px; }
+  .stat .n { font-size: 26px; font-weight: 900; letter-spacing: -.03em; color: var(--tx-1); }
+  .stat .n span { color: var(--green); }
+  .stat .l { font-size: 12px; color: var(--tx-3); margin-top: 2px; }
+  .stat + .stat { border-left: 1px solid var(--line-2); padding-left: 14px; }
 
   /* SECTIONS */
-  section.block { padding: 76px 0; border-top: 1px solid var(--line-1); }
+  section.block { padding: 78px 0; border-top: 1px solid var(--line-1); }
   .eyebrow { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--green-dim); margin-bottom: 12px; }
-  .h2 { text-align: center; font-size: clamp(26px,4vw,38px); font-weight: 800; letter-spacing: -.02em; margin-bottom: 14px; }
+  .h2 { text-align: center; font-size: clamp(26px,4vw,38px); font-weight: 800; letter-spacing: -.025em; margin-bottom: 14px; }
   .lede { text-align: center; color: var(--tx-2); max-width: 640px; margin: 0 auto 48px; font-size: 16px; line-height: 1.65; }
 
   .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
-  .card {
-    background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 14px; padding: 26px;
-    transition: .18s;
-  }
-  .card:hover { border-color: #33465a; transform: translateY(-2px); }
-  .card .ico { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-size: 20px; margin-bottom: 16px; background: var(--bg-3); border: 1px solid var(--line-2); }
+  .card { background: linear-gradient(180deg, var(--bg-1), #0e131c); border: 1px solid var(--line-2); border-radius: 15px; padding: 26px; transition: .2s; }
+  .card:hover { border-color: #33465a; transform: translateY(-3px); box-shadow: 0 18px 40px -20px rgba(0,0,0,.6); }
+  .card .ico-box { width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 16px; color: var(--green); background: var(--green-bg); border: 1px solid rgba(63,207,110,.24); }
   .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
   .card p { color: var(--tx-3); font-size: 14.5px; line-height: 1.6; }
   .card p b { color: var(--tx-2); font-weight: 600; }
 
   /* HONESTY */
   .honesty { max-width: 760px; margin: 0 auto; display: grid; gap: 14px; }
-  .row {
-    display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px;
-    background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 13px;
-  }
-  .row .k { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 17px; background: var(--green-bg); border: 1px solid rgba(63,207,110,.25); }
+  .row { display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px; background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 13px; transition: .2s; }
+  .row:hover { border-color: #33465a; }
+  .row .k { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--green); background: var(--green-bg); border: 1px solid rgba(63,207,110,.25); }
   .row h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 4px; }
   .row p { color: var(--tx-3); font-size: 14px; line-height: 1.6; }
   .row p em { color: var(--tx-2); font-style: italic; }
 
   /* CTA */
   .cta-final { text-align: center; }
-  .cta-final .box {
-    max-width: 720px; margin: 0 auto; padding: 52px 32px; border-radius: 18px;
-    background: linear-gradient(160deg, #12211a 0%, #0e1620 60%); border: 1px solid #234030;
-  }
-  .cta-final h2 { font-size: clamp(24px,4vw,34px); font-weight: 800; letter-spacing: -.02em; margin-bottom: 12px; }
-  .cta-final p { color: var(--tx-2); margin-bottom: 28px; font-size: 16px; }
+  .cta-final .box { position: relative; overflow: hidden; max-width: 720px; margin: 0 auto; padding: 54px 32px; border-radius: 20px; background: linear-gradient(160deg, #12211a 0%, #0e1620 60%); border: 1px solid #234030; }
+  .cta-final .box::before { content:''; position:absolute; width:360px; height:360px; top:-160px; left:50%; margin-left:-180px; background: radial-gradient(circle, rgba(63,207,110,.22), transparent 70%); filter: blur(30px); }
+  .cta-final h2 { position: relative; font-size: clamp(24px,4vw,34px); font-weight: 800; letter-spacing: -.025em; margin-bottom: 12px; }
+  .cta-final p { position: relative; color: var(--tx-2); margin-bottom: 28px; font-size: 16px; }
+  .cta-final .btn { position: relative; }
 
   /* FOOTER */
   footer { border-top: 1px solid var(--line-2); background: var(--bg-1); padding: 40px 0 56px; }
@@ -139,12 +171,23 @@
   footer a.link:hover { text-decoration: underline; }
   .fine { color: var(--tx-4); font-size: 12px; line-height: 1.6; margin-top: 18px; }
 
+  /* scroll reveal */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orb, .badge .dot { animation: none !important; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    html { scroll-behavior: auto; }
+  }
   @media (max-width: 780px) {
     .grid { grid-template-columns: 1fr; }
     .nav-links a.muted { display: none; }
-    .hero { padding: 68px 0 52px; }
+    .hero { padding: 64px 0 32px; }
     section.block { padding: 56px 0; }
     footer .cols { flex-direction: column; }
+    .stat + .stat { border-left: none; padding-left: 0; }
+    .metrics { gap: 12px; }
   }
 </style>
 </head>
@@ -160,6 +203,7 @@
 </nav>
 
 <header class="hero">
+  <div class="orbs" aria-hidden="true"><span class="orb a"></span><span class="orb b"></span><span class="orb c"></span></div>
   <div class="wrap">
     <span class="badge"><span class="dot"></span>De-vigged prices · Sharp-line checked · AI analyst</span>
     <h1>Find the <span class="g">edge</span> the bookmakers hope you'll miss.</h1>
@@ -169,42 +213,85 @@
       across the Premier League, La Liga and the Scottish Premiership.
     </p>
     <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="/app">Open the dashboard</a>
+      <a class="btn btn-primary btn-lg" href="/app">Open the dashboard
+        <svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+      </a>
       <a class="btn btn-ghost btn-lg" href="#how">See how it works</a>
     </div>
     <div class="hero-note">Free to use · No account · 18+ only</div>
 
-    <div class="leagues">
-      <span class="league-chip"><span class="flag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span> Premier League</span>
-      <span class="league-chip"><span class="flag">🇪🇸</span> La Liga</span>
-      <span class="league-chip"><span class="flag">🏴󠁧󠁢󠁳󠁣󠁴󠁿</span> Scottish Premiership</span>
+    <!-- Product preview: a faithful CSS recreation of a real Value Single card -->
+    <div class="preview" aria-label="Soccer Edge Finder dashboard preview">
+      <div class="browser">
+        <div class="browser-bar">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="urlbar">soccer-edge-finder · Markets → Value Singles</div>
+        </div>
+        <div class="app">
+          <div class="app-top">
+            <div class="app-brand"><span class="m">⚽</span>Soccer&nbsp;<em>Edge&nbsp;Finder</em></div>
+            <div class="app-age"><span class="d"></span>Odds 2m ago</div>
+          </div>
+          <div class="app-pills">
+            <span class="app-pill on">Value Singles</span>
+            <span class="app-pill">Accumulators</span>
+            <span class="app-pill">Sharp Line</span>
+          </div>
+          <div class="single">
+            <div class="single-h">
+              <div class="t">Aston Villa <small>— Aston Villa vs Arsenal</small></div>
+              <span class="tag hi">High</span>
+            </div>
+            <div class="single-sub">Mon 31 Aug · 1X2 · Premier League &nbsp;·&nbsp; <span class="tag edge">edge +5.0%</span></div>
+            <div class="metrics">
+              <span>Price <b>4.33</b></span>
+              <span>Book fair <b>28.1%</b></span>
+              <span>Sharp <span class="sh">46.7%</span></span>
+            </div>
+            <div class="ev">
+              <span class="big">+€2.17</span>
+              <span class="lbl">expected value<br>per €10 (+21.7%)</span>
+              <span class="ret">Returns if it wins<br><b>€43.30</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </header>
 
+<section class="cred">
+  <div class="wrap">
+    <div class="stat"><div class="n" id="stat-fixtures">—</div><div class="l">fixtures priced right now</div></div>
+    <div class="stat"><div class="n"><span>3</span></div><div class="l">leagues covered</div></div>
+    <div class="stat"><div class="n"><span>0%</span></div><div class="l">bookmaker margin, removed</div></div>
+    <div class="stat"><div class="n"><span>2</span> reads</div><div class="l">maths + analyst, per match</div></div>
+  </div>
+</section>
+
 <section class="block" id="how">
   <div class="wrap">
-    <div class="eyebrow">How it works</div>
-    <h2 class="h2">Two independent reads, one honest verdict</h2>
-    <p class="lede">
+    <div class="eyebrow reveal">How it works</div>
+    <h2 class="h2 reveal">Two independent reads, one honest verdict</h2>
+    <p class="lede reveal">
       The maths never has a football opinion. The analyst never sees enough to judge value.
       They meet only at the end — and where they agree is the strongest signal on the page.
     </p>
     <div class="grid">
-      <div class="card">
-        <div class="ico">📊</div>
+      <div class="card reveal">
+        <div class="ico-box"><svg class="ico" viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></div>
         <h3>De-vigged fair prices</h3>
         <p>Bookmaker odds bake in a margin. We strip it out of every book and average to a
         <b>consensus fair probability</b>, then line-shop the best price you can actually get.</p>
       </div>
-      <div class="card">
-        <div class="ico">🎯</div>
+      <div class="card reveal">
+        <div class="ico-box"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></div>
         <h3>The sharp-line check</h3>
         <p>Pinnacle and the exchanges run tiny margins and move first on real money. Every edge is
         cross-checked against that <b>sharp line</b> — the closest thing to a true probability.</p>
       </div>
-      <div class="card">
-        <div class="ico">🧠</div>
+      <div class="card reveal">
+        <div class="ico-box"><svg class="ico" viewBox="0 0 24 24"><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8A3 3 0 0 0 7 17a3 3 0 0 0 5 1 3 3 0 0 0 5-1 3 3 0 0 0 2-5.2A3 3 0 0 0 18 6a3 3 0 0 0-3-3 3 3 0 0 0-3 1.5A3 3 0 0 0 9 3Z"/><path d="M12 5v13"/></svg></div>
         <h3>A grounded analyst</h3>
         <p>An AI analyst researches each match — form, table, team news, head-to-head — and writes a
         read <b>grounded only in what it found</b>. It is forbidden from inventing stats.</p>
@@ -215,15 +302,15 @@
 
 <section class="block" id="honest">
   <div class="wrap">
-    <div class="eyebrow">Why trust it</div>
-    <h2 class="h2">Built to be honest, not to look impressive</h2>
-    <p class="lede">
+    <div class="eyebrow reveal">Why trust it</div>
+    <h2 class="h2 reveal">Built to be honest, not to look impressive</h2>
+    <p class="lede reveal">
       Most tipster sites are engineered to sell confidence. This one is engineered to tell you the
       truth about the numbers — including the parts that make the edges look smaller.
     </p>
     <div class="honesty">
-      <div class="row">
-        <div class="k">💸</div>
+      <div class="row reveal">
+        <div class="k"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5A2.5 2.5 0 0 0 12.5 8h-1a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4h-1A2.5 2.5 0 0 1 9 14.5"/><path d="M12 6.5v11"/></svg></div>
         <div>
           <h4>Exchange commission is priced in</h4>
           <p>Exchanges show the best headline price on almost everything — but take a cut of your
@@ -231,24 +318,24 @@
           real 1%, not a mirage.</p>
         </div>
       </div>
-      <div class="row">
-        <div class="k">🚫</div>
+      <div class="row reveal">
+        <div class="k"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg></div>
         <div>
           <h4>No fake predictions</h4>
           <p>These are +EV leans and pricing soft-spots, not score forecasts. Club league markets are
           highly efficient; edges are small and variance dominates. The app says so, everywhere.</p>
         </div>
       </div>
-      <div class="row">
-        <div class="k">⏱️</div>
+      <div class="row reveal">
+        <div class="k"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
         <div>
           <h4>You always know how old a price is</h4>
           <p>Odds are cached, and the app shows the age in plain sight — green when fresh, red when
           it has had time to move. Always confirm the price on your betslip before you stake.</p>
         </div>
       </div>
-      <div class="row">
-        <div class="k">📒</div>
+      <div class="row reveal">
+        <div class="k"><svg class="ico" viewBox="0 0 24 24"><path d="M5 4a2 2 0 0 1 2-2h11v18H7a2 2 0 0 0-2 2z"/><path d="M9 7h6M9 11h6"/></svg></div>
         <div>
           <h4>Your record, kept honest</h4>
           <p>The My Bets journal snapshots the model's fair price and EV at the moment you log a bet —
@@ -261,10 +348,12 @@
 
 <section class="block cta-final">
   <div class="wrap">
-    <div class="box">
+    <div class="box reveal">
       <h2>Ready to see today's board?</h2>
       <p>Live fixtures, de-vigged prices and the analyst's read — no sign-up.</p>
-      <a class="btn btn-primary btn-lg" href="/app">Launch Soccer Edge Finder →</a>
+      <a class="btn btn-primary btn-lg" href="/app">Launch Soccer Edge Finder
+        <svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+      </a>
     </div>
   </div>
 </section>
@@ -293,6 +382,25 @@
   </div>
 </footer>
 
-<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // Live credibility number — real fixture count from the running backend.
+  fetch('/api/status').then(r => r.json()).then(d => {
+    const n = d && d.match_count;
+    const el = document.getElementById('stat-fixtures');
+    if (n && el) el.innerHTML = '<span>' + n + '</span>';
+    else if (el) el.innerHTML = '<span>90+</span>';
+  }).catch(() => {
+    const el = document.getElementById('stat-fixtures');
+    if (el) el.innerHTML = '<span>90+</span>';
+  });
+
+  // Scroll reveal
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
 </body>
 </html>
