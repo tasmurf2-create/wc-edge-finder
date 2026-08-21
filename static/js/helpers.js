@@ -113,26 +113,64 @@ function fmtAltitudeText(text) {
   return String(text || '').replace(/\b(\d{3,5})(?:\.0)?m\b/g, (_, n) => parseInt(n, 10).toLocaleString() + 'm');
 }
 
-// ---- team-name normalisation (mirror of Python prediction_markets.normalize_team) ----
+// ---- club-name normalisation ----
+// MUST stay in step with names.py — the server stores each analyst card under
+// BOTH its display label and the Python-normalised label, so if these two
+// disagree the frontend silently fails to match cards to fixtures.
+// names.py is the source of truth; mirror any change made there here.
+const _CLUB_AFFIXES = new Set([
+  "fc", "afc", "cf", "sc", "ac", "sd", "rcd", "cd", "ud", "rc", "club",
+  "calcio", "cp", "sad",
+]);
 const _TEAM_ALIASES = {
-  "usa": "united states", "us": "united states", "u s a": "united states",
-  "korea republic": "south korea", "korea": "south korea",
-  "republic of korea": "south korea",
-  "czech republic": "czechia",
-  "cote divoire": "ivory coast", "cote d ivoire": "ivory coast",
-  "ivory coast": "ivory coast",
-  "bosnia and herzegovina": "bosnia", "bosnia herzegovina": "bosnia",
-  "bosnia-herzegovina": "bosnia",
-  "cabo verde": "cape verde", "cape verde": "cape verde",
-  "turkey": "turkiye", "ir iran": "iran",
-  "curacao": "curacao",
-  "congo dr": "dr congo", "democratic republic of congo": "dr congo",
-  "democratic republic congo": "dr congo",
+  // Premier League
+  "man united": "manchester united", "man utd": "manchester united",
+  "manutd": "manchester united", "man u": "manchester united",
+  "man city": "manchester city", "mancity": "manchester city",
+  "tottenham": "tottenham hotspur", "spurs": "tottenham hotspur",
+  "wolves": "wolverhampton wanderers", "wolverhampton": "wolverhampton wanderers",
+  "brighton": "brighton and hove albion",
+  "brighton hove albion": "brighton and hove albion",
+  "newcastle": "newcastle united", "west ham": "west ham united",
+  "nottm forest": "nottingham forest", "forest": "nottingham forest",
+  "leeds": "leeds united", "leicester": "leicester city",
+  "ipswich": "ipswich town", "coventry": "coventry city", "hull": "hull city",
+  "sheffield utd": "sheffield united", "sheffield weds": "sheffield wednesday",
+  "palace": "crystal palace", "villa": "aston villa",
+  "west brom": "west bromwich albion", "wba": "west bromwich albion",
+  // La Liga
+  "atletico de madrid": "atletico madrid", "atleti": "atletico madrid",
+  "atl madrid": "atletico madrid", "club atletico de madrid": "atletico madrid",
+  "betis": "real betis", "real betis balompie": "real betis",
+  "athletic club": "athletic bilbao", "athletic club bilbao": "athletic bilbao",
+  "celta": "celta vigo", "celta de vigo": "celta vigo",
+  "alaves": "deportivo alaves", "sociedad": "real sociedad",
+  "real sociedad de futbol": "real sociedad",
+  "barca": "barcelona",
+  "ca osasuna": "osasuna", "club atletico osasuna": "osasuna",
+  "real mallorca": "mallorca", "espanyol barcelona": "espanyol",
+  "oviedo": "real oviedo", "rayo": "rayo vallecano",
+  "real racing club de santander": "racing santander",
+  "racing de santander": "racing santander", "real racing club": "racing santander",
+  "deportivo": "deportivo la coruna", "depor": "deportivo la coruna",
+  // Scottish Premiership
+  "hearts": "heart of midlothian", "hibs": "hibernian",
+  "saint johnstone": "st johnstone", "saint mirren": "st mirren",
+  "dundee utd": "dundee united", "county": "ross county",
+  "morton": "greenock morton", "queen park": "queens park",
 };
 function normalizeTeam(name) {
   if (!name) return "";
   let n = name.normalize("NFKD").replace(/\p{M}/gu, "");
+  // dots/apostrophes close up ("F.C." -> "fc"); other punctuation splits
+  n = n.replace(/[.'’]/g, "");
   n = n.replace(/[^a-z0-9 ]/gi, " ").toLowerCase().replace(/\s+/g, " ").trim();
+  let toks = n.split(" ").filter(Boolean);
+  const orig = toks.slice();
+  while (toks.length && _CLUB_AFFIXES.has(toks[0])) toks.shift();
+  while (toks.length && _CLUB_AFFIXES.has(toks[toks.length - 1])) toks.pop();
+  if (!toks.length) toks = orig;          // never normalise a name away to nothing
+  n = toks.join(" ");
   return _TEAM_ALIASES[n] ?? n;
 }
 function normalizeMatchLabel(label) {
