@@ -6,13 +6,14 @@
    ============================================================ */
 
 :root {
-  /* surfaces */
-  --bg-0: #0b0f15;      /* page */
-  --bg-1: #11161f;      /* raised surface (cards) */
-  --bg-2: #161d28;      /* card header / inset */
-  --bg-3: #1c2533;      /* hover / controls */
-  --line-1: #1d2632;    /* hairline inside cards */
-  --line-2: #28323f;    /* card borders, dividers */
+  /* surfaces — a mid-slate dark theme, clearly lifted off black so it reads
+     refined rather than gloomy. Cards sit well above the page so content floats. */
+  --bg-0: #171d28;      /* page */
+  --bg-1: #212936;      /* raised surface (cards) */
+  --bg-2: #2a3341;      /* card header / inset */
+  --bg-3: #35404f;      /* hover / controls */
+  --line-1: #2f3a49;    /* hairline inside cards */
+  --line-2: #3e4b5c;    /* card borders, dividers */
 
   /* text */
   --tx-1: #e9eef5;      /* primary */
@@ -67,7 +68,7 @@ a { color: var(--blue); }
 /* ---------- header ---------- */
 .app-header {
   height: var(--header-h);
-  background: rgba(13, 18, 26, 0.92);
+  background: rgba(31, 39, 51, 0.92);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line-2);
   display: flex; align-items: center; gap: var(--sp-4);
@@ -213,7 +214,7 @@ input[type="range"] { accent-color: var(--blue); }
 
 /* ---------- cards ---------- */
 .card {
-  background: linear-gradient(180deg, var(--bg-1), #0e131c);
+  background: linear-gradient(180deg, #273040, var(--bg-1));
   border: 1px solid var(--line-2);
   border-radius: var(--radius); overflow: hidden;
   box-shadow: 0 1px 2px rgba(0,0,0,.28), 0 14px 32px -22px rgba(0,0,0,.7);
@@ -581,7 +582,7 @@ tr:last-child td { border-bottom: none; }
   /* bottom navigation */
   .bottombar {
     display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
-    background: rgba(13, 18, 26, 0.97); backdrop-filter: blur(10px);
+    background: rgba(31, 39, 51, 0.97); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line-2); height: var(--bottomnav-h);
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -702,7 +703,7 @@ body { padding-bottom: 0; }
 .topbar {
   height: 60px;
   padding: 0 var(--sp-5);
-  background: linear-gradient(180deg, rgba(13,18,26,.94), rgba(11,15,21,.86));
+  background: linear-gradient(180deg, rgba(35,43,56,.92), rgba(23,29,40,.86));
 }
 
 /* per-view page identity (desktop only; mobile keeps the brand) */
@@ -742,7 +743,7 @@ body { padding-bottom: 0; }
 /* --- sidebar: subtle premium lift --- */
 @media (min-width: 900px) {
   .sidebar {
-    background: linear-gradient(180deg, #10151d 0%, var(--bg-1) 120px);
+    background: linear-gradient(180deg, #1e2734 0%, var(--bg-1) 130px);
     padding: 18px 12px;
   }
   .sidebar .brand { padding: 4px 8px 16px; margin-bottom: 8px; border-bottom: 1px solid var(--line-1); }

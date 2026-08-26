@@ -45,27 +45,41 @@ function renderToday() {
   if (!allMatches.length) { panel.innerHTML = _dataLoaded ? noOddsState() : skeletonCards(3); return; }
 
   const now = new Date();
-  let dayMatches = [], dayLabel = '';
 
-  for (let d = 0; d <= 6; d++) {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 0, 0, 0);
-    const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 23, 59, 59);
-    const from  = d === 0 ? now : start;   // today: from now, not midnight
-    dayMatches = allMatches.filter(m => { const k = new Date(m.commence); return k >= from && k <= end; });
-    if (dayMatches.length) {
-      dayLabel = d === 0 ? 'Today' : d === 1 ? 'Tomorrow'
-               : start.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-      break;
-    }
-  }
+  // League football plays a *round*, not a single day: a matchday is spread
+  // across a weekend (a Friday game, the bulk Sat/Sun, a Monday night) and
+  // sometimes a midweek Tue/Wed round. So anchor on the next upcoming fixture
+  // and show the whole cluster within a 4-day window from that day — not just
+  // one calendar day the way a one-match-a-day tournament would.
+  const upcoming = allMatches
+    .filter(m => new Date(m.commence) >= now)
+    .sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
 
-  if (!dayMatches.length) {
-    panel.innerHTML = emptyState('📅', 'No upcoming matches in the next 7 days',
-      `Browse <button class="linklike" onclick="switchView('markets')">Markets</button> for everything that's priced.`);
+  if (!upcoming.length) {
+    panel.innerHTML = emptyState('📅', 'No upcoming fixtures',
+      `The next round isn't priced yet. Browse <button class="linklike" onclick="switchView('markets')">Markets</button> for everything currently available.`);
     return;
   }
 
-  dayMatches.sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
+  const anchor    = new Date(upcoming[0].commence);
+  const roundEnd  = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 4, 0, 0, 0);
+  const dayMatches = upcoming.filter(m => new Date(m.commence) < roundEnd);
+
+  // Header label: a single day keeps Today/Tomorrow/weekday; a multi-day round
+  // shows the date span so "next round" reads honestly (e.g. Fri 29 – Mon 1 Sep).
+  const firstD = new Date(dayMatches[0].commence);
+  const lastD  = new Date(dayMatches[dayMatches.length - 1].commence);
+  const fmtD   = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const midnight = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  let dayLabel;
+  if (midnight(firstD) === midnight(lastD)) {
+    dayLabel = midnight(firstD) === midnight(now) ? 'Today'
+             : midnight(firstD) === midnight(tomorrow) ? 'Tomorrow'
+             : fmtD(firstD);
+  } else {
+    dayLabel = `Next round · ${fmtD(firstD)} – ${fmtD(lastD)}`;
+  }
   const logged = new Set(loadPlacedBets().map(b => b.match + '|' + b.outcome));
 
   const cards = dayMatches.map(match => {

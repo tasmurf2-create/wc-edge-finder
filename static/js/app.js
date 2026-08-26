@@ -16,7 +16,7 @@ const MORE_VIEWS = ['injuries', 'method', 'admin'];
 // Per-view identity shown in the top bar — turns each view into a titled page
 // rather than a bare content pane. Keeps the shell feeling like a product.
 const PAGE_META = {
-  today:    ['Today',        'Your next matchday at a glance'],
+  today:    ['Matchday',     'The next round of fixtures at a glance'],
   best:     ['Best Bets',    'Analyst-recommended picks, quality-scored'],
   markets:  ['Markets',      'Every priced outcome vs the sharp line'],
   mybets:   ['My Bets',      'Your journal — expected vs actual P&L'],
