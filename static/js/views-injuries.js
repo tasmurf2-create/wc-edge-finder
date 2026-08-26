@@ -32,8 +32,19 @@ function fmtInjuryDigest(text) {
 
 function renderInjuryTable() {
   const panel = document.getElementById('injuries-panel');
-  const items = _injuryInfo?.items || [];      // per-match: {match, league, commence, absences}
+  const rawItems = _injuryInfo?.items || [];   // per-match: {match, league, commence, absences}
   const leagueFilter = document.getElementById('inj-team-filter')?.value || '';
+
+  // The cache can hold one fixture under two label spellings (e.g. "Hearts" vs
+  // "Heart of Midlothian"), which otherwise shows the same match twice. Collapse
+  // by normalised fixture key, keeping the richer entry (longest team-news text).
+  const byFixture = new Map();
+  for (const it of rawItems) {
+    const key = normalizeMatchLabel((it.match || '').toLowerCase());
+    const cur = byFixture.get(key);
+    if (!cur || (it.absences || '').length > (cur.absences || '').length) byFixture.set(key, it);
+  }
+  const items = [...byFixture.values()];
 
   const leagues = [...new Set(items.map(i => i.league).filter(Boolean))].sort();
   const list = items.filter(i => !leagueFilter || i.league === leagueFilter);
