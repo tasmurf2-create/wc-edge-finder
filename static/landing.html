@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0b0f15">
+<meta name="theme-color" content="#12161d">
 <title>Soccer Edge Finder — de-vigged prices, sharp-line checked, analyst-backed</title>
 <meta name="description" content="A betting edge finder for club football across the Premier League, La Liga and the Scottish Premiership. De-vigged bookmaker prices, a sharp-line cross-check and a grounded AI analyst — with the maths kept honest.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230b0f15%27/%3E%3Ctext x=%2716%27 y=%2723%27 font-size=%2720%27 text-anchor=%27middle%27%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
@@ -13,19 +13,34 @@
 <style>
   *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg-0:#0b0f15; --bg-1:#11161f; --bg-2:#161d28; --bg-3:#1c2533;
-    --line-1:#1d2632; --line-2:#28323f;
+    --bg-0:#171d28; --bg-1:#212936; --bg-2:#2a3341; --bg-3:#35404f;
+    --line-1:#2f3a49; --line-2:#3e4b5c;
     --tx-1:#e9eef5; --tx-2:#aeb9c7; --tx-3:#7d8aa0; --tx-4:#59667a;
     --green:#3fcf6e; --green-dim:#2ea25b; --green-bg:#0e2417;
     --blue:#58a6ff; --amber:#e3a93c; --red:#f85149;
     --maxw:1080px;
   }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; background: #12161d; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-0); color: var(--tx-1);
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     line-height: 1.5; letter-spacing: -.006em; overflow-x: hidden;
+  }
+  /* Depth layer: soft aurora glows + a faint dot-grid on a viewport-fixed layer
+     behind all content, so the page reads as a lit, textured surface rather than
+     a flat dark void. A fixed element (not background-attachment:fixed) keeps it
+     smooth on mobile and reliable to paint. */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-color: var(--bg-0);
+    background-image:
+      radial-gradient(1000px 560px at 50% -6%, rgba(63,207,110,.18), transparent 60%),
+      radial-gradient(820px 560px at 98% -2%, rgba(88,166,255,.12), transparent 56%),
+      radial-gradient(760px 680px at 2% 16%, rgba(63,207,110,.09), transparent 58%),
+      radial-gradient(rgba(154,174,204,.05) 1px, transparent 1.5px);
+    background-size: auto, auto, auto, 24px 24px;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   }
   a { color: inherit; text-decoration: none; }
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
@@ -36,7 +51,7 @@
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; justify-content: space-between;
     height: 62px; padding: 0 24px;
-    background: rgba(11,15,21,.8); backdrop-filter: blur(12px);
+    background: rgba(23,29,40,.72); backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line-2);
   }
   .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; letter-spacing: -.02em; }
@@ -138,7 +153,7 @@
   .lede { text-align: center; color: var(--tx-2); max-width: 640px; margin: 0 auto 48px; font-size: 16px; line-height: 1.65; }
 
   .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
-  .card { background: linear-gradient(180deg, var(--bg-1), #0e131c); border: 1px solid var(--line-2); border-radius: 15px; padding: 26px; transition: .2s; }
+  .card { background: linear-gradient(180deg, #273040, var(--bg-1)); border: 1px solid var(--line-2); border-radius: 15px; padding: 26px; transition: .2s; }
   .card:hover { border-color: #33465a; transform: translateY(-3px); box-shadow: 0 18px 40px -20px rgba(0,0,0,.6); }
   .card .ico-box { width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 16px; color: var(--green); background: var(--green-bg); border: 1px solid rgba(63,207,110,.24); }
   .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
