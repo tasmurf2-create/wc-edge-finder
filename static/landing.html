@@ -137,6 +137,23 @@
   .ev .ret { margin-left: auto; font-size: 12px; color: var(--tx-2); }
   .ev .ret b { color: var(--tx-1); }
 
+  /* second floating screen — the analyst read, tilted behind the value single */
+  .preview .browser { z-index: 2; }
+  .float-card {
+    position: absolute; z-index: 1; top: -34px; right: -42px; width: 300px;
+    text-align: left; padding: 15px 17px; border-radius: 14px;
+    background: linear-gradient(180deg, #273040, var(--bg-1));
+    border: 1px solid var(--line-2);
+    box-shadow: 0 28px 62px -26px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.02);
+    transform: rotate(4.5deg);
+  }
+  .fc-head { display: flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 700; color: var(--tx-2); margin-bottom: 11px; }
+  .fc-badge { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--green); background: var(--green-bg); border: 1px solid var(--green-dim); border-radius: 999px; padding: 3px 9px; }
+  .fc-quote { font-size: 12.5px; line-height: 1.55; color: var(--tx-2); margin-bottom: 13px; }
+  .fc-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fc-chip { font-size: 10.5px; font-weight: 600; color: var(--tx-3); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 999px; padding: 3px 9px; }
+  .fc-conf { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--green); }
+
   /* CREDIBILITY STRIP */
   .cred { border-top: 1px solid var(--line-1); border-bottom: 1px solid var(--line-1); background: var(--bg-1); }
   .cred .wrap { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; padding: 26px 24px; }
@@ -205,6 +222,7 @@
     footer .cols { flex-direction: column; }
     .stat + .stat { border-left: none; padding-left: 0; }
     .metrics { gap: 12px; }
+    .float-card { display: none; }   /* would poke off-screen on a phone */
   }
 </style>
 </head>
@@ -240,6 +258,16 @@
     <!-- Product preview: a faithful CSS recreation of a real Value Single card -->
     <div class="preview-cap">A live value single, exactly as the dashboard shows it</div>
     <div class="preview" aria-label="Soccer Edge Finder dashboard preview">
+      <!-- second floating screen: the analyst read, peeking behind the value single -->
+      <div class="float-card" aria-hidden="true">
+        <div class="fc-head"><span class="fc-badge">Analyst</span>Aston Villa vs Arsenal</div>
+        <p class="fc-quote">"Villa unbeaten at home in six; Arsenal without two first-choice centre-backs. The price on Villa's draw-no-bet drifts past fair."</p>
+        <div class="fc-foot">
+          <span class="fc-chip">Team news ✓</span>
+          <span class="fc-chip">Form ✓</span>
+          <span class="fc-conf">High confidence</span>
+        </div>
+      </div>
       <div class="browser">
         <div class="app">
           <div class="app-top">
