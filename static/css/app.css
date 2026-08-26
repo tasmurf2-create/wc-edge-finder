@@ -691,3 +691,77 @@ body { padding-bottom: 0; }
   .bottombar { display: none; }
   #views { padding-bottom: 28px; }
 }
+
+/* ============================================================
+   SHELL POLISH — page identity, status pill, refined depth.
+   Appended last: authoritative over the base shell rules.
+   Purely presentational; no layout/logic dependencies.
+   ============================================================ */
+
+/* --- top bar: a little more presence, a real page header --- */
+.topbar {
+  height: 60px;
+  padding: 0 var(--sp-5);
+  background: linear-gradient(180deg, rgba(13,18,26,.94), rgba(11,15,21,.86));
+}
+
+/* per-view page identity (desktop only; mobile keeps the brand) */
+.topbar-title { display: none; flex-direction: column; gap: 1px; line-height: 1.22; min-width: 0; }
+.topbar-title__name { font-size: 1.02rem; font-weight: 750; letter-spacing: -0.02em; color: var(--tx-1); }
+.topbar-title__sub { font-size: var(--fs-xs); color: var(--tx-3); font-weight: 450; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 900px) { .topbar-title { display: flex; } }
+
+/* odds-age: promote to a status pill so freshness reads at a glance */
+.updated-stamp {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--bg-2); border: 1px solid var(--line-2);
+  color: var(--tx-2); font-weight: 550; font-variant-numeric: tabular-nums;
+}
+.updated-stamp .live-dot {
+  width: 7px; height: 7px; margin-right: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent);
+}
+.stamp--fresh { border-color: #1d5733; }
+.stamp--fresh .live-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.stamp--aging { border-color: #5d4715; }
+.stamp--aging .live-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+.stamp--stale { border-color: #6e2a26; }
+.stamp--stale .live-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+
+/* search field: quieter until focused, matches the pill language */
+#team-search {
+  background: var(--bg-2); border-radius: 999px; padding-left: 14px;
+  transition: border-color .12s, background .12s, width .18s ease;
+}
+#team-search:focus { background: var(--bg-1); }
+
+/* refresh button in the top bar: cleaner, aligned to the pill row */
+.topbar-actions .btn--sm { border-radius: 999px; }
+
+/* --- sidebar: subtle premium lift --- */
+@media (min-width: 900px) {
+  .sidebar {
+    background: linear-gradient(180deg, #10151d 0%, var(--bg-1) 120px);
+    padding: 18px 12px;
+  }
+  .sidebar .brand { padding: 4px 8px 16px; margin-bottom: 8px; border-bottom: 1px solid var(--line-1); }
+}
+.brand__mark {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: linear-gradient(150deg, #1a2d20, #0d1712);
+  border: 1px solid #263a2c;
+  box-shadow: 0 2px 8px -2px rgba(63,207,110,.35), inset 0 1px 0 rgba(255,255,255,.05);
+}
+/* active nav row: a quiet accent bar reads more "app" than a flat fill */
+.nav-btn.active {
+  background: var(--bg-2);
+  box-shadow: inset 2px 0 0 var(--green), 0 1px 2px rgba(0,0,0,.2);
+}
+
+/* --- cards: crisper edge + a touch more depth --- */
+.card {
+  border-color: var(--line-2);
+  box-shadow: 0 1px 1px rgba(0,0,0,.3), 0 18px 40px -28px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.02);
+}
+.section-title { letter-spacing: -0.015em; }

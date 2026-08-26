@@ -13,6 +13,26 @@
 const VIEWS = ['today', 'best', 'markets', 'mybets', 'injuries', 'method', 'admin'];
 const MORE_VIEWS = ['injuries', 'method', 'admin'];
 
+// Per-view identity shown in the top bar — turns each view into a titled page
+// rather than a bare content pane. Keeps the shell feeling like a product.
+const PAGE_META = {
+  today:    ['Today',        'Your next matchday at a glance'],
+  best:     ['Best Bets',    'Analyst-recommended picks, quality-scored'],
+  markets:  ['Markets',      'Every priced outcome vs the sharp line'],
+  mybets:   ['My Bets',      'Your journal — expected vs actual P&L'],
+  injuries: ['Team News',    'Confirmed absences the analyst reasons from'],
+  method:   ['Methodology',  'How every number on this site is computed'],
+  admin:    ['Admin',        'Owner-only diagnostics'],
+};
+
+function setPageMeta(view) {
+  const meta = PAGE_META[view] || PAGE_META.today;
+  const n = document.getElementById('topbar-title-name');
+  const s = document.getElementById('topbar-title-sub');
+  if (n) n.textContent = meta[0];
+  if (s) s.textContent = meta[1];
+}
+
 let currentView = 'today';
 let bestSubTab = 'picks';       // 'picks' | 'writeups'
 let marketsSubTab = 'singles';  // 'singles' | 'accas' | 'builder' | 'divergence'
@@ -24,6 +44,7 @@ function switchView(view) {
 
   document.querySelectorAll('.view').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + view)?.classList.add('active');
+  setPageMeta(view);
 
   // nav highlighting (desktop top nav + mobile bottom bar + More entries)
   const isMore = MORE_VIEWS.includes(view);
